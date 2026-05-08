@@ -21,6 +21,7 @@ export default function DocumentsPage() {
   const [loadingDocuments, setLoadingDocuments] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
 
   async function readDocuments(signal?: AbortSignal) {
     const res = await fetch(`${API}/documents`, { signal });
@@ -106,6 +107,7 @@ export default function DocumentsPage() {
   }
 
   async function deleteDocument(documentId: string) {
+    setConfirmingId(null);   // clear confirmation before starting
     setDeletingId(documentId);
     setStatus(null);
     try {
@@ -223,14 +225,34 @@ export default function DocumentsPage() {
                       {Math.ceil(doc.size_bytes / 1024)} KB
                     </td>
                     <td className="p-2 text-right">
-                      <button
-                        type="button"
-                        onClick={() => void deleteDocument(doc.document_id)}
-                        disabled={deletingId === doc.document_id}
-                        className="border rounded px-2 py-1 text-xs text-red-700 hover:bg-red-50 disabled:opacity-50"
-                      >
-                        {deletingId === doc.document_id ? "Deleting..." : "Delete"}
-                      </button>
+                      {confirmingId === doc.document_id ? (
+                        <span className="flex justify-end gap-1">
+                          <button
+                            type="button"
+                            onClick={() => void deleteDocument(doc.document_id)}
+                            disabled={deletingId === doc.document_id}
+                            className="border rounded px-2 py-1 text-xs text-red-700 bg-red-50 hover:bg-red-100 disabled:opacity-50"
+                          >
+                            {deletingId === doc.document_id ? "Deleting..." : "Confirm?"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setConfirmingId(null)}
+                            className="border rounded px-2 py-1 text-xs text-gray-500 hover:bg-gray-50"
+                          >
+                            Cancel
+                          </button>
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setConfirmingId(doc.document_id)}
+                          disabled={deletingId !== null}
+                          className="border rounded px-2 py-1 text-xs text-red-700 hover:bg-red-50 disabled:opacity-50"
+                        >
+                          Delete
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}
