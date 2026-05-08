@@ -1,0 +1,26 @@
+# Core retrieval
+r2r
+
+# Evaluation
+ragas
+langchain-openai
+datasets
+pandas
+
+# API layer
+fastapi
+uvicorn[standard]
+python-dotenv
+pydantic
+httpx
+
+# Ingestion parsers
+pdfplumber
+pytesseract
+camelot-py
+
+# Workflows
+langgraph
+
+# Utilities
+pyyaml

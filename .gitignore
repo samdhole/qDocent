@@ -1,0 +1,40 @@
+# Environment
+.env
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Lock files
+requirements-lock.txt
+requirements-lock-local.txt
+uv.lock
+
+# Data
+data/do_not_commit/
+data/sample_docs/*.pdf
+data/sample_docs/*.docx
+
+# Reports with sensitive content
+reports/private/
+
+# R2R upstream clone
+external/
+
+# Node
+node_modules/
+apps/web/.next/
+apps/web/out/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+
+# Pytest
+.pytest_cache/
