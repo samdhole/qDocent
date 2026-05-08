@@ -1,6 +1,8 @@
 export type Citation = {
+  document_id?: string;
   document: string;
   page?: number;
+  page_end?: number;
   section?: string;
   chunk_id?: string;
 };
@@ -27,4 +29,28 @@ export type AskResponse = {
   figures: FigureAsset[];
   confidence_label: "high" | "medium" | "low" | "needs_review";
   needs_human_review: boolean;
+};
+
+export type WorkflowResponse = {
+  customer_message: string;
+  intent: string;
+  retrieved_contexts: RetrievedContext[];
+  draft_response: string;
+  citations: Citation[];
+  confidence_label: "high" | "medium" | "low" | "needs_review";
+  requires_human_approval: boolean;
+  final_response: string;
+};
+
+export type IngestJob = {
+  job_id: string;
+  filename: string;
+  status: "queued" | "running" | "completed" | "failed";
+  created_at: string;
+  updated_at: string;
+  result?: {
+    document_id?: string;
+    source_url?: string;
+  } | null;
+  error?: string | null;
 };

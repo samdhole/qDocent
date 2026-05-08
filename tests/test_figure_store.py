@@ -135,6 +135,24 @@ class TestFiguresForResponse:
         assert len(result) == 1
         assert result[0]["figure_id"] == "doc_p001_fig001_01"
 
+    def test_stage1_ignores_low_score_incidental_figure_context(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        """Low-score figure sidecar hits do not surface unrelated figures."""
+        figures_dir = tmp_path / "figures"
+        monkeypatch.setattr(figure_store_mod, "FIGURES_DIR", figures_dir)
+        fig = _figure("doc_p001_fig001_01", source_file="report.pdf", page_number=1)
+        _write_fixture_figures(figures_dir, "doc", [fig])
+
+        result = figures_for_response(
+            citations=[],
+            retrieved_contexts=[
+                {"text": "## Figure ID: doc_p001_fig001_01\nContent type: figure\nPage: 1", "score": 0.45}
+            ],
+        )
+
+        assert result == []
+
     def test_stage1_multiple_ids_in_single_chunk(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         """Multiple Figure IDs in one retrieved context chunk are all matched."""
         figures_dir = tmp_path / "figures"

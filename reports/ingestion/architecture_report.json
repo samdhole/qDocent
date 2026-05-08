@@ -1,0 +1,11 @@
+{
+  "document_id": "architecture_report",
+  "document_type": "general",
+  "parser_used": "fast_text",
+  "pages": 1,
+  "chunks": 1,
+  "tables_detected": 0,
+  "figures_detected": 1,
+  "low_confidence_pages": [],
+  "citation_coverage_estimate": 1.0
+}

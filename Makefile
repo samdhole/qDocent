@@ -1,4 +1,4 @@
-.PHONY: setup r2r api web smoke ingest eval clean
+.PHONY: setup r2r api web smoke ingest eval demo-check clean
 
 setup:
 	uv venv .venv
@@ -22,6 +22,9 @@ ingest:
 eval:
 	mkdir -p reports/evals
 	uv run python scripts/eval_ragas.py
+
+demo-check:
+	uv run python scripts/demo_readiness.py
 
 clean:
 	rm -rf .pytest_cache

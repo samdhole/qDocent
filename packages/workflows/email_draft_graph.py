@@ -52,19 +52,35 @@ def retrieve_policy(state: SupportState) -> SupportState:
     return {**state, "retrieved_contexts": contexts, "citations": citations}
 
 
+def _fallback_email_draft(customer_message: str, contexts: list[dict[str, Any]]) -> str:
+    policy_context = contexts[0]["text"] if contexts else "No matching policy context was found."
+    return (
+        "Subject: Follow-up on your request\n\n"
+        "Hello,\n\n"
+        "Thanks for reaching out. I reviewed the available policy context for your request:\n\n"
+        f"{policy_context}\n\n"
+        "Based on that context, I would reply carefully and ask a teammate to confirm before sending.\n\n"
+        f"Customer message: {customer_message}\n\n"
+        "Best,\nSupport Team"
+    )
+
+
 def draft_email(state: SupportState) -> SupportState:
     """Draft a polite email response using LLM. Always sets approval required."""
     context_text = "\n".join(c["text"] for c in state["retrieved_contexts"][:3])
-    llm = ChatGoogleGenerativeAI(model=_LLM_MODEL, temperature=0.3)
-    prompt = (
-        f"You are a helpful support agent. Draft a polite, professional email response "
-        f"to this customer message. Use only the policy context provided.\n\n"
-        f"Customer message: {state['customer_message']}\n\n"
-        f"Policy context:\n{context_text or 'No policy context found.'}\n\n"
-        f"Draft email (subject and body):"
-    )
-    raw = llm.invoke(prompt).content
-    draft = (raw[0].get("text", "") if isinstance(raw, list) else raw).strip()
+    if os.getenv("GOOGLE_API_KEY"):
+        llm = ChatGoogleGenerativeAI(model=_LLM_MODEL, temperature=0.3)
+        prompt = (
+            f"You are a helpful support agent. Draft a polite, professional email response "
+            f"to this customer message. Use only the policy context provided.\n\n"
+            f"Customer message: {state['customer_message']}\n\n"
+            f"Policy context:\n{context_text or 'No policy context found.'}\n\n"
+            f"Draft email (subject and body):"
+        )
+        raw = llm.invoke(prompt).content
+        draft = (raw[0].get("text", "") if isinstance(raw, list) else raw).strip()
+    else:
+        draft = _fallback_email_draft(state["customer_message"], state["retrieved_contexts"])
     confidence = "medium" if state["retrieved_contexts"] else "low"
     return {
         **state,

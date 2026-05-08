@@ -38,6 +38,7 @@ def figures_for_response(
     citations: list[dict[str, Any]],
     retrieved_contexts: list[dict[str, Any]],
     limit: int = 6,
+    stage1_min_score: float = 0.5,
 ) -> list[dict[str, Any]]:
     """Return figures relevant to a RAG response, capped at limit.
 
@@ -56,6 +57,8 @@ def figures_for_response(
     # Figure IDs past position 400 will be silently missed. Stage 2 (page-match) is the
     # load-bearing primary path for general queries; Stage 1 is best-effort for explicit refs.
     for ctx in retrieved_contexts:
+        if (ctx.get("score") or 0.0) < stage1_min_score:
+            continue
         text = ctx.get("text", "")
         for fig_id in _FIGURE_ID_RE.findall(text):
             if fig_id in by_id:

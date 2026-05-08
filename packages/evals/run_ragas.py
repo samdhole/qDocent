@@ -16,7 +16,7 @@ from ragas import evaluate
 from ragas.embeddings import LangchainEmbeddingsWrapper
 from ragas.integrations.r2r import transform_to_ragas_dataset
 from ragas.llms import LangchainLLMWrapper
-from ragas.metrics import AnswerRelevancy, ContextPrecision, Faithfulness
+from ragas.metrics import AnswerRelevancy, Faithfulness, LLMContextPrecisionWithReference
 
 
 def load_dataset(path: Path) -> tuple[list[str], list[str], list[str]]:
@@ -61,10 +61,15 @@ def run_eval(
     evaluator_embeddings = LangchainEmbeddingsWrapper(
         GoogleGenerativeAIEmbeddings(model=embedding_model)
     )
-    metrics = [
-        AnswerRelevancy(llm=evaluator_llm, embeddings=evaluator_embeddings),
-        ContextPrecision(llm=evaluator_llm),
-        Faithfulness(llm=evaluator_llm),
-    ]
+    metrics = build_metrics(llm=evaluator_llm, embeddings=evaluator_embeddings)
 
     return evaluate(dataset=dataset, metrics=metrics)
+
+
+def build_metrics(*, llm: Any, embeddings: Any) -> list[Any]:
+    """Build RAGAS metrics compatible with LangChain-backed Gemini evaluators."""
+    return [
+        AnswerRelevancy(llm=llm, embeddings=embeddings),
+        LLMContextPrecisionWithReference(llm=llm, name="context_precision"),
+        Faithfulness(llm=llm),
+    ]

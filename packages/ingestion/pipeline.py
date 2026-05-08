@@ -29,12 +29,12 @@ def run_pipeline(
     avoid temp paths appearing in figure records and quality reports.
 
     Returns the quality report dict plus figures and chunk metadata.
-    Chunks are not sent to R2R here — that is done by the caller after this
-    function returns.
+    R2R ingestion is done by the caller after this function returns.
 
-    NOTE: Chunks are produced for quality reporting and citation metadata extraction.
-    The raw PDF file is sent to R2R separately via ingest_file() — R2R performs its own
-    chunking for retrieval. Pre-chunked ingestion via R2R SDK is a Phase 4 enhancement.
+    NOTE: The API sends these chunks to R2R's pre-chunked ingest path with a
+    citation header embedded in each chunk, preserving DocQuery source/page metadata
+    through retrieval. If this pipeline fails or emits no chunks, the caller can still
+    fall back to raw-file ingestion.
     """
     path = Path(pdf_path)
     doc_id = document_id or path.stem

@@ -16,6 +16,7 @@ data/do_not_commit/
 data/sample_docs/*.pdf
 data/sample_docs/*.docx
 data/figures/
+data/documents/
 
 # Reports with sensitive content
 reports/private/
@@ -50,3 +51,4 @@ docs/
 .gitignore
 .claude/
 **/CLAUDE.md
+**/AGENTS.md

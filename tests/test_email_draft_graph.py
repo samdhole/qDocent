@@ -18,6 +18,34 @@ class TestEmailDraftWorkflow:
 
     @mock.patch("packages.workflows.email_draft_graph.R2RClient")
     @mock.patch("packages.workflows.email_draft_graph.ChatGoogleGenerativeAI")
+    def test_email_draft_without_api_key_uses_deterministic_fallback(
+        self,
+        mock_llm_class,
+        mock_r2r_class,
+        monkeypatch,
+    ):
+        """Email draft remains demoable without a Gemini API key."""
+        monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
+        mock_search_result = mock.Mock()
+        mock_search_result.text = "Refunds are available within 30 days of purchase."
+        mock_search_result.score = 0.86
+        mock_search_result.metadata = {"source_file": "policy.pdf"}
+
+        mock_r2r = mock.Mock()
+        mock_r2r.retrieval.rag.return_value = _make_r2r_response([mock_search_result])
+        mock_r2r_class.return_value = mock_r2r
+
+        result = run_email_draft("Please draft a refund reply")
+
+        mock_llm_class.assert_not_called()
+        assert "Subject:" in result["draft_response"]
+        assert "Please draft a refund reply" in result["draft_response"]
+        assert "30 days" in result["draft_response"]
+        assert result["requires_human_approval"] is True
+        assert result["final_response"] == "[Awaiting human approval before sending email]"
+
+    @mock.patch("packages.workflows.email_draft_graph.R2RClient")
+    @mock.patch("packages.workflows.email_draft_graph.ChatGoogleGenerativeAI")
     def test_email_draft_always_requires_approval(self, mock_llm_class, mock_r2r_class):
         """Email draft always returns requires_human_approval=True."""
         mock_search_result = mock.Mock()

@@ -17,12 +17,18 @@ export default function AnswerCard({ result }: Props) {
   const isLowConfidenceNoContext =
     result.confidence_label === "low" && result.retrieved_contexts.length === 0;
 
+  function sourceHref(documentId: string, page?: number) {
+    return `${API}/documents/${encodeURIComponent(documentId)}/source${
+      page != null ? `#page=${page}` : ""
+    }`;
+  }
+
   return (
     <div className="space-y-4">
       {isLowConfidenceNoContext && (
         <div className="border border-amber-300 rounded p-3 bg-amber-50">
           <p className="text-sm text-amber-700">
-            ⚠ This question could not be answered from the available documents.
+            This question could not be answered from the available documents.
             The information may not be in the ingested content.
           </p>
         </div>
@@ -39,7 +45,7 @@ export default function AnswerCard({ result }: Props) {
           {result.confidence_label}
         </span>
         {result.needs_human_review && (
-          <p className="text-xs text-orange-700 mt-1">⚠ Human review recommended</p>
+          <p className="text-xs text-orange-700 mt-1">Human review recommended</p>
         )}
       </div>
 
@@ -47,12 +53,27 @@ export default function AnswerCard({ result }: Props) {
         <div className="border rounded p-4">
           <p className="text-sm font-semibold text-gray-500 mb-2">Citations</p>
           <ul className="text-xs space-y-1">
-            {result.citations.map((c, i) => (
-              <li key={c.chunk_id ?? i}>
-                {c.document} {c.page != null ? `· p.${c.page}` : ""}{" "}
-                {c.section ? `· ${c.section}` : ""}
-              </li>
-            ))}
+            {result.citations.map((c, i) => {
+              const label = `${c.document}${
+                c.page != null ? ` · p.${c.page}` : ""
+              }${c.section ? ` · ${c.section}` : ""}`;
+              return (
+                <li key={c.chunk_id ?? i}>
+                  {c.document_id ? (
+                    <a
+                      href={sourceHref(c.document_id, c.page)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-blue-700 hover:underline"
+                    >
+                      {label}
+                    </a>
+                  ) : (
+                    label
+                  )}
+                </li>
+              );
+            })}
           </ul>
         </div>
       )}

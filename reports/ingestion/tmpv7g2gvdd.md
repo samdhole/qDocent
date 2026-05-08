@@ -1,4 +1,4 @@
-# Ingestion Quality Report: original_upload.pdf
+# Ingestion Quality Report: architecture_report.pdf
 
 ## Summary
 
@@ -8,7 +8,7 @@
 | Parser Used | fast_text |
 | Chunks Created | 1 |
 | Tables Detected | 0 |
-| Figures Detected | 0 |
+| Figures Detected | 1 |
 | Low-Confidence Pages | None |
 | Citation Coverage Estimate | 100% |
 

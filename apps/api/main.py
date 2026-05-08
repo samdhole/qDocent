@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from apps.api.routes import ask, evals, ingest, reports, workflows
+from apps.api.routes import ask, documents, evals, ingest, reports, workflows
 
 app = FastAPI(
     title="DocQuery API",
@@ -21,6 +21,7 @@ app.add_middleware(
 )
 
 app.include_router(ask.router)
+app.include_router(documents.router)
 app.include_router(ingest.router)
 app.include_router(evals.router)
 app.include_router(reports.router)

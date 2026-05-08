@@ -96,3 +96,46 @@ class TestIngestRoute:
         mock_ingest.assert_called_once()
         _, kwargs = mock_ingest.call_args
         assert kwargs.get("original_filename") == "my_report.pdf"
+
+    @mock.patch("apps.api.services.r2r_client.ingest_file_with_pipeline")
+    def test_post_ingest_job_returns_completed_job(self, mock_ingest, client, sample_pdf):
+        """POST /ingest/jobs returns a tracked async ingest job."""
+        mock_ingest.return_value = {
+            "r2r": "ok",
+            "quality_report": None,
+            "document_id": "job_doc",
+            "figures": [],
+            "figures_r2r": None,
+        }
+
+        response = client.post(
+            "/ingest/jobs",
+            files={"file": ("job.pdf", sample_pdf, "application/pdf")},
+        )
+
+        assert response.status_code == 202
+        data = response.json()
+        assert data["status"] in {"queued", "running", "completed"}
+        assert data["job_id"]
+
+        job_response = client.get(f"/ingest/jobs/{data['job_id']}")
+        assert job_response.status_code == 200
+        job = job_response.json()
+        assert job["status"] == "completed"
+        assert job["result"]["document_id"] == "job_doc"
+
+    def test_post_ingest_job_non_pdf_rejected(self, client):
+        """POST /ingest/jobs with non-PDF returns 400."""
+        response = client.post(
+            "/ingest/jobs",
+            files={"file": ("test.txt", BytesIO(b"text content"), "text/plain")},
+        )
+
+        assert response.status_code == 400
+        assert "Only PDF" in response.json()["detail"]
+
+    def test_get_ingest_job_missing_returns_404(self, client):
+        """GET /ingest/jobs/{job_id} returns 404 for unknown jobs."""
+        response = client.get("/ingest/jobs/not-a-real-job")
+
+        assert response.status_code == 404

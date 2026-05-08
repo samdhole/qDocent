@@ -7,27 +7,29 @@ const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 export default function AskForm() {
   const [question, setQuestion] = useState("");
-  const [result, setResult] = useState<AskResponse | null>(null);
+  const [results, setResults] = useState<AskResponse[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!question.trim()) return;
+    const submittedQuestion = question.trim();
     setLoading(true);
     setError(null);
-    setResult(null);
     try {
       const res = await fetch(`${API}/ask`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question }),
+        body: JSON.stringify({ question: submittedQuestion }),
       });
       if (!res.ok) {
         const err = await res.json();
         throw new Error(err.detail ?? "Request failed");
       }
-      setResult(await res.json());
+      const nextResult = await res.json();
+      setResults((current) => [nextResult, ...current]);
+      setQuestion("");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Unknown error");
     } finally {
@@ -53,7 +55,17 @@ export default function AskForm() {
         </button>
       </form>
       {error && <p className="text-red-600 text-sm mb-4">{error}</p>}
-      {result && <AnswerCard result={result} />}
+      <div className="space-y-6">
+        {results.map((result, i) => (
+          <section key={`${result.question}-${i}`} className="space-y-2">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+              Question
+            </p>
+            <p className="text-sm">{result.question}</p>
+            <AnswerCard result={result} />
+          </section>
+        ))}
+      </div>
     </div>
   );
 }
