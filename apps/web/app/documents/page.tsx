@@ -92,36 +92,47 @@ export default function DocumentsPage() {
     const maxAttempts = 90;
     for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
       if (signal.aborted) return;
-      const res = await fetch(`${API}/ingest/jobs/${jobId}`, { signal }).catch(() => null);
-      if (res === null || signal.aborted) return;
-      const nextJob = await res.json();
-      if (signal.aborted) return;
-      if (!res.ok) {
-        setStatus(`Error: ${nextJob.detail ?? "Could not load ingest job."}`);
+      try {
+        const res = await fetch(`${API}/ingest/jobs/${jobId}`, { signal });
+        if (signal.aborted) return;
+        const nextJob = await res.json();
+        if (signal.aborted) return;
+        if (!res.ok) {
+          setStatus(`Error: ${nextJob.detail ?? "Could not load ingest job."}`);
+          setUploading(false);
+          return;
+        }
+        setJob(nextJob);
+        if (nextJob.status === "completed") {
+          setStatus(`Ingested document ID: ${nextJob.result?.document_id ?? "OK"}`);
+          setSourceUrl(nextJob.result?.source_url ? `${API}${nextJob.result.source_url}` : null);
+          await loadDocuments();
+          setUploading(false);
+          return;
+        }
+        if (nextJob.status === "failed") {
+          setStatus(`Error: ${nextJob.error ?? "Ingest failed."}`);
+          setUploading(false);
+          return;
+        }
+        await new Promise<void>((resolve) => {
+          const onAbort = () => {
+            signal.removeEventListener("abort", onAbort);
+            clearTimeout(timer);
+            resolve();
+          };
+          const timer = setTimeout(() => {
+            signal.removeEventListener("abort", onAbort);
+            resolve();
+          }, 1000);
+          signal.addEventListener("abort", onAbort);
+        });
+      } catch (err) {
+        if (err instanceof Error && err.name === "AbortError") return;
+        setStatus(`Error polling ingest job: ${String(err)}`);
         setUploading(false);
         return;
       }
-      setJob(nextJob);
-      if (nextJob.status === "completed") {
-        setStatus(`Ingested document ID: ${nextJob.result?.document_id ?? "OK"}`);
-        setSourceUrl(nextJob.result?.source_url ? `${API}${nextJob.result.source_url}` : null);
-        await loadDocuments();
-        setUploading(false);
-        return;
-      }
-      if (nextJob.status === "failed") {
-        setStatus(`Error: ${nextJob.error ?? "Ingest failed."}`);
-        setUploading(false);
-        return;
-      }
-      await new Promise<void>((resolve) => {
-        const onAbort = () => { clearTimeout(timer); resolve(); };
-        const timer = setTimeout(() => {
-          signal.removeEventListener("abort", onAbort);
-          resolve();
-        }, 1000);
-        signal.addEventListener("abort", onAbort);
-      });
     }
     setStatus("Ingest is still running. Refresh stored sources in a moment.");
     setUploading(false);
