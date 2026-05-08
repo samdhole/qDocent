@@ -2,7 +2,6 @@
 from pathlib import Path
 from unittest.mock import patch
 import tempfile
-import pytest
 from apps.api.services.report_writer import latest_eval_results
 
 
