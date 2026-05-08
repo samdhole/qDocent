@@ -1,12 +1,15 @@
 """R2R SDK wrapper — the only place in apps/api/ that imports r2r."""
 from __future__ import annotations
 
+import logging
 import os
 from typing import Any
 
 import httpx
 from dotenv import load_dotenv
 from r2r import R2RClient
+
+from packages.ingestion.pipeline import run_pipeline
 
 load_dotenv()
 
@@ -109,12 +112,13 @@ def ingest_file(file_path: str) -> Any:
 def ingest_file_with_pipeline(file_path: str) -> dict:
     """Run Phase 3 ingestion pipeline, then ingest the original file into R2R.
 
+    The pipeline produces quality reports and citation metadata for auditing and
+    transparency. The raw PDF file is ingested separately into R2R, which performs
+    its own chunking and vector embedding for retrieval.
+
     Returns combined result: R2R response + quality report.
     Gracefully falls back to plain R2R ingestion if pipeline fails.
     """
-    import logging
-    from packages.ingestion.pipeline import run_pipeline
-
     log = logging.getLogger(__name__)
     pipeline_result: dict = {}
     try:
