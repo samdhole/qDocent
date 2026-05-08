@@ -65,10 +65,11 @@ def test_list_documents_returns_stored_source_pdfs(
     ]
 
 
+@mock.patch("apps.api.routes.documents.r2r_client.delete_r2r_documents")
 def test_delete_document_removes_stored_source_pdf(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, client: TestClient
+    mock_delete_r2r, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, client: TestClient
 ):
-    """DELETE /documents/{document_id} removes local source storage."""
+    """DELETE /documents/{document_id} removes local source storage; no R2R call without manifest."""
     monkeypatch.setattr(document_store_mod, "DOCUMENTS_DIR", tmp_path / "documents")
     doc_dir = tmp_path / "documents" / "doc123"
     doc_dir.mkdir(parents=True)
@@ -83,6 +84,7 @@ def test_delete_document_removes_stored_source_pdf(
         "r2r_delete": {"deleted": [], "failed": []},
     }
     assert not doc_dir.exists()
+    mock_delete_r2r.assert_not_called()
 
 
 @mock.patch("apps.api.routes.documents.r2r_client.delete_r2r_documents")

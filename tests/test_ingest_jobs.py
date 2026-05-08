@@ -126,3 +126,16 @@ def test_recent_completed_job_is_not_pruned():
     assert result is not None
     assert result["status"] == "completed"
     assert job_id in _JOBS
+
+
+def test_is_expired_handles_none_updated_at():
+    """_is_expired returns False (not pruned) when updated_at is None (TypeError guard)."""
+    job = ingest_jobs.create_ingest_job("sample.pdf")
+    job_id = job["job_id"]
+
+    _JOBS[job_id]["status"] = "completed"
+    _JOBS[job_id]["updated_at"] = None  # triggers TypeError in fromisoformat
+
+    result = ingest_jobs.get_ingest_job(job_id)
+
+    assert result is not None  # not pruned — safe fallback
