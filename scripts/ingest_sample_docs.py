@@ -23,13 +23,23 @@ def main() -> None:
     client = R2RClient(base_url=BASE_URL)
     print(f"Ingesting {len(pdfs)} document(s) into {BASE_URL} ...")
 
+    failures = []
     for pdf in pdfs:
         print(f"  {pdf.name} ...", end=" ", flush=True)
         try:
-            result = client.documents.create(file_path=str(pdf))
+            _ = client.documents.create(file_path=str(pdf))
             print("OK")
         except Exception as exc:
             print(f"FAILED: {exc}")
+            failures.append((pdf.name, str(exc)))
+
+    if failures:
+        print(f"\n{len(failures)} ingestion(s) failed.")
+        # Check if it's a connection error
+        if failures and "Connection" in failures[0][1]:
+            sys.exit("Is R2R running? Start it with: make r2r")
+        else:
+            sys.exit(1)
 
     print("Done.")
 
