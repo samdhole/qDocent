@@ -1,6 +1,8 @@
 """Tests for R2R client behavior and confidence heuristic."""
 from unittest import mock
 
+import pytest
+
 from apps.api.services.r2r_client_helpers import _label_from_score
 
 
@@ -412,6 +414,69 @@ class TestIngestPrechunkedDocument:
         assert metadata["docquery_document_id"] is None
         assert metadata["source_file"] is None
         assert metadata["ingestion_mode"] == "docquery_pre_chunked"
+
+    @mock.patch("apps.api.services.r2r_client._client")
+    def test_passes_chunks_as_strings_with_citation_headers(self, mock_client_factory):
+        """chunks_for_r2r output is passed verbatim to client.documents.create (arfix.AC15.1)."""
+        mock_client = mock_client_factory.return_value
+        mock_client.documents.create.return_value = {"results": {"id": "r2r-abc123"}}
+
+        from apps.api.services.r2r_client import ingest_prechunked_document
+
+        chunks = [
+            {
+                "document_id": "doc1",
+                "source_file": "test.pdf",
+                "page_start": 1,
+                "page_end": 2,
+                "section_path": "Intro",
+                "text": "Some policy text here.",
+            }
+        ]
+        report = {"document_id": "doc1", "source_file": "test.pdf"}
+
+        ingest_prechunked_document(chunks, report)
+
+        mock_client.documents.create.assert_called_once()
+        call_kwargs = mock_client.documents.create.call_args.kwargs
+        assert "chunks" in call_kwargs, "chunks kwarg must be passed"
+        assert isinstance(call_kwargs["chunks"], list), "chunks must be a list"
+        assert len(call_kwargs["chunks"]) == 1
+        assert call_kwargs["chunks"][0].startswith("DocQuery Citation:"), (
+            "each chunk string must begin with the citation header prefix"
+        )
+
+    @mock.patch("apps.api.services.r2r_client._client")
+    def test_metadata_contains_required_fields(self, mock_client_factory):
+        """metadata dict passed to R2R contains ingestion_mode, docquery_document_id, source_file (arfix.AC15.2)."""
+        mock_client = mock_client_factory.return_value
+        mock_client.documents.create.return_value = {}
+
+        from apps.api.services.r2r_client import ingest_prechunked_document
+
+        chunks = [{"document_id": "doc1", "source_file": "test.pdf", "text": "body"}]
+        report = {"document_id": "doc1", "source_file": "test.pdf"}
+
+        ingest_prechunked_document(chunks, report)
+
+        call_kwargs = mock_client.documents.create.call_args.kwargs
+        metadata = call_kwargs.get("metadata", {})
+        assert metadata.get("ingestion_mode") == "docquery_pre_chunked"
+        assert "docquery_document_id" in metadata
+        assert "source_file" in metadata
+
+    @mock.patch("apps.api.services.r2r_client._client")
+    def test_raises_runtime_error_when_client_construction_fails(self, mock_client_factory):
+        """RuntimeError is raised when R2R client cannot be constructed (arfix.AC15.3)."""
+        import httpx
+
+        mock_client_factory.side_effect = httpx.HTTPError("connection refused")
+
+        from apps.api.services.r2r_client import ingest_prechunked_document
+
+        chunks = [{"document_id": "d", "source_file": "f.pdf", "text": "t"}]
+        with pytest.raises(RuntimeError, match="R2R unavailable"):
+            ingest_prechunked_document(chunks, {})
 
 
 class TestDeleteR2RDocuments:
