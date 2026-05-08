@@ -1,4 +1,5 @@
 """Run RAGAS evaluation against R2R and save timestamped results."""
+# pattern: Imperative Shell
 import os
 import sys
 from datetime import datetime

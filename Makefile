@@ -27,3 +27,4 @@ clean:
 	rm -rf .pytest_cache
 	rm -rf reports/evals/*.csv
 	rm -rf reports/evals/*.json
+	rm -rf reports/evals/*.md

@@ -1,4 +1,5 @@
 """Ingest all sample PDFs into R2R."""
+# pattern: Imperative Shell
 import os
 import sys
 from pathlib import Path

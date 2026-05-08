@@ -1,4 +1,5 @@
 """Summarize the latest RAGAS results CSV and print a markdown table."""
+# pattern: Imperative Shell
 from __future__ import annotations
 
 from pathlib import Path

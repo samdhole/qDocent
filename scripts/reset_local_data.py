@@ -1,4 +1,5 @@
 """Delete all documents from local R2R instance and clear report files."""
+# pattern: Imperative Shell
 import os
 import sys
 from pathlib import Path

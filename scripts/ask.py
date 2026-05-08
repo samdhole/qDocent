@@ -1,4 +1,5 @@
 """CLI: ask a RAG question directly against R2R."""
+# pattern: Imperative Shell
 import os
 import sys
 

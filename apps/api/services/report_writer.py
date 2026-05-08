@@ -1,4 +1,5 @@
 """Read eval and ingestion reports from disk for API routes."""
+# pattern: Imperative Shell
 from __future__ import annotations
 
 import json

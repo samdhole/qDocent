@@ -1,4 +1,5 @@
 """Smoke test: connect to R2R, ingest one PDF, ask one RAG question."""
+# pattern: Imperative Shell
 import os
 import sys
 from pathlib import Path

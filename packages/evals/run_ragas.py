@@ -3,6 +3,7 @@
 Called by scripts/eval_ragas.py and apps/api/services/ragas_runner.py.
 Never imports from apps/ or packages/ingestion/.
 """
+# pattern: Imperative Shell
 from __future__ import annotations
 
 from pathlib import Path

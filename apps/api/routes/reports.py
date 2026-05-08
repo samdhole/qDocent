@@ -1,3 +1,4 @@
+# pattern: Imperative Shell
 from fastapi import APIRouter, HTTPException
 
 from apps.api.services import report_writer

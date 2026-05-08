@@ -1,4 +1,5 @@
 """Thin orchestration wrapper around packages/evals/run_ragas.py."""
+# pattern: Imperative Shell
 from __future__ import annotations
 
 import os

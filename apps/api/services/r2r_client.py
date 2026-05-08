@@ -1,4 +1,5 @@
 """R2R SDK wrapper — the only place in apps/api/ that imports r2r."""
+# pattern: Imperative Shell
 from __future__ import annotations
 
 import logging
