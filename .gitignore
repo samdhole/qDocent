@@ -38,3 +38,8 @@ Thumbs.db
 
 # Pytest
 .pytest_cache/
+pytest_results.txt
+
+# Vibecoding artifacts
+HANDOFF.md
+docs/implementation-plans/
