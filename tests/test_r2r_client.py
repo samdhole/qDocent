@@ -428,6 +428,39 @@ class TestDeleteR2RDocuments:
             mock.call("r2r-figures"),
         ]
 
+    @mock.patch("apps.api.services.r2r_client._client")
+    def test_delete_r2r_documents_returns_failed_when_client_construction_fails(self, mock_client_fn):
+        """AC11.1: Client construction failure returns all IDs in failed[], no raise."""
+        import httpx
+
+        mock_client_fn.side_effect = httpx.ConnectError("R2R server down")
+
+        from apps.api.services.r2r_client import delete_r2r_documents
+
+        result = delete_r2r_documents(["r2r-primary", "r2r-figures"])
+
+        assert result == {"deleted": [], "failed": ["r2r-primary", "r2r-figures"]}
+
+    @mock.patch("apps.api.services.r2r_client._client")
+    def test_delete_r2r_documents_handles_partial_per_doc_failure(self, mock_client_fn):
+        """AC11.2: Per-document deletion failure is caught; successful deletions proceed."""
+        import httpx
+
+        mock_client = mock.MagicMock()
+        mock_client_fn.return_value = mock_client
+
+        # First call raises, second succeeds
+        mock_client.documents.delete.side_effect = [
+            httpx.HTTPError("Delete failed"),
+            None,  # succeeds
+        ]
+
+        from apps.api.services.r2r_client import delete_r2r_documents
+
+        result = delete_r2r_documents(["r2r-primary", "r2r-figures"])
+
+        assert result == {"deleted": ["r2r-figures"], "failed": ["r2r-primary"]}
+
 
 class TestRagQueryFigures:
     """Test rag_query() response enrichment."""

@@ -28,7 +28,7 @@ def _is_expired(job: dict[str, Any]) -> bool:
     try:
         updated = datetime.fromisoformat(job["updated_at"])
         return datetime.now(timezone.utc) - updated > _JOB_TTL
-    except (KeyError, ValueError):
+    except (KeyError, ValueError, TypeError):
         return False
 
 
