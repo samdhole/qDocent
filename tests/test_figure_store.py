@@ -135,6 +135,25 @@ class TestFiguresForResponse:
         assert len(result) == 1
         assert result[0]["figure_id"] == "doc_p001_fig001_01"
 
+    def test_stage1_multiple_ids_in_single_chunk(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+        """Multiple Figure IDs in one retrieved context chunk are all matched."""
+        figures_dir = tmp_path / "figures"
+        monkeypatch.setattr(figure_store_mod, "FIGURES_DIR", figures_dir)
+        fig1 = _figure("doc_p001_fig001_01", source_file="report.pdf", page_number=1)
+        fig2 = _figure("doc_p001_fig002_01", source_file="report.pdf", page_number=1)
+        _write_fixture_figures(figures_dir, "doc", [fig1, fig2])
+
+        result = figures_for_response(
+            citations=[],
+            retrieved_contexts=[
+                {"text": "Compare Figure ID: doc_p001_fig001_01 with Figure ID: doc_p001_fig002_01", "score": 0.9}
+            ],
+        )
+
+        assert len(result) == 2
+        figure_ids = {f["figure_id"] for f in result}
+        assert figure_ids == {"doc_p001_fig001_01", "doc_p001_fig002_01"}
+
     def test_deduplication_across_stages(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         """Figure matched by both stages appears only once."""
         figures_dir = tmp_path / "figures"

@@ -7,6 +7,8 @@ from pathlib import Path
 from typing import Any
 
 FIGURES_DIR = Path("data/figures")
+# Regex charset [A-Za-z0-9_\-] matches UUID/hash format of current document IDs.
+# A format change (e.g. IDs containing '.') would require updating this pattern.
 _FIGURE_ID_RE = re.compile(r"Figure ID:\s*([A-Za-z0-9_\-]+)")
 
 
@@ -50,6 +52,9 @@ def figures_for_response(
     selected: dict[str, dict[str, Any]] = {}
 
     # Stage 1: figure IDs mentioned in retrieved context text
+    # NOTE: retrieved_contexts text is truncated to 400 chars by r2r_client.py (Phase 5 concern).
+    # Figure IDs past position 400 will be silently missed. Stage 2 (page-match) is the
+    # load-bearing primary path for general queries; Stage 1 is best-effort for explicit refs.
     for ctx in retrieved_contexts:
         text = ctx.get("text", "")
         for fig_id in _FIGURE_ID_RE.findall(text):
