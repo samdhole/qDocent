@@ -1,5 +1,5 @@
 """Tests for R2R client and confidence heuristic."""
-from apps.api.services.r2r_client import _label_from_score
+from apps.api.services.r2r_client_helpers import _label_from_score
 
 
 def test_high_confidence():
