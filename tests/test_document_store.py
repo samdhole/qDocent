@@ -6,6 +6,7 @@ import pytest
 
 import apps.api.services.document_store as document_store_mod
 from apps.api.services.document_store import (
+    _safe_segment,
     delete_source_document,
     load_document_manifest,
     list_source_documents,
@@ -130,3 +131,62 @@ def test_load_document_manifest_returns_none_when_missing(
     monkeypatch.setattr(document_store_mod, "DOCUMENTS_DIR", tmp_path / "documents")
 
     assert load_document_manifest("missing") is None
+
+
+# Tests for _safe_segment() empty-input safety (arfix.AC3.1, arfix.AC3.2)
+
+
+def test_safe_segment_raises_on_empty_string():
+    """Empty string sanitizes to empty, raising ValueError."""
+    with pytest.raises(ValueError, match="sanitizes to empty string"):
+        _safe_segment("")
+
+
+def test_safe_segment_raises_on_dot_only():
+    """Dot-only string sanitizes to empty, raising ValueError."""
+    with pytest.raises(ValueError, match="sanitizes to empty string"):
+        _safe_segment(".")
+
+
+def test_safe_segment_raises_on_slash_only():
+    """Slash-only string sanitizes to empty, raising ValueError."""
+    with pytest.raises(ValueError, match="sanitizes to empty string"):
+        _safe_segment("/")
+
+
+def test_safe_segment_raises_on_dots_only():
+    """Multiple dots sanitize to empty, raising ValueError."""
+    with pytest.raises(ValueError, match="sanitizes to empty string"):
+        _safe_segment("...")
+
+
+def test_safe_segment_raises_on_special_chars_only():
+    """String with only special characters sanitizes to empty, raising ValueError."""
+    with pytest.raises(ValueError, match="sanitizes to empty string"):
+        _safe_segment("!@#$%")
+
+
+def test_safe_segment_accepts_alphanumeric():
+    """Alphanumeric strings pass through unchanged."""
+    assert _safe_segment("abc123") == "abc123"
+
+
+def test_safe_segment_accepts_with_allowed_chars():
+    """Strings with allowed special chars (hyphen, underscore, dot) pass through."""
+    assert _safe_segment("a-b_c.d") == "a-b_c.d"
+
+
+def test_safe_segment_accepts_uuid_format():
+    """UUID-format strings pass through unchanged."""
+    assert _safe_segment("550e8400-e29b-41d4-a716-446655440000") == "550e8400-e29b-41d4-a716-446655440000"
+
+
+def test_safe_segment_sanitizes_spaces_to_underscores():
+    """Spaces and other disallowed chars are replaced with underscores."""
+    assert _safe_segment("hello world") == "hello_world"
+
+
+def test_safe_segment_strips_leading_trailing_dots():
+    """Leading/trailing dots and underscores are stripped."""
+    assert _safe_segment(".abc.") == "abc"
+    assert _safe_segment("_abc_") == "abc"

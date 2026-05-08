@@ -96,7 +96,10 @@ def delete_source_document(document_id: str) -> bool:
 
 
 def _safe_segment(value: str) -> str:
-    return re.sub(r"[^A-Za-z0-9_.-]+", "_", value).strip("._") or "document"
+    sanitized = re.sub(r"[^A-Za-z0-9_.-]+", "_", value).strip("._")
+    if not sanitized:
+        raise ValueError(f"document_id {value!r} sanitizes to empty string")
+    return sanitized
 
 
 def _safe_pdf_name(value: str) -> str:
