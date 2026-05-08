@@ -149,7 +149,7 @@ def ingest_prechunked_document(chunks: list[dict[str, Any]], report: dict[str, A
         }
         return client.documents.create(
             chunks=chunks_for_r2r(chunks),
-            metadata=metadata,
+            metadata=metadata,  # pass None values — R2R accepts them; callers rely on key presence
         )
     except (httpx.HTTPError, R2RException) as exc:
         raise RuntimeError(f"R2R unavailable: {exc}") from exc
@@ -201,7 +201,7 @@ def ingest_file_with_pipeline(
     report = pipeline_result.get("report", {})
     source_url = None
     r2r_document_ids: list[str] = []
-    if chunks:  # validation pass first (Task 3)
+    if chunks:  # filter invalid chunks before deciding ingest path
         chunks = _valid_chunks(chunks)
     if chunks:  # pre-chunked path — may be empty after validation → falls to else
         r2r_result = ingest_prechunked_document(chunks, report)
@@ -221,7 +221,7 @@ def ingest_file_with_pipeline(
     else:  # fallback path: no chunks, pipeline failed, or all chunks filtered invalid
         r2r_result = ingest_file(file_path)
         ingestion_mode = "raw_file_fallback"
-        # Task 2: save source PDF when pipeline provided a document_id
+        # save source PDF in fallback path when pipeline provided a document_id
         _fallback_doc_id = report.get("document_id")
         _fallback_source = (
             report.get("source_file")

@@ -17,8 +17,8 @@ async def ingest(file: UploadFile) -> JSONResponse:
         raise HTTPException(status_code=400, detail="Only PDF files are supported.")
     content = await file.read()
     with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
-        tmp.write(content)
         tmp_path = tmp.name
+        tmp.write(content)
     try:
         result = r2r_client.ingest_file_with_pipeline(tmp_path, original_filename=file.filename)
         return JSONResponse(content={"status": "ok", "result": result})
@@ -36,8 +36,8 @@ async def create_ingest_job(file: UploadFile, background_tasks: BackgroundTasks)
     tmp_path: Path | None = None
     try:
         with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
-            tmp.write(content)
             tmp_path = Path(tmp.name)
+            tmp.write(content)
         # NOTE: In-memory background tasks are not persisted. A process restart between
         # this 202 response and task execution will orphan tmp_path on disk.
         # Acceptable for demo; fix would require a persistent task queue.
