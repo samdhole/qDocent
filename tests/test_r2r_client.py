@@ -380,6 +380,35 @@ class TestIngestFileWithPipeline:
         assert result["r2r_document_ids"] == ["r2r-primary", "r2r-figures"]
 
 
+class TestIngestPrechunkedDocument:
+    """Test ingest_prechunked_document() metadata handling."""
+
+    @mock.patch("apps.api.services.r2r_client._client")
+    def test_none_valued_metadata_fields_are_included(self, mock_client_fn):
+        """When document_id and source_file are None, metadata includes None values (arfix.AC8.1)."""
+        mock_client = mock.MagicMock()
+        mock_client_fn.return_value = mock_client
+
+        from apps.api.services.r2r_client import ingest_prechunked_document
+
+        chunks = [{"text": "body", "document_id": "doc", "source_file": "test.pdf"}]
+        report = {}  # No document_id or source_file, so both will be None
+
+        ingest_prechunked_document(chunks, report)
+
+        # Verify that documents.create was called with metadata containing None values
+        mock_client.documents.create.assert_called_once()
+        call_args = mock_client.documents.create.call_args
+        metadata = call_args.kwargs["metadata"]
+
+        # Metadata should include the keys even though values are None
+        assert "docquery_document_id" in metadata
+        assert "source_file" in metadata
+        assert metadata["docquery_document_id"] is None
+        assert metadata["source_file"] is None
+        assert metadata["ingestion_mode"] == "docquery_pre_chunked"
+
+
 class TestDeleteR2RDocuments:
     @mock.patch("apps.api.services.r2r_client._client")
     def test_delete_r2r_documents_calls_sdk_delete_for_each_id(self, mock_client_fn):

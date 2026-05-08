@@ -149,7 +149,7 @@ def ingest_prechunked_document(chunks: list[dict[str, Any]], report: dict[str, A
         }
         return client.documents.create(
             chunks=chunks_for_r2r(chunks),
-            metadata={k: v for k, v in metadata.items() if v is not None},
+            metadata=metadata,
         )
     except (httpx.HTTPError, R2RException) as exc:
         raise RuntimeError(f"R2R unavailable: {exc}") from exc
