@@ -216,6 +216,49 @@ class TestIngestFileWithPipeline:
         mock_ingest.assert_called_once_with("/tmp/tmpXXXX.pdf")
         assert result["ingestion_mode"] == "raw_file_fallback"
 
+    @mock.patch("apps.api.services.r2r_client.save_source_pdf")
+    @mock.patch("apps.api.services.r2r_client.ingest_file")
+    @mock.patch("apps.api.services.r2r_client.run_pipeline")
+    def test_fallback_path_saves_source_pdf_when_pipeline_provides_document_id(
+        self, mock_pipeline, mock_ingest, mock_save_source
+    ):
+        """When fallback path is taken and pipeline provided a document_id, save_source_pdf is called (arfix.AC6.1)."""
+        mock_pipeline.return_value = {
+            "report": {"document_id": "abc", "source_file": "test.pdf"},
+            "chunks": [],  # Empty chunks trigger fallback
+            "classifier": {},
+            "figures": [],
+            "figure_manifest": None,
+        }
+        mock_ingest.return_value = "ok"
+
+        from apps.api.services.r2r_client import ingest_file_with_pipeline
+
+        result = ingest_file_with_pipeline("/tmp/tmpXXXX.pdf")
+
+        mock_save_source.assert_called_once_with(
+            "/tmp/tmpXXXX.pdf", document_id="abc", source_file="test.pdf"
+        )
+        assert result["source_url"] == "/documents/abc/source"
+        assert result["ingestion_mode"] == "raw_file_fallback"
+
+    @mock.patch("apps.api.services.r2r_client.save_source_pdf")
+    @mock.patch("apps.api.services.r2r_client.ingest_file")
+    @mock.patch("apps.api.services.r2r_client.run_pipeline")
+    def test_fallback_path_skips_save_source_pdf_when_pipeline_raises(
+        self, mock_pipeline, mock_ingest, mock_save_source
+    ):
+        """When pipeline itself raises, save_source_pdf is NOT called (arfix.AC6.2)."""
+        mock_pipeline.side_effect = ValueError("parse failed")
+        mock_ingest.return_value = "ok"
+
+        from apps.api.services.r2r_client import ingest_file_with_pipeline
+
+        result = ingest_file_with_pipeline("/tmp/tmpXXXX.pdf")
+
+        mock_save_source.assert_not_called()
+        assert result["ingestion_mode"] == "raw_file_fallback"
+
     @mock.patch("apps.api.services.r2r_client.write_document_manifest")
     @mock.patch("apps.api.services.r2r_client.ingest_file")
     @mock.patch("apps.api.services.r2r_client.ingest_prechunked_document")

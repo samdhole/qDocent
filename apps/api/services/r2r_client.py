@@ -205,6 +205,17 @@ def ingest_file_with_pipeline(
     else:
         r2r_result = ingest_file(file_path)
         ingestion_mode = "raw_file_fallback"
+        # Save source PDF and set source_url for fallback path if pipeline provided a document_id.
+        # When the pipeline itself raised (pipeline_result = {}), document_id is None and we skip.
+        _fallback_doc_id = report.get("document_id")
+        _fallback_source = (
+            report.get("source_file")
+            or original_filename
+            or os.path.basename(file_path)
+        )
+        if _fallback_doc_id and _fallback_source:
+            save_source_pdf(file_path, document_id=_fallback_doc_id, source_file=_fallback_source)
+            source_url = f"/documents/{_fallback_doc_id}/source"
 
     # Ingest figure manifest only after PDF ingest succeeds — non-fatal on failure
     figure_r2r_result = None
