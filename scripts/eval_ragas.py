@@ -4,7 +4,6 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-import pandas as pd
 from dotenv import load_dotenv
 
 from packages.evals.run_ragas import load_dataset, run_eval
