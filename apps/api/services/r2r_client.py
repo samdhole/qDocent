@@ -29,7 +29,7 @@ def rag_query(query: str) -> dict[str, Any]:
             query=query,
             search_settings=_SEARCH_SETTINGS,
         )
-    except (httpx.ConnectError, Exception) as exc:
+    except (httpx.ConnectError, httpx.HTTPStatusError, httpx.TimeoutException) as exc:
         raise RuntimeError(f"R2R unavailable: {exc}") from exc
 
     # Extract answer text
@@ -54,7 +54,7 @@ def rag_query(query: str) -> dict[str, Any]:
         retrieved_contexts.append(
             {
                 "chunk_id": chunk_id,
-                "text": getattr(r, "text", "")[:400],
+                "text": (getattr(r, "text", "") or "")[:400],
                 "score": round(score, 4),
             }
         )
@@ -86,5 +86,5 @@ def ingest_file(file_path: str) -> Any:
     try:
         client = _client()
         return client.documents.create(file_path=file_path)
-    except (httpx.ConnectError, Exception) as exc:
+    except (httpx.ConnectError, httpx.HTTPStatusError, httpx.TimeoutException) as exc:
         raise RuntimeError(f"R2R unavailable: {exc}") from exc
