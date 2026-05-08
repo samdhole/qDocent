@@ -1,6 +1,5 @@
 """Tests for extract_figures Imperative Shell module."""
 import json
-from io import BytesIO
 from pathlib import Path
 from unittest import mock
 
@@ -10,7 +9,6 @@ import pytest
 import packages.ingestion.extract_figures as extract_figures_mod
 from packages.ingestion.extract_figures import extract_figures, write_figure_manifest
 
-SAMPLE_PDF = Path("data/sample_docs/company_policy.pdf")
 _REQUIRED_RECORD_KEYS = {
     "content_type",
     "figure_id",

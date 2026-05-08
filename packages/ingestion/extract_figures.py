@@ -11,7 +11,6 @@ import pytesseract
 from PIL import Image
 
 from packages.ingestion.extract_figures_helpers import (
-    _CAPTION_RE,
     figure_id_from,
     nearest_caption,
 )
@@ -128,7 +127,7 @@ def write_figure_manifest(
 def _ocr_image(path: Path) -> str:
     """Run pytesseract on a saved PNG. Returns '' on any failure."""
     try:
-        image = Image.open(path)
-        return " ".join(pytesseract.image_to_string(image).split())
+        with Image.open(path) as image:
+            return " ".join(pytesseract.image_to_string(image).split())
     except Exception:
         return ""
