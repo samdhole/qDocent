@@ -2,8 +2,18 @@
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+import pytest
+
 from apps.api.services import ingest_jobs
 from apps.api.services.ingest_jobs import _JOBS
+
+
+@pytest.fixture(autouse=True)
+def clear_jobs():
+    """Clear the _JOBS dict before and after each test to prevent state bleed."""
+    _JOBS.clear()
+    yield
+    _JOBS.clear()
 
 
 def test_ingest_job_completes_with_result(tmp_path):
@@ -54,7 +64,6 @@ def test_unknown_ingest_job_returns_none():
 
 def test_expired_completed_job_is_pruned():
     """Terminal job (completed) older than 60 minutes is pruned and returns None."""
-    _JOBS.clear()
     job = ingest_jobs.create_ingest_job("sample.pdf")
     job_id = job["job_id"]
 
@@ -71,7 +80,6 @@ def test_expired_completed_job_is_pruned():
 
 def test_expired_failed_job_is_pruned():
     """Terminal job (failed) older than 60 minutes is pruned and returns None."""
-    _JOBS.clear()
     job = ingest_jobs.create_ingest_job("sample.pdf")
     job_id = job["job_id"]
 
@@ -88,7 +96,6 @@ def test_expired_failed_job_is_pruned():
 
 def test_non_terminal_job_is_never_pruned():
     """Non-terminal job (running) older than 60 minutes is NOT pruned."""
-    _JOBS.clear()
     job = ingest_jobs.create_ingest_job("sample.pdf")
     job_id = job["job_id"]
 
@@ -106,7 +113,6 @@ def test_non_terminal_job_is_never_pruned():
 
 def test_recent_completed_job_is_not_pruned():
     """Terminal job (completed) within 60 minutes is NOT pruned."""
-    _JOBS.clear()
     job = ingest_jobs.create_ingest_job("sample.pdf")
     job_id = job["job_id"]
 

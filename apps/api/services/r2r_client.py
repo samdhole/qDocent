@@ -133,7 +133,7 @@ def delete_r2r_documents(document_ids: list[str]) -> dict[str, list[str]]:
         try:
             client.documents.delete(document_id)
             deleted.append(document_id)
-        except (httpx.HTTPError, R2RException):
+        except Exception:
             failed.append(document_id)
     return {"deleted": deleted, "failed": failed}
 
