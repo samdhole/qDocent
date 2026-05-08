@@ -2,6 +2,7 @@
 
 60/30/10 rule: classification is fully deterministic (regex + pdfplumber heuristics).
 LLM is used only when document_type cannot be resolved by rules — and only as a last resort.
+# pattern: Imperative Shell
 """
 from __future__ import annotations
 

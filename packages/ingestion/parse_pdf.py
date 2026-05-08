@@ -4,6 +4,7 @@ Returns a list of raw page dicts. Chunking happens in chunk_templates.py.
 Table normalization happens in normalize_tables.py.
 
 No LLM calls here — this module is 100% deterministic.
+# pattern: Imperative Shell
 """
 from __future__ import annotations
 
@@ -80,7 +81,7 @@ def _parse_table_aware(path: Path) -> list[dict[str, Any]]:
                 {
                     "df": t.df,
                     "accuracy": t.accuracy,
-                    "bbox": list(t._bbox),
+                    "bbox": list(getattr(t, "_bbox", None) or bbox_by_page.get(pnum, [])),
                     "page_number": pnum,
                 }
             )

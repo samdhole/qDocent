@@ -5,6 +5,7 @@ INVARIANT: Every chunk dict MUST contain all 9 citation metadata fields:
     bbox, parser, chunk_template, confidence
 
 A chunk missing any field is invalid output (per packages/ingestion/CONTEXT.md).
+# pattern: Functional Core
 """
 from __future__ import annotations
 
@@ -76,6 +77,7 @@ def _make_chunk(
 
 
 _HEADING_RE = re.compile(r"^(#{1,3}|[A-Z][A-Z\s]{3,})\s", re.MULTILINE)
+_TITLE_CASE_HEADING_RE = re.compile(r"^(?:[A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2})$")
 _CLAUSE_RE = re.compile(r"^\d+\.\d*\s|^Section \d+", re.MULTILINE | re.IGNORECASE)
 
 
@@ -98,8 +100,12 @@ def _heading_aware_chunks(
             seg = seg.strip()
             if not seg:
                 continue
-            # Detect if this segment is a heading
-            if _HEADING_RE.match(seg + " "):
+            # Detect if this segment is a heading (markdown, all-caps, or Title Case)
+            is_heading = (
+                _HEADING_RE.match(seg + " ")
+                or _TITLE_CASE_HEADING_RE.match(seg)
+            )
+            if is_heading:
                 current_section = seg[:80]
                 continue
             # Break into max_chars chunks

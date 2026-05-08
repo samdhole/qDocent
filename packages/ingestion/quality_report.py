@@ -2,6 +2,7 @@
 
 Reports always produced — even for low-confidence documents.
 Low-confidence pages (OCR conf < 70.0) are listed as warnings.
+# pattern: Imperative Shell
 """
 from __future__ import annotations
 

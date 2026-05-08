@@ -2,6 +2,7 @@
 
 Called by apps/api/services/r2r_client.ingest_file_with_pipeline().
 Never imported by apps/web/ directly.
+# pattern: Imperative Shell
 """
 from __future__ import annotations
 
@@ -20,6 +21,10 @@ def run_pipeline(pdf_path: str | Path, document_id: str | None = None) -> dict[s
 
     Returns the quality report dict. Chunks are not sent to R2R here —
     that is done by the caller after this function returns.
+
+    NOTE: Chunks are produced for quality reporting and citation metadata extraction.
+    The raw PDF file is sent to R2R separately via ingest_file() — R2R performs its own
+    chunking for retrieval. Pre-chunked ingestion via R2R SDK is a Phase 4 enhancement.
     """
     path = Path(pdf_path)
     doc_id = document_id or path.stem

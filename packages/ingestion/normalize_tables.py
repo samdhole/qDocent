@@ -5,6 +5,7 @@ The CONTEXT.md 60/30/10 rule permits LLM calls only for ambiguous multi-header
 tables — that path is stubbed here for Phase 3; implement when needed.
 
 Dual storage: raw_table_markdown AND normalized_table_text on every table chunk.
+# pattern: Functional Core
 """
 from __future__ import annotations
 
