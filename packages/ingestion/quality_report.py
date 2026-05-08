@@ -21,12 +21,13 @@ def generate_report(
     pages: list[dict[str, Any]],
     chunks: list[dict[str, Any]],
     classifier_result: dict[str, Any],
+    figures: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Generate and write quality report. Returns the report dict."""
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
 
     tables_detected = sum(len(p.get("tables", [])) for p in pages)
-    figures_detected = 0  # figure detection deferred to Phase 3+ extensions
+    figures_detected = len(figures or [])
     low_confidence_pages = [
         p["page_number"]
         for p in pages

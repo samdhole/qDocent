@@ -85,3 +85,50 @@ class TestPipeline:
         assert "document_id" in report
         assert isinstance(report.get("tables_detected", 0), int)
         assert "document_type" in report
+
+    def test_pipeline_returns_figures_key(self):
+        """run_pipeline return dict must include 'figures' key (list)."""
+        sample_doc = Path("data/sample_docs/company_policy.pdf")
+        if not sample_doc.exists():
+            pytest.skip("Sample doc not found; run scripts/create_sample_docs.py")
+
+        result = run_pipeline(str(sample_doc))
+
+        assert "figures" in result
+        assert isinstance(result["figures"], list)
+
+    def test_pipeline_returns_figure_manifest_key(self):
+        """run_pipeline return dict must include 'figure_manifest' key (str or None)."""
+        sample_doc = Path("data/sample_docs/company_policy.pdf")
+        if not sample_doc.exists():
+            pytest.skip("Sample doc not found; run scripts/create_sample_docs.py")
+
+        result = run_pipeline(str(sample_doc))
+
+        assert "figure_manifest" in result
+        assert result["figure_manifest"] is None or isinstance(result["figure_manifest"], str)
+
+    def test_figures_detected_matches_figures_list(self):
+        """quality_report['figures_detected'] must equal len(result['figures'])."""
+        sample_doc = Path("data/sample_docs/company_policy.pdf")
+        if not sample_doc.exists():
+            pytest.skip("Sample doc not found; run scripts/create_sample_docs.py")
+
+        result = run_pipeline(str(sample_doc))
+
+        assert result["report"]["figures_detected"] == len(result["figures"])
+
+    def test_pipeline_source_file_param(self):
+        """source_file param flows into chunk records instead of the temp path."""
+        sample_doc = Path("data/sample_docs/company_policy.pdf")
+        if not sample_doc.exists():
+            pytest.skip("Sample doc not found; run scripts/create_sample_docs.py")
+
+        result = run_pipeline(str(sample_doc), source_file="original_upload.pdf")
+
+        # AC6.3: original filename must appear in every chunk record, not a temp path
+        assert len(result["chunks"]) > 0, "Expected at least one chunk from sample doc"
+        for chunk in result["chunks"]:
+            assert chunk.get("source_file") == "original_upload.pdf", (
+                f"chunk source_file={chunk.get('source_file')!r}, expected 'original_upload.pdf'"
+            )

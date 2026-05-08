@@ -259,3 +259,66 @@ class TestGenerateReport:
 
         # Should mention no warnings (check for core phrase, avoiding em-dash encoding issues)
         assert "all pages parsed with high confidence" in content
+
+    def test_figures_detected_with_figures(self, tmp_reports_dir):
+        """figures_detected should equal len(figures) when figures are provided."""
+        pages = [{"page_number": 1, "text": "text", "tables": [], "confidence": 100.0, "bbox": [0, 0, 612, 792]}]
+        chunks = [{"confidence": 0.9, "text": "chunk"}]
+        classifier_result = {"document_type": "general", "recommended_parser": "fast_text"}
+        figures = [
+            {"figure_id": "doc_p001_fig001_01", "source_file": "test.pdf", "page_number": 1},
+            {"figure_id": "doc_p001_fig002_01", "source_file": "test.pdf", "page_number": 1},
+        ]
+
+        report = generate_report(
+            document_id="test_doc",
+            source_file="test.pdf",
+            pages=pages,
+            chunks=chunks,
+            classifier_result=classifier_result,
+            figures=figures,
+        )
+
+        assert report["figures_detected"] == 2
+
+    def test_figures_detected_zero_when_empty(self, tmp_reports_dir):
+        """figures_detected should be 0 when figures is empty or None."""
+        pages = [{"page_number": 1, "text": "text", "tables": [], "confidence": 100.0, "bbox": [0, 0, 612, 792]}]
+        chunks = [{"confidence": 0.9, "text": "chunk"}]
+        classifier_result = {"document_type": "general", "recommended_parser": "fast_text"}
+
+        report_empty = generate_report(
+            document_id="test_doc",
+            source_file="test.pdf",
+            pages=pages,
+            chunks=chunks,
+            classifier_result=classifier_result,
+            figures=[],
+        )
+        report_none = generate_report(
+            document_id="test_doc2",
+            source_file="test.pdf",
+            pages=pages,
+            chunks=chunks,
+            classifier_result=classifier_result,
+            figures=None,
+        )
+
+        assert report_empty["figures_detected"] == 0
+        assert report_none["figures_detected"] == 0
+
+    def test_figures_detected_backwards_compatible(self, tmp_reports_dir):
+        """Calling generate_report without figures param still returns 0."""
+        pages = [{"page_number": 1, "text": "text", "tables": [], "confidence": 100.0, "bbox": [0, 0, 612, 792]}]
+        chunks = [{"confidence": 0.9, "text": "chunk"}]
+        classifier_result = {"document_type": "general", "recommended_parser": "fast_text"}
+
+        report = generate_report(
+            document_id="test_doc",
+            source_file="test.pdf",
+            pages=pages,
+            chunks=chunks,
+            classifier_result=classifier_result,
+        )
+
+        assert report["figures_detected"] == 0
