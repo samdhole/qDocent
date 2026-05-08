@@ -1,9 +1,14 @@
 """Generate synthetic sample PDFs for local demo use."""
+# pattern: Imperative Shell
 from pathlib import Path
 
 try:
     from reportlab.lib.pagesizes import letter
+    from reportlab.lib import colors
     from reportlab.pdfgen import canvas
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import inch
 except ImportError:
     raise SystemExit("Run: uv pip install reportlab")
 
@@ -38,22 +43,44 @@ def make_policy(path: Path) -> None:
 
 
 def make_pricing(path: Path) -> None:
-    c = canvas.Canvas(str(path), pagesize=letter)
-    c.setFont("Helvetica-Bold", 16)
-    c.drawString(72, 720, "Acme Corp — Pricing Table")
-    c.setFont("Helvetica", 12)
-    rows = [
-        ("Plan", "Price/mo", "Users", "Support"),
-        ("Starter", "$29", "1", "Email"),
-        ("Pro", "$99", "5", "Email + Chat"),
-        ("Business", "$299", "25", "Priority"),
-        ("Enterprise", "Custom", "Unlimited", "Dedicated CSM"),
+    """Create pricing table using Platypus (real PDF table structure)."""
+    doc = SimpleDocTemplate(str(path), pagesize=letter)
+    story = []
+
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        'CustomTitle',
+        parent=styles['Heading1'],
+        fontSize=16,
+        textColor=colors.black,
+        spaceAfter=20,
+    )
+    story.append(Paragraph("Acme Corp — Pricing Table", title_style))
+    story.append(Spacer(1, 0.3 * inch))
+
+    # Create table data
+    data = [
+        ["Plan", "Price/mo", "Users", "Support"],
+        ["Starter", "$29", "1", "Email"],
+        ["Pro", "$99", "5", "Email + Chat"],
+        ["Business", "$299", "25", "Priority"],
+        ["Enterprise", "Custom", "Unlimited", "Dedicated CSM"],
     ]
-    y = 690
-    for row in rows:
-        c.drawString(72, y, "  |  ".join(row))
-        y -= 20
-    c.save()
+
+    table = Table(data, colWidths=[1.5 * inch, 1.5 * inch, 1.5 * inch, 2 * inch])
+    table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 12),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+    ]))
+
+    story.append(table)
+    doc.build(story)
 
 
 def make_support(path: Path) -> None:
