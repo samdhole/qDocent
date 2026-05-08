@@ -2,11 +2,14 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+_log = logging.getLogger(__name__)
 
 DOCUMENTS_DIR = Path("data/documents")
 
@@ -45,7 +48,15 @@ def load_document_manifest(document_id: str) -> dict[str, Any] | None:
     manifest_path = DOCUMENTS_DIR / _safe_segment(document_id) / "manifest.json"
     if not manifest_path.exists():
         return None
-    return json.loads(manifest_path.read_text(encoding="utf-8"))
+    try:
+        data = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        _log.warning("Corrupt manifest for %r: %s", document_id, exc)
+        return None
+    if not isinstance(data.get("r2r_document_ids"), list):
+        _log.warning("Manifest for %r missing valid r2r_document_ids field", document_id)
+        return None
+    return data
 
 
 def source_pdf_path(document_id: str) -> Path | None:

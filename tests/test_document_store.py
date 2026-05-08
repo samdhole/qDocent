@@ -190,3 +190,90 @@ def test_safe_segment_strips_leading_trailing_dots():
     """Leading/trailing dots and underscores are stripped."""
     assert _safe_segment(".abc.") == "abc"
     assert _safe_segment("_abc_") == "abc"
+
+
+# Tests for load_document_manifest() schema validation (arfix.AC4.1, arfix.AC4.2, arfix.AC4.3)
+
+
+def test_load_document_manifest_returns_none_on_corrupt_json(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    """Corrupt JSON in manifest.json returns None with warning logged."""
+    monkeypatch.setattr(document_store_mod, "DOCUMENTS_DIR", tmp_path / "documents")
+    doc_dir = tmp_path / "documents" / "doc123"
+    doc_dir.mkdir(parents=True)
+    (doc_dir / "manifest.json").write_text("not json", encoding="utf-8")
+
+    result = load_document_manifest("doc123")
+
+    assert result is None
+
+
+def test_load_document_manifest_returns_none_when_r2r_ids_is_null(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    """Manifest with r2r_document_ids set to null (JSON null) returns None."""
+    monkeypatch.setattr(document_store_mod, "DOCUMENTS_DIR", tmp_path / "documents")
+    doc_dir = tmp_path / "documents" / "doc123"
+    doc_dir.mkdir(parents=True)
+    (doc_dir / "manifest.json").write_text(
+        '{"document_id": "doc123", "r2r_document_ids": null}',
+        encoding="utf-8",
+    )
+
+    result = load_document_manifest("doc123")
+
+    assert result is None
+
+
+def test_load_document_manifest_returns_none_when_r2r_ids_is_string(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    """Manifest with r2r_document_ids as string instead of list returns None."""
+    monkeypatch.setattr(document_store_mod, "DOCUMENTS_DIR", tmp_path / "documents")
+    doc_dir = tmp_path / "documents" / "doc123"
+    doc_dir.mkdir(parents=True)
+    (doc_dir / "manifest.json").write_text(
+        '{"document_id": "doc123", "r2r_document_ids": "abc"}',
+        encoding="utf-8",
+    )
+
+    result = load_document_manifest("doc123")
+
+    assert result is None
+
+
+def test_load_document_manifest_returns_none_when_r2r_ids_missing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    """Manifest missing r2r_document_ids field returns None."""
+    monkeypatch.setattr(document_store_mod, "DOCUMENTS_DIR", tmp_path / "documents")
+    doc_dir = tmp_path / "documents" / "doc123"
+    doc_dir.mkdir(parents=True)
+    (doc_dir / "manifest.json").write_text(
+        '{"document_id": "doc123", "source_file": "report.pdf"}',
+        encoding="utf-8",
+    )
+
+    result = load_document_manifest("doc123")
+
+    assert result is None
+
+
+def test_load_document_manifest_round_trips_with_valid_schema(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    """Well-formed manifest round-trips correctly (unchanged behavior)."""
+    monkeypatch.setattr(document_store_mod, "DOCUMENTS_DIR", tmp_path / "documents")
+
+    manifest = write_document_manifest(
+        "doc123",
+        source_file="report.pdf",
+        r2r_document_ids=["r2r-primary", "r2r-figures"],
+    )
+
+    loaded = load_document_manifest("doc123")
+
+    assert loaded == manifest
+    assert loaded is not None
+    assert isinstance(loaded.get("r2r_document_ids"), list)
