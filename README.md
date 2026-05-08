@@ -40,7 +40,7 @@ packages/workflows/        LangGraph triage + email-draft graphs (additive)
 | Frontend | Next.js 14 (App Router) |
 | Workflows | LangGraph ≥ 1.1.10 |
 | PDF parsing | pdfplumber, camelot-py (pdfium), PyMuPDF, pytesseract |
-| LLM / embeddings | OpenAI (`gpt-4o-mini`, `text-embedding-3-small`) |
+| LLM / embeddings | Google Gemini (`gemini-3-flash-preview`, `gemini-embedding-2`) |
 
 **Runtime requirements:** Python 3.11 · Node.js 20 LTS · [uv](https://github.com/astral-sh/uv) · Docker 24+ (full R2R mode only)
 
@@ -54,7 +54,7 @@ make setup           # creates .venv and installs deps
 
 # 2. Configure environment
 cp .env.example .env
-# Edit .env: add OPENAI_API_KEY
+# Edit .env: add GOOGLE_API_KEY
 
 # 3. Generate sample documents
 python scripts/create_sample_docs.py
@@ -80,7 +80,7 @@ make api             # Start FastAPI wrapper
 make web             # Start Next.js UI (npm install + dev server)
 make smoke           # Smoke test: connect to R2R, ingest one doc, run RAG query
 make ingest          # Ingest all PDFs in data/sample_docs/
-make eval            # Run RAGAS evaluation (requires OPENAI_API_KEY + running R2R)
+make eval            # Run RAGAS evaluation (requires GOOGLE_API_KEY + running R2R)
 make clean           # Remove pytest cache and eval reports
 ```
 
@@ -99,10 +99,10 @@ python scripts/reset_local_data.py      # delete all R2R docs + report files
 Copy `.env.example` → `.env` (never commit `.env`):
 
 ```bash
-OPENAI_API_KEY=sk-...
+GOOGLE_API_KEY=...
 R2R_BASE_URL=http://localhost:7272
-RAGAS_EVAL_MODEL=gpt-4o-mini
-RAGAS_EMBEDDING_MODEL=text-embedding-3-small
+RAGAS_EVAL_MODEL=gemini-3-flash-preview
+RAGAS_EMBEDDING_MODEL=models/gemini-embedding-001
 APP_ENV=local
 LOG_LEVEL=INFO
 ```
@@ -121,7 +121,7 @@ make r2r
 ```bash
 git clone git@github.com:SciPhi-AI/R2R.git external/R2R
 cd external/R2R
-R2R_CONFIG_NAME=full OPENAI_API_KEY=<key> \
+R2R_CONFIG_NAME=full GEMINI_API_KEY=<key> \
   docker compose -f compose.full.yaml --profile postgres up -d
 ```
 
