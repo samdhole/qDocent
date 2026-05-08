@@ -35,11 +35,7 @@ def delete_document(document_id: str) -> dict:
     r2r_ids = (manifest or {}).get("r2r_document_ids", [])
     r2r_delete: dict = {"deleted": [], "failed": []}
     if r2r_ids:
-        try:
-            r2r_delete = r2r_client.delete_r2r_documents(r2r_ids)
-        except RuntimeError as exc:
-            raise HTTPException(status_code=503, detail=str(exc)) from exc
-
+        r2r_delete = r2r_client.delete_r2r_documents(r2r_ids)
     deleted = delete_source_document(document_id)
     if not deleted:
         raise HTTPException(status_code=404, detail=f"No source PDF for '{document_id}'.")

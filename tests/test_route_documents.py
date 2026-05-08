@@ -116,13 +116,13 @@ def test_delete_document_removes_r2r_documents_when_manifest_has_ids(
 
 
 @mock.patch("apps.api.routes.documents.r2r_client.delete_r2r_documents")
-def test_delete_document_returns_503_when_r2r_delete_fails(
+def test_delete_document_succeeds_even_when_r2r_delete_fails(
     mock_delete_r2r,
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     client: TestClient,
 ):
-    """R2R cleanup failure prevents local deletion so cleanup can be retried."""
+    """R2R cleanup failure is reported in response but does not block local deletion."""
     monkeypatch.setattr(document_store_mod, "DOCUMENTS_DIR", tmp_path / "documents")
     doc_dir = tmp_path / "documents" / "doc123"
     doc_dir.mkdir(parents=True)
@@ -132,12 +132,13 @@ def test_delete_document_returns_503_when_r2r_delete_fails(
         source_file="report.pdf",
         r2r_document_ids=["r2r-primary"],
     )
-    mock_delete_r2r.side_effect = RuntimeError("R2R unavailable")
+    mock_delete_r2r.return_value = {"deleted": [], "failed": ["r2r-primary"]}
 
     response = client.delete("/documents/doc123")
 
-    assert response.status_code == 503
-    assert doc_dir.exists()
+    assert response.status_code == 200
+    assert response.json()["r2r_delete"] == {"deleted": [], "failed": ["r2r-primary"]}
+    assert not doc_dir.exists()  # local PDF deleted despite R2R failure
 
 
 def test_delete_document_returns_404_for_unknown_document(

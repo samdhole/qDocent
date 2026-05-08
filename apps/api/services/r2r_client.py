@@ -122,19 +122,19 @@ def ingest_file(file_path: str) -> Any:
 
 
 def delete_r2r_documents(document_ids: list[str]) -> dict[str, list[str]]:
-    """Delete known R2R documents by SDK ID."""
+    """Delete known R2R documents by SDK ID. Never raises — failures go to failed[]."""
     deleted: list[str] = []
     failed: list[str] = []
     try:
         client = _client()
-        for document_id in document_ids:
-            try:
-                client.documents.delete(document_id)
-                deleted.append(document_id)
-            except (httpx.HTTPError, R2RException):
-                failed.append(document_id)
-    except (httpx.HTTPError, R2RException) as exc:
-        raise RuntimeError(f"R2R unavailable: {exc}") from exc
+    except (httpx.HTTPError, R2RException):
+        return {"deleted": [], "failed": list(document_ids)}
+    for document_id in document_ids:
+        try:
+            client.documents.delete(document_id)
+            deleted.append(document_id)
+        except (httpx.HTTPError, R2RException):
+            failed.append(document_id)
     return {"deleted": deleted, "failed": failed}
 
 
