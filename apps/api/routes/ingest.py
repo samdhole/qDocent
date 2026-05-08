@@ -16,16 +16,18 @@ async def ingest(file: UploadFile) -> JSONResponse:
     if not file.filename or not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files are supported.")
     content = await file.read()
-    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
-        tmp_path = tmp.name
-        tmp.write(content)
+    tmp_path: Path | None = None
     try:
-        result = r2r_client.ingest_file_with_pipeline(tmp_path, original_filename=file.filename)
+        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+            tmp_path = Path(tmp.name)
+            tmp.write(content)
+        result = r2r_client.ingest_file_with_pipeline(str(tmp_path), original_filename=file.filename)
         return JSONResponse(content={"status": "ok", "result": result})
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     finally:
-        Path(tmp_path).unlink(missing_ok=True)
+        if tmp_path is not None:
+            tmp_path.unlink(missing_ok=True)
 
 
 @router.post("/ingest/jobs", status_code=202)
