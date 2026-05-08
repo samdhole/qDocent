@@ -28,7 +28,7 @@ def main() -> None:
 
     print(f"Deleting {len(doc_list)} document(s) ...")
     for doc in doc_list:
-        doc_id = doc.id if hasattr(doc, "id") else doc.get("id")
+        doc_id = getattr(doc, "id", None) or (doc.get("id") if isinstance(doc, dict) else None)
         print(f"  Deleting {doc_id} ...", end=" ", flush=True)
         try:
             client.documents.delete(id=doc_id)
