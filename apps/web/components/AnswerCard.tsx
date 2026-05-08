@@ -58,7 +58,7 @@ export default function AnswerCard({ result }: Props) {
                 c.page != null ? ` · p.${c.page}` : ""
               }${c.section ? ` · ${c.section}` : ""}`;
               return (
-                <li key={c.chunk_id != null ? `${c.document_id ?? "doc"}-${c.chunk_id}` : i}>
+                <li key={c.chunk_id != null ? `${c.document_id ?? "doc"}-${c.chunk_id}-${i}` : i}>
                   {c.document_id ? (
                     <a
                       href={sourceHref(c.document_id, c.page)}

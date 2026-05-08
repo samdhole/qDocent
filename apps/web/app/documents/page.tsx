@@ -95,6 +95,7 @@ export default function DocumentsPage() {
       const res = await fetch(`${API}/ingest/jobs/${jobId}`, { signal }).catch(() => null);
       if (res === null || signal.aborted) return;
       const nextJob = await res.json();
+      if (signal.aborted) return;
       if (!res.ok) {
         setStatus(`Error: ${nextJob.detail ?? "Could not load ingest job."}`);
         setUploading(false);
@@ -113,9 +114,13 @@ export default function DocumentsPage() {
         setUploading(false);
         return;
       }
-      await new Promise<void>((resolve, reject) => {
-        const timer = setTimeout(resolve, 1000);
-        signal.addEventListener("abort", () => { clearTimeout(timer); resolve(); });
+      await new Promise<void>((resolve) => {
+        const onAbort = () => { clearTimeout(timer); resolve(); };
+        const timer = setTimeout(() => {
+          signal.removeEventListener("abort", onAbort);
+          resolve();
+        }, 1000);
+        signal.addEventListener("abort", onAbort);
       });
     }
     setStatus("Ingest is still running. Refresh stored sources in a moment.");
