@@ -34,7 +34,7 @@ def rag_query(query: str) -> dict[str, Any]:
             query=query,
             search_settings=_SEARCH_SETTINGS,
         )
-    except (httpx.ConnectError, httpx.HTTPStatusError, httpx.TimeoutException) as exc:
+    except httpx.HTTPError as exc:
         raise RuntimeError(f"R2R unavailable: {exc}") from exc
 
     # Extract answer text
@@ -84,7 +84,7 @@ def ingest_file(file_path: str) -> Any:
     try:
         client = _client()
         return client.documents.create(file_path=file_path)
-    except (httpx.ConnectError, httpx.HTTPStatusError, httpx.TimeoutException) as exc:
+    except httpx.HTTPError as exc:
         raise RuntimeError(f"R2R unavailable: {exc}") from exc
 
 

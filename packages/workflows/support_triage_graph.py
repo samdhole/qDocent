@@ -12,9 +12,11 @@ Nodes are pure functions. No side effects except retrieve_context (R2R call).
 # pattern: Imperative Shell
 from __future__ import annotations
 
+import logging
 import os
 from typing import Any
 
+import httpx
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 from langgraph.graph import END, START, StateGraph
@@ -69,6 +71,7 @@ def classify_intent(state: SupportState) -> SupportState:
 
 def retrieve_context(state: SupportState) -> SupportState:
     """Retrieve relevant policy chunks from R2R."""
+    log = logging.getLogger(__name__)
     try:
         client = R2RClient(base_url=_R2R_URL)
         response = client.retrieval.rag(
@@ -93,7 +96,8 @@ def retrieve_context(state: SupportState) -> SupportState:
             for r in search_results
         ]
         answer = getattr(response, "generated_answer", "") or ""
-    except Exception:
+    except (httpx.ConnectError, httpx.HTTPStatusError, httpx.TimeoutException) as exc:
+        log.warning("R2R retrieval failed: %s", exc, exc_info=True)
         retrieved_contexts = []
         citations = []
         answer = ""

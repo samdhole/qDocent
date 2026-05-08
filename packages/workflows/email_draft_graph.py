@@ -6,9 +6,11 @@ This is a simplified graph for demo purposes.
 # pattern: Imperative Shell
 from __future__ import annotations
 
+import logging
 import os
 from typing import Any
 
+import httpx
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 from langgraph.graph import END, START, StateGraph
@@ -24,6 +26,7 @@ _SEARCH_SETTINGS: dict[str, Any] = {"limit": 3, "graph_settings": {"enabled": Fa
 
 
 def retrieve_policy(state: SupportState) -> SupportState:
+    log = logging.getLogger(__name__)
     try:
         client = R2RClient(base_url=_R2R_URL)
         response = client.retrieval.rag(
@@ -38,7 +41,8 @@ def retrieve_policy(state: SupportState) -> SupportState:
             {"document": (getattr(r, "metadata", {}) or {}).get("source_file", "unknown")}
             for r in (getattr(response, "search_results", None) or [])
         ]
-    except Exception:
+    except (httpx.ConnectError, httpx.HTTPStatusError, httpx.TimeoutException) as exc:
+        log.warning("R2R retrieval failed: %s", exc, exc_info=True)
         contexts, citations = [], []
 
     return {**state, "retrieved_contexts": contexts, "citations": citations}
