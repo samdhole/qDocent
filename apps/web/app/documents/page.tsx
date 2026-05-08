@@ -43,6 +43,8 @@ export default function DocumentsPage() {
     return () => controller.abort();
   }, []);
 
+  // Abort any in-flight poll on unmount. Active-upload abort is handled inside
+  // upload() via pollAbortRef.current?.abort() before creating a new controller.
   useEffect(() => {
     return () => {
       pollAbortRef.current?.abort();
