@@ -1,4 +1,4 @@
-from fastapi import APIRouter, BackgroundTasks, HTTPException
+from fastapi import APIRouter, HTTPException
 
 from apps.api.services import ragas_runner, report_writer
 
@@ -14,6 +14,9 @@ def eval_results() -> list[dict]:
 
 
 @router.post("/run")
-def eval_run(background_tasks: BackgroundTasks) -> dict:
-    background_tasks.add_task(ragas_runner.run_and_save)
-    return {"status": "started", "message": "Eval running in background. Check GET /eval/results when complete."}
+def eval_run() -> dict:
+    try:
+        ragas_runner.run_and_save()
+        return {"status": "ok", "message": "Evaluation completed successfully."}
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Eval failed: {str(exc)}") from exc
