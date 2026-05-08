@@ -36,7 +36,9 @@ def main() -> None:
     if results:
         print("\nRetrieved chunks:")
         for r in results[:3]:
-            print(f"  score={getattr(r, 'score', '?'):.3f}  {str(r)[:120]}")
+            score = getattr(r, "score", None)
+            score_str = f"{score:.3f}" if isinstance(score, (int, float)) else "?"
+            print(f"  score={score_str}  {str(r)[:120]}")
 
 
 if __name__ == "__main__":
