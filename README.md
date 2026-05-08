@@ -143,7 +143,7 @@ Keep upstream R2R under `external/` — never modify it. Wrap everything through
 ## Testing
 
 ```bash
-# Run full test suite (98 tests)
+# Run full test suite (152 tests)
 .venv/Scripts/python.exe -m pytest tests/ -v   # Windows
 source .venv/bin/activate && pytest tests/ -v  # Unix
 ```
@@ -158,6 +158,9 @@ Test coverage:
 - `tests/test_quality_report.py` — quality report generation + file output
 - `tests/test_parse_pdf.py` — PDF parsing (fast-text, table-aware, OCR paths)
 - `tests/test_pipeline.py` — end-to-end ingestion pipeline
+- `tests/test_extract_figures.py` — figure extraction pipeline (PyMuPDF, bbox, dedup)
+- `tests/test_extract_figures_helpers.py` — figure ID generation, caption detection
+- `tests/test_figure_store.py` — figure loading + Stage 1/2 response matching
 - `tests/test_approval_policy.py` — approval policy rules + confidence scoring
 - `tests/test_support_triage_graph.py` — support triage LangGraph (mocked)
 - `tests/test_email_draft_graph.py` — email draft LangGraph (mocked)
@@ -173,7 +176,7 @@ docquery/
 │   ├── api/                  FastAPI app
 │   │   ├── main.py
 │   │   ├── routes/           ask, ingest, evals, reports, workflows
-│   │   └── services/         r2r_client, r2r_client_helpers, ragas_runner, report_writer
+│   │   └── services/         r2r_client, r2r_client_helpers, figure_store, ragas_runner, report_writer
 │   └── web/                  Next.js 14 UI
 │       ├── app/              App Router pages
 │       ├── components/       AskForm, AnswerCard, EvalTable
@@ -187,6 +190,8 @@ docquery/
 │   │   ├── parse_pdf.py
 │   │   ├── normalize_tables.py
 │   │   ├── chunk_templates.py
+│   │   ├── extract_figures.py
+│   │   ├── extract_figures_helpers.py
 │   │   ├── quality_report.py
 │   │   └── pipeline.py
 │   └── workflows/            LangGraph approval-gated workflows
@@ -195,7 +200,7 @@ docquery/
 │       ├── support_triage_graph.py
 │       └── email_draft_graph.py
 ├── scripts/                  CLI utilities
-├── tests/                    98 pytest tests
+├── tests/                    152 pytest tests
 ├── data/sample_docs/         Generated sample PDFs (3 documents)
 ├── reports/
 │   ├── evals/                RAGAS CSV + Markdown reports (timestamped)
