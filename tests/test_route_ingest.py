@@ -76,3 +76,23 @@ class TestIngestRoute:
         )
 
         assert response.status_code == 503
+
+    @mock.patch("apps.api.services.r2r_client.ingest_file_with_pipeline")
+    def test_post_ingest_passes_original_filename(self, mock_ingest, client, sample_pdf):
+        """POST /ingest passes file.filename as original_filename to ingest_file_with_pipeline."""
+        mock_ingest.return_value = {
+            "r2r": "ok",
+            "quality_report": None,
+            "document_id": None,
+            "figures": [],
+            "figures_r2r": None,
+        }
+
+        client.post(
+            "/ingest",
+            files={"file": ("my_report.pdf", sample_pdf, "application/pdf")},
+        )
+
+        mock_ingest.assert_called_once()
+        _, kwargs = mock_ingest.call_args
+        assert kwargs.get("original_filename") == "my_report.pdf"

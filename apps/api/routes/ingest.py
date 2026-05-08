@@ -19,7 +19,7 @@ async def ingest(file: UploadFile) -> JSONResponse:
         tmp.write(content)
         tmp_path = tmp.name
     try:
-        result = r2r_client.ingest_file_with_pipeline(tmp_path)
+        result = r2r_client.ingest_file_with_pipeline(tmp_path, original_filename=file.filename)
         return JSONResponse(content={"status": "ok", "result": result})
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc

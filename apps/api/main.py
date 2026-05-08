@@ -1,6 +1,9 @@
 # pattern: Imperative Shell
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from apps.api.routes import ask, evals, ingest, reports, workflows
 
@@ -22,6 +25,9 @@ app.include_router(ingest.router)
 app.include_router(evals.router)
 app.include_router(reports.router)
 app.include_router(workflows.router)
+
+if Path("data/figures").exists():
+    app.mount("/figures", StaticFiles(directory="data/figures"), name="figures")
 
 
 @app.get("/health")

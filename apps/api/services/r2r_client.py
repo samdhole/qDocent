@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 from r2r import R2RClient
 from shared.abstractions.exception import R2RException
 
+from apps.api.services.figure_store import figures_for_response
 from apps.api.services.r2r_client_helpers import _label_from_score
 from packages.ingestion.pipeline import run_pipeline
 
@@ -74,11 +75,14 @@ def rag_query(query: str) -> dict[str, Any]:
     top_score = retrieved_contexts[0]["score"] if retrieved_contexts else 0.0
     confidence_label, needs_review = _label_from_score(top_score)
 
+    figures = figures_for_response(citations, retrieved_contexts)
+
     return {
         "question": query,
         "answer": answer,
         "citations": citations,
         "retrieved_contexts": retrieved_contexts,
+        "figures": figures,
         "confidence_label": confidence_label,
         "needs_human_review": needs_review,
     }
@@ -93,24 +97,30 @@ def ingest_file(file_path: str) -> Any:
         raise RuntimeError(f"R2R unavailable: {exc}") from exc
 
 
-def ingest_file_with_pipeline(file_path: str) -> dict:
-    """Run Phase 3 ingestion pipeline, then ingest the original file into R2R.
+def ingest_file_with_pipeline(
+    file_path: str, original_filename: str | None = None
+) -> dict:
+    """Run ingestion pipeline, then ingest the original file and figure manifest into R2R.
 
-    The pipeline produces quality reports and citation metadata for auditing and
-    transparency. The raw PDF file is ingested separately into R2R, which performs
-    its own chunking and vector embedding for retrieval.
+    original_filename: the original uploaded filename. When provided, threads through
+    to run_pipeline so figure records and quality reports show the real filename
+    instead of the temp path.
 
-    Returns combined result: R2R response + quality report.
+    Figure manifest ingest runs only after the raw PDF ingest succeeds. Failure
+    of the manifest ingest is non-fatal — logged as warning, not raised.
+
+    Returns combined result: R2R response + quality report + figures list.
     Gracefully falls back to plain R2R ingestion if pipeline fails.
     """
     log = logging.getLogger(__name__)
     pipeline_result: dict = {}
     try:
-        pipeline_result = run_pipeline(file_path)
+        pipeline_result = run_pipeline(file_path, source_file=original_filename)
         log.info(
-            "Pipeline complete: %d chunks, %d tables",
+            "Pipeline complete: %d chunks, %d tables, %d figures",
             len(pipeline_result.get("chunks", [])),
             pipeline_result.get("report", {}).get("tables_detected", 0),
+            len(pipeline_result.get("figures", [])),
         )
     except Exception as exc:
         log.warning("Pipeline failed, falling back to direct R2R ingest: %s", exc)
@@ -118,8 +128,19 @@ def ingest_file_with_pipeline(file_path: str) -> dict:
     # Always ingest the raw file into R2R for vector retrieval
     r2r_result = ingest_file(file_path)
 
+    # Ingest figure manifest only after PDF ingest succeeds — non-fatal on failure
+    figure_r2r_result = None
+    figure_manifest = pipeline_result.get("figure_manifest")
+    if figure_manifest:
+        try:
+            figure_r2r_result = ingest_file(figure_manifest)
+        except Exception as exc:
+            log.warning("Figure manifest ingest failed: %s", exc)
+
     return {
         "r2r": str(r2r_result),
         "quality_report": pipeline_result.get("report"),
         "document_id": pipeline_result.get("report", {}).get("document_id"),
+        "figures": pipeline_result.get("figures", []),
+        "figures_r2r": str(figure_r2r_result) if figure_r2r_result else None,
     }
