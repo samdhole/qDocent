@@ -42,4 +42,8 @@ pytest_results.txt
 
 # Vibecoding artifacts
 HANDOFF.md
-docs/implementation-plans/
+docs/
+**/CONTEXT.md
+
+# Local config
+.gitignore
