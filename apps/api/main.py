@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from apps.api.routes import ask, evals, ingest, reports
+from apps.api.routes import ask, evals, ingest, reports, workflows
 
 app = FastAPI(
     title="DocQuery API",
@@ -20,6 +20,7 @@ app.include_router(ask.router)
 app.include_router(ingest.router)
 app.include_router(evals.router)
 app.include_router(reports.router)
+app.include_router(workflows.router)
 
 
 @app.get("/health")
