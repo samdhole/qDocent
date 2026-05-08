@@ -36,7 +36,7 @@ def run_eval(
     r2r_base_url: str,
     eval_model: str,
     dataset_path: Path,
-    embedding_model: str = "models/text-embedding-004",
+    embedding_model: str = "models/gemini-embedding-001",
     search_settings: dict[str, Any] | None = None,
 ) -> Any:  # ragas.EvaluationResult
     """Run RAGAS evaluation and return result object (call .to_pandas() on it)."""

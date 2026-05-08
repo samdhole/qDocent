@@ -62,7 +62,8 @@ def draft_email(state: SupportState) -> SupportState:
         f"Policy context:\n{context_text or 'No policy context found.'}\n\n"
         f"Draft email (subject and body):"
     )
-    draft = llm.invoke(prompt).content.strip()
+    raw = llm.invoke(prompt).content
+    draft = (raw[0].get("text", "") if isinstance(raw, list) else raw).strip()
     confidence = "medium" if state["retrieved_contexts"] else "low"
     return {
         **state,

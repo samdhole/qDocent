@@ -65,7 +65,9 @@ def classify_intent(state: SupportState) -> SupportState:
         f"cancellation_request, support_request, policy_lookup, or general.\n"
         f"Message: {state['customer_message']}\nIntent:"
     )
-    intent = llm.invoke(prompt).content.strip().split()[0]
+    raw = llm.invoke(prompt).content
+    text = raw[0].get("text", "") if isinstance(raw, list) else raw
+    intent = text.strip().split()[0]
     return {**state, "intent": intent}
 
 

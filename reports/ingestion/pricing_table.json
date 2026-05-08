@@ -1,10 +1,10 @@
 {
   "document_id": "pricing_table",
-  "document_type": "general",
-  "parser_used": "fast_text",
+  "document_type": "table_heavy",
+  "parser_used": "table_aware",
   "pages": 1,
-  "chunks": 1,
-  "tables_detected": 0,
+  "chunks": 2,
+  "tables_detected": 1,
   "figures_detected": 0,
   "low_confidence_pages": [],
   "citation_coverage_estimate": 1.0

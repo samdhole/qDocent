@@ -9,6 +9,7 @@ from typing import Any
 import httpx
 from dotenv import load_dotenv
 from r2r import R2RClient
+from shared.abstractions.exception import R2RException
 
 from apps.api.services.r2r_client_helpers import _label_from_score
 from packages.ingestion.pipeline import run_pipeline
@@ -34,7 +35,7 @@ def rag_query(query: str) -> dict[str, Any]:
             query=query,
             search_settings=_SEARCH_SETTINGS,
         )
-    except httpx.HTTPError as exc:
+    except (httpx.HTTPError, R2RException) as exc:
         raise RuntimeError(f"R2R unavailable: {exc}") from exc
 
     # New R2R SDK (>=3.6.6 with core) wraps responses in a .results object
@@ -88,7 +89,7 @@ def ingest_file(file_path: str) -> Any:
     try:
         client = _client()
         return client.documents.create(file_path=file_path)
-    except httpx.HTTPError as exc:
+    except (httpx.HTTPError, R2RException) as exc:
         raise RuntimeError(f"R2R unavailable: {exc}") from exc
 
 
