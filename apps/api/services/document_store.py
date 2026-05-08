@@ -118,5 +118,8 @@ def _safe_segment(value: str) -> str:
 
 def _safe_pdf_name(value: str) -> str:
     name = Path(value).name
-    stem = _safe_segment(Path(name).stem)
+    try:
+        stem = _safe_segment(Path(name).stem)
+    except ValueError:
+        stem = "document"
     return f"{stem}.pdf"

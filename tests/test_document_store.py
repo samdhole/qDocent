@@ -7,6 +7,7 @@ import pytest
 
 import apps.api.services.document_store as document_store_mod
 from apps.api.services.document_store import (
+    _safe_pdf_name,
     _safe_segment,
     delete_source_document,
     load_document_manifest,
@@ -197,6 +198,34 @@ def test_safe_segment_strips_leading_trailing_underscores():
     assert _safe_segment("_abc_") == "abc"
 
 
+# Tests for _safe_pdf_name() degenerate filename handling
+
+
+def test_safe_pdf_name_normalizes_degenerate_stem():
+    """_safe_pdf_name falls back to 'document' when stem sanitizes to empty."""
+    assert _safe_pdf_name("....pdf") == "document.pdf"
+
+
+def test_safe_pdf_name_normalizes_special_chars_only_stem():
+    """_safe_pdf_name falls back to 'document' when stem is only special chars."""
+    assert _safe_pdf_name("!@#$.pdf") == "document.pdf"
+
+
+def test_safe_pdf_name_normalizes_underscore_only_stem():
+    """_safe_pdf_name falls back to 'document' when stem is only underscore."""
+    assert _safe_pdf_name("_.pdf") == "document.pdf"
+
+
+def test_safe_pdf_name_preserves_valid_stem():
+    """_safe_pdf_name preserves valid stems."""
+    assert _safe_pdf_name("report.pdf") == "report.pdf"
+
+
+def test_safe_pdf_name_sanitizes_spaces_in_stem():
+    """_safe_pdf_name sanitizes spaces to underscores in valid stems."""
+    assert _safe_pdf_name("Policy Report.pdf") == "Policy_Report.pdf"
+
+
 # Tests for load_document_manifest() schema validation (arfix.AC4.1, arfix.AC4.2, arfix.AC4.3)
 
 
@@ -249,7 +278,7 @@ def test_load_document_manifest_returns_none_when_json_is_array(
 
 
 def test_load_document_manifest_returns_none_when_r2r_ids_is_null(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ):
     """Manifest with r2r_document_ids set to null (JSON null) returns None."""
     monkeypatch.setattr(document_store_mod, "DOCUMENTS_DIR", tmp_path / "documents")
@@ -260,13 +289,15 @@ def test_load_document_manifest_returns_none_when_r2r_ids_is_null(
         encoding="utf-8",
     )
 
-    result = load_document_manifest("doc123")
+    with caplog.at_level(logging.WARNING, logger="apps.api.services.document_store"):
+        result = load_document_manifest("doc123")
 
     assert result is None
+    assert "missing valid r2r_document_ids" in caplog.text
 
 
 def test_load_document_manifest_returns_none_when_r2r_ids_is_string(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ):
     """Manifest with r2r_document_ids as string instead of list returns None."""
     monkeypatch.setattr(document_store_mod, "DOCUMENTS_DIR", tmp_path / "documents")
@@ -277,9 +308,11 @@ def test_load_document_manifest_returns_none_when_r2r_ids_is_string(
         encoding="utf-8",
     )
 
-    result = load_document_manifest("doc123")
+    with caplog.at_level(logging.WARNING, logger="apps.api.services.document_store"):
+        result = load_document_manifest("doc123")
 
     assert result is None
+    assert "missing valid r2r_document_ids" in caplog.text
 
 
 def test_load_document_manifest_returns_none_when_r2r_ids_missing(
