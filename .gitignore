@@ -48,3 +48,4 @@ docs/
 # Local config
 .gitignore
 .claude/
+**/CLAUDE.md
