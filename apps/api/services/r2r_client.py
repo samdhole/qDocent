@@ -65,15 +65,15 @@ def rag_query(query: str) -> dict[str, Any]:
         citations.append(
             {
                 "document": (
-                    meta.get("source_file")
-                    or header_citation.get("document")
+                    header_citation.get("document")
+                    or meta.get("source_file")
                     or "unknown"
                 ),
-                "page": meta.get("page_start") or header_citation.get("page"),
-                "page_end": meta.get("page_end") or header_citation.get("page_end"),
+                "page": header_citation.get("page") or meta.get("page_start"),
+                "page_end": header_citation.get("page_end") or meta.get("page_end"),
                 "section": (
-                    meta.get("section_path")
-                    or header_citation.get("section")
+                    header_citation.get("section")
+                    or meta.get("section_path")
                 ),
                 "document_id": header_citation.get("document_id"),
                 "chunk_id": chunk_id,

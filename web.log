@@ -1,0 +1,27 @@
+
+> web@0.1.0 dev
+> next dev
+
+▲ Next.js 16.2.6 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://10.5.0.2:3000
+- Environments: .env.local
+✓ Ready in 972ms
+
+ GET / 200 in 3.1s (next.js: 2.8s, application-code: 258ms)
+ GET / 200 in 111ms (next.js: 7ms, application-code: 103ms)
+ GET /ask 200 in 453ms (next.js: 406ms, application-code: 47ms)
+ GET /ask 200 in 75ms (next.js: 7ms, application-code: 68ms)
+ GET /evals 200 in 416ms (next.js: 343ms, application-code: 73ms)
+ GET /documents 200 in 458ms (next.js: 403ms, application-code: 55ms)
+ GET /ask 200 in 71ms (next.js: 5ms, application-code: 66ms)
+ GET /evals 200 in 71ms (next.js: 6ms, application-code: 64ms)
+ GET /ask 200 in 71ms (next.js: 12ms, application-code: 59ms)
+ GET /ask 200 in 66ms (next.js: 6ms, application-code: 60ms)
+  Reload env: .env.local
+✓ Compiled in 347ms
+ GET /ask 200 in 611ms (next.js: 302ms, application-code: 309ms)
+ GET /ask 200 in 195ms (next.js: 82ms, application-code: 114ms)
+ GET /ask 200 in 71ms (next.js: 4ms, application-code: 67ms)
+ GET /ask 200 in 72ms (next.js: 32ms, application-code: 40ms)
+[?25h

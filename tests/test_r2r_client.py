@@ -361,3 +361,96 @@ class TestRagQueryFigures:
 
         assert len(result["citations"]) == 1
         assert result["citations"][0]["document"] == "policy.pdf"
+
+    @mock.patch("apps.api.services.r2r_client.figures_for_response")
+    @mock.patch("apps.api.services.r2r_client._client")
+    def test_rag_query_header_document_takes_precedence_over_meta(
+        self, mock_client_fn, mock_figures
+    ):
+        """arfix.AC1.1: Header document wins over meta.source_file."""
+        mock_figures.return_value = []
+
+        hit = mock.MagicMock()
+        hit.id = "r2r-hit"
+        hit.score = 0.91
+        hit.metadata = {"source_file": "meta_doc.pdf"}  # wrong source from R2R meta
+        hit.text = (
+            "DocQuery Citation: document_id=doc; source_file=header_doc.pdf; "
+            "page_start=4; page_end=4; section_path=Refunds; chunk_index=2\n\n"
+            "Body text."
+        )
+        mock_inner = mock.MagicMock()
+        mock_inner.generated_answer = "The answer."
+        mock_inner.search_results = mock.MagicMock()
+        mock_inner.search_results.chunk_search_results = [hit]
+        mock_response = mock.MagicMock()
+        mock_response.results = mock_inner
+        mock_client_fn.return_value.retrieval.rag.return_value = mock_response
+
+        from apps.api.services.r2r_client import rag_query
+
+        result = rag_query("question?")
+
+        # Header should win: document should be header_doc.pdf, not meta_doc.pdf
+        assert result["citations"][0]["document"] == "header_doc.pdf"
+
+    @mock.patch("apps.api.services.r2r_client.figures_for_response")
+    @mock.patch("apps.api.services.r2r_client._client")
+    def test_rag_query_meta_fallback_when_no_header(
+        self, mock_client_fn, mock_figures
+    ):
+        """arfix.AC1.2: Falls back to meta.source_file when no DocQuery header."""
+        mock_figures.return_value = []
+
+        hit = mock.MagicMock()
+        hit.id = "r2r-hit"
+        hit.score = 0.91
+        hit.metadata = {"source_file": "fallback_doc.pdf"}
+        hit.text = "Plain text with no DocQuery header."
+
+        mock_inner = mock.MagicMock()
+        mock_inner.generated_answer = "The answer."
+        mock_inner.search_results = mock.MagicMock()
+        mock_inner.search_results.chunk_search_results = [hit]
+        mock_response = mock.MagicMock()
+        mock_response.results = mock_inner
+        mock_client_fn.return_value.retrieval.rag.return_value = mock_response
+
+        from apps.api.services.r2r_client import rag_query
+
+        result = rag_query("question?")
+
+        assert result["citations"][0]["document"] == "fallback_doc.pdf"
+
+    @mock.patch("apps.api.services.r2r_client.figures_for_response")
+    @mock.patch("apps.api.services.r2r_client._client")
+    def test_rag_query_header_page_takes_precedence_over_meta(
+        self, mock_client_fn, mock_figures
+    ):
+        """arfix.AC1.3: Header page wins over meta.page_start."""
+        mock_figures.return_value = []
+
+        hit = mock.MagicMock()
+        hit.id = "r2r-hit"
+        hit.score = 0.91
+        hit.metadata = {"page_start": 10, "page_end": 11}
+        hit.text = (
+            "DocQuery Citation: document_id=doc; source_file=doc.pdf; "
+            "page_start=4; page_end=5; section_path=Intro; chunk_index=0\n\n"
+            "Body text."
+        )
+        mock_inner = mock.MagicMock()
+        mock_inner.generated_answer = "The answer."
+        mock_inner.search_results = mock.MagicMock()
+        mock_inner.search_results.chunk_search_results = [hit]
+        mock_response = mock.MagicMock()
+        mock_response.results = mock_inner
+        mock_client_fn.return_value.retrieval.rag.return_value = mock_response
+
+        from apps.api.services.r2r_client import rag_query
+
+        result = rag_query("question?")
+
+        # Header should win: page should be 4 (from header), not 10 (from meta)
+        assert result["citations"][0]["page"] == 4
+        assert result["citations"][0]["page_end"] == 5
