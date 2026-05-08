@@ -1,4 +1,5 @@
 """Shared state type for all workflow graphs."""
+# pattern: Functional Core
 from typing import Any, TypedDict
 
 

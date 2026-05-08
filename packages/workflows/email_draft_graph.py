@@ -3,6 +3,7 @@
 Proposing to send an email is an external action → requires_human_approval always True.
 This is a simplified graph for demo purposes.
 """
+# pattern: Imperative Shell
 from __future__ import annotations
 
 import os

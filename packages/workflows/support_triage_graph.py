@@ -9,6 +9,7 @@ this field and must not send the response until a human approves.
 
 Nodes are pure functions. No side effects except retrieve_context (R2R call).
 """
+# pattern: Imperative Shell
 from __future__ import annotations
 
 import os
@@ -53,7 +54,9 @@ def classify_intent(state: SupportState) -> SupportState:
     for pattern, intent in _INTENT_RULES:
         if re.search(pattern, msg):
             return {**state, "intent": intent}
-    # LLM fallback — counts against 10% LLM budget
+    # LLM fallback — only if API key is available; otherwise default to "general"
+    if not os.getenv("OPENAI_API_KEY"):
+        return {**state, "intent": "general"}
     llm = ChatOpenAI(model=_LLM_MODEL, temperature=0)
     prompt = (
         f"Classify this customer message into one of: refund_request, pricing_inquiry, "

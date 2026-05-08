@@ -3,6 +3,7 @@
 These are pure functions — no side effects, no LLM calls.
 Rules are from packages/workflows/CONTEXT.md invariants.
 """
+# pattern: Functional Core
 from __future__ import annotations
 
 import re
