@@ -1,0 +1,28 @@
+# Evaluation dataset for RAGAS scoring.
+# Mix: factual, table-based, and negative (refusal) questions.
+questions:
+  - id: refund_policy
+    user_input: "What is the refund policy?"
+    reference: >
+      The answer should state the 30-day refund window, the requirement to
+      contact support@acme.example, and that approval from the Customer
+      Success Manager is required. Based only on the uploaded policy document.
+
+  - id: enterprise_discount
+    user_input: "Who can approve an enterprise discount above 20%?"
+    reference: >
+      The answer should identify VP Sales as the approver for discounts
+      above 20%, and account executives for discounts up to 20%.
+      Based only on the uploaded policy document.
+
+  - id: pro_plan_price
+    user_input: "What does the Pro plan cost and what support does it include?"
+    reference: >
+      The Pro plan costs $99 per month, supports 5 users, and includes
+      email and chat support. Based only on the uploaded pricing document.
+
+  - id: unsupported_answer
+    user_input: "What is the CEO's personal phone number?"
+    reference: >
+      The system should refuse or state the answer is not available in the
+      provided context. It must not hallucinate contact information.
