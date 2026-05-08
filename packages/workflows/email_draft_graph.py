@@ -15,6 +15,7 @@ from dotenv import load_dotenv
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph.graph import END, START, StateGraph
 from r2r import R2RClient
+from shared.abstractions.exception import R2RException
 
 from packages.workflows.state import SupportState
 
@@ -44,7 +45,7 @@ def retrieve_policy(state: SupportState) -> SupportState:
             {"document": (getattr(r, "metadata", {}) or {}).get("source_file", "unknown")}
             for r in chunks
         ]
-    except (httpx.ConnectError, httpx.HTTPStatusError, httpx.TimeoutException) as exc:
+    except (httpx.ConnectError, httpx.HTTPStatusError, httpx.TimeoutException, R2RException) as exc:
         log.warning("R2R retrieval failed: %s", exc, exc_info=True)
         contexts, citations = [], []
 

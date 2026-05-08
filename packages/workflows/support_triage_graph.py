@@ -21,6 +21,7 @@ from dotenv import load_dotenv
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph.graph import END, START, StateGraph
 from r2r import R2RClient
+from shared.abstractions.exception import R2RException
 
 from packages.workflows.approval_policy import (
     confidence_from_contexts,
@@ -100,7 +101,7 @@ def retrieve_context(state: SupportState) -> SupportState:
             for r in search_results
         ]
         answer = getattr(inner, "generated_answer", "") or ""
-    except (httpx.ConnectError, httpx.HTTPStatusError, httpx.TimeoutException) as exc:
+    except (httpx.ConnectError, httpx.HTTPStatusError, httpx.TimeoutException, R2RException) as exc:
         log.warning("R2R retrieval failed: %s", exc, exc_info=True)
         retrieved_contexts = []
         citations = []
