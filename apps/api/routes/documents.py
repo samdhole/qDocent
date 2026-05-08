@@ -33,7 +33,7 @@ def delete_document(document_id: str) -> dict:
     """Delete DocQuery's locally stored source PDF for a document."""
     manifest = load_document_manifest(document_id)
     r2r_ids = (manifest or {}).get("r2r_document_ids", [])
-    r2r_delete: str | dict = "not_configured"
+    r2r_delete: dict = {"deleted": [], "failed": []}
     if r2r_ids:
         try:
             r2r_delete = r2r_client.delete_r2r_documents(r2r_ids)

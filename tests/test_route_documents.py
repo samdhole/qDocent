@@ -80,7 +80,7 @@ def test_delete_document_removes_stored_source_pdf(
     assert response.json() == {
         "status": "deleted",
         "document_id": "doc123",
-        "r2r_delete": "not_configured",
+        "r2r_delete": {"deleted": [], "failed": []},
     }
     assert not doc_dir.exists()
 
