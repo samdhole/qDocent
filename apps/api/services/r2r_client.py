@@ -155,6 +155,20 @@ def ingest_prechunked_document(chunks: list[dict[str, Any]], report: dict[str, A
         raise RuntimeError(f"R2R unavailable: {exc}") from exc
 
 
+def _valid_chunks(chunks: list[dict]) -> list[dict]:
+    """Filter out chunks missing required fields for citation header embedding."""
+    required = {"text", "document_id", "source_file"}
+    valid = [c for c in chunks if all(c.get(k) for k in required)]
+    if len(valid) < len(chunks):
+        log = logging.getLogger(__name__)
+        log.warning(
+            "Dropped %d of %d chunks missing required fields",
+            len(chunks) - len(valid),
+            len(chunks),
+        )
+    return valid
+
+
 def ingest_file_with_pipeline(
     file_path: str, original_filename: str | None = None
 ) -> dict:
@@ -187,7 +201,9 @@ def ingest_file_with_pipeline(
     report = pipeline_result.get("report", {})
     source_url = None
     r2r_document_ids: list[str] = []
-    if chunks:
+    if chunks:  # validation pass first (Task 3)
+        chunks = _valid_chunks(chunks)
+    if chunks:  # pre-chunked path — may be empty after validation → falls to else
         r2r_result = ingest_prechunked_document(chunks, report)
         primary_r2r_id = _r2r_document_id_from_response(r2r_result)
         if primary_r2r_id:
@@ -202,11 +218,10 @@ def ingest_file_with_pipeline(
         if document_id and source_file:
             save_source_pdf(file_path, document_id=document_id, source_file=source_file)
             source_url = f"/documents/{document_id}/source"
-    else:
+    else:  # fallback path: no chunks, pipeline failed, or all chunks filtered invalid
         r2r_result = ingest_file(file_path)
         ingestion_mode = "raw_file_fallback"
-        # Save source PDF and set source_url for fallback path if pipeline provided a document_id.
-        # When the pipeline itself raised (pipeline_result = {}), document_id is None and we skip.
+        # Task 2: save source PDF when pipeline provided a document_id
         _fallback_doc_id = report.get("document_id")
         _fallback_source = (
             report.get("source_file")

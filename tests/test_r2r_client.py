@@ -259,6 +259,90 @@ class TestIngestFileWithPipeline:
         mock_save_source.assert_not_called()
         assert result["ingestion_mode"] == "raw_file_fallback"
 
+    @mock.patch("apps.api.services.r2r_client.save_source_pdf")
+    @mock.patch("apps.api.services.r2r_client.write_document_manifest")
+    @mock.patch("apps.api.services.r2r_client.ingest_prechunked_document")
+    @mock.patch("apps.api.services.r2r_client.run_pipeline")
+    def test_chunk_validation_filters_invalid_chunks(
+        self, mock_pipeline, mock_ingest_chunks, mock_manifest, mock_save_source
+    ):
+        """Chunks missing required fields are filtered out (arfix.AC7.1)."""
+        valid_chunk = {"text": "Valid content", "document_id": "doc", "source_file": "test.pdf"}
+        invalid_chunk = {"text": "", "document_id": "doc", "source_file": "test.pdf"}  # empty text
+        mock_pipeline.return_value = {
+            "report": {"document_id": "doc", "source_file": "test.pdf"},
+            "chunks": [valid_chunk, invalid_chunk],
+            "classifier": {},
+            "figures": [],
+            "figure_manifest": None,
+        }
+        mock_ingest_chunks.return_value = "ok"
+
+        from apps.api.services.r2r_client import ingest_file_with_pipeline
+
+        ingest_file_with_pipeline("/tmp/tmpXXXX.pdf")
+
+        # Should be called with only the valid chunk, not the invalid one
+        mock_ingest_chunks.assert_called_once()
+        called_chunks = mock_ingest_chunks.call_args[0][0]
+        assert len(called_chunks) == 1
+        assert called_chunks[0]["text"] == "Valid content"
+
+    @mock.patch("apps.api.services.r2r_client.save_source_pdf")
+    @mock.patch("apps.api.services.r2r_client.ingest_file")
+    @mock.patch("apps.api.services.r2r_client.run_pipeline")
+    def test_all_invalid_chunks_falls_back_to_raw_pdf(
+        self, mock_pipeline, mock_ingest, mock_save_source
+    ):
+        """When all chunks are invalid, fallback to raw ingest (arfix.AC7.2)."""
+        invalid_chunk = {"text": "", "document_id": "doc", "source_file": "test.pdf"}
+        mock_pipeline.return_value = {
+            "report": {"document_id": "doc", "source_file": "test.pdf"},
+            "chunks": [invalid_chunk],
+            "classifier": {},
+            "figures": [],
+            "figure_manifest": None,
+        }
+        mock_ingest.return_value = "ok"
+
+        from apps.api.services.r2r_client import ingest_file_with_pipeline
+
+        result = ingest_file_with_pipeline("/tmp/tmpXXXX.pdf")
+
+        mock_ingest.assert_called_once_with("/tmp/tmpXXXX.pdf")
+        assert result["ingestion_mode"] == "raw_file_fallback"
+
+    @mock.patch("apps.api.services.r2r_client.save_source_pdf")
+    @mock.patch("apps.api.services.r2r_client.write_document_manifest")
+    @mock.patch("apps.api.services.r2r_client.ingest_prechunked_document")
+    @mock.patch("apps.api.services.r2r_client.run_pipeline")
+    def test_valid_chunks_pass_through_unchanged(
+        self, mock_pipeline, mock_ingest_chunks, mock_manifest, mock_save_source
+    ):
+        """Valid chunks with all required fields pass through unchanged (arfix.AC7.3)."""
+        valid_chunks = [
+            {"text": "Content 1", "document_id": "doc", "source_file": "test.pdf"},
+            {"text": "Content 2", "document_id": "doc", "source_file": "test.pdf"},
+        ]
+        mock_pipeline.return_value = {
+            "report": {"document_id": "doc", "source_file": "test.pdf"},
+            "chunks": valid_chunks,
+            "classifier": {},
+            "figures": [],
+            "figure_manifest": None,
+        }
+        mock_ingest_chunks.return_value = "ok"
+
+        from apps.api.services.r2r_client import ingest_file_with_pipeline
+
+        ingest_file_with_pipeline("/tmp/tmpXXXX.pdf")
+
+        # Should be called with all valid chunks unchanged
+        mock_ingest_chunks.assert_called_once()
+        called_chunks = mock_ingest_chunks.call_args[0][0]
+        assert len(called_chunks) == 2
+        assert called_chunks == valid_chunks
+
     @mock.patch("apps.api.services.r2r_client.write_document_manifest")
     @mock.patch("apps.api.services.r2r_client.ingest_file")
     @mock.patch("apps.api.services.r2r_client.ingest_prechunked_document")
