@@ -63,6 +63,7 @@ export default function AnswerCard({ result }: Props) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {result.figures.map((fig) => (
               <figure key={fig.figure_id} className="border rounded p-2">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={`${API}${fig.image_url}`}
                   alt={fig.caption || fig.figure_id}
