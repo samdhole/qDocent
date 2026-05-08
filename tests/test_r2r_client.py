@@ -1,4 +1,6 @@
 """Tests for R2R client and confidence heuristic."""
+from unittest import mock
+
 from apps.api.services.r2r_client_helpers import _label_from_score
 
 
@@ -35,9 +37,6 @@ def test_no_results():
     confidence_label, needs_review = _label_from_score(0.0)
     assert confidence_label == "low"
     assert needs_review is True
-
-
-from unittest import mock
 
 
 class TestIngestFileWithPipeline:

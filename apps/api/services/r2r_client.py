@@ -134,7 +134,7 @@ def ingest_file_with_pipeline(
     if figure_manifest:
         try:
             figure_r2r_result = ingest_file(figure_manifest)
-        except Exception as exc:
+        except RuntimeError as exc:
             log.warning("Figure manifest ingest failed: %s", exc)
 
     return {
