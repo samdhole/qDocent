@@ -1,17 +1,9 @@
 "use client";
 import { useState } from "react";
 import AnswerCard from "./AnswerCard";
+import type { AskResponse } from "@/lib/types";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
-
-type AskResponse = {
-  question: string;
-  answer: string;
-  citations: { document: string; page?: number; section?: string; chunk_id?: string }[];
-  retrieved_contexts: { chunk_id?: string; text: string; score: number }[];
-  confidence_label: "high" | "medium" | "low" | "needs_review";
-  needs_human_review: boolean;
-};
 
 export default function AskForm() {
   const [question, setQuestion] = useState("");
