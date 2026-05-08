@@ -18,7 +18,7 @@ export default function DocumentsPage() {
       form.append("file", file);
       const res = await fetch(`${API}/ingest`, { method: "POST", body: form });
       const data = await res.json();
-      setStatus(res.ok ? `Ingested: ${data.result}` : `Error: ${data.detail}`);
+      setStatus(res.ok ? `Ingested document ID: ${data.document_id ?? "OK"}` : `Error: ${data.detail}`);
     } catch (err: unknown) {
       setStatus(err instanceof Error ? err.message : "Upload failed");
     } finally {
