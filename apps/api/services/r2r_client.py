@@ -104,3 +104,34 @@ def ingest_file(file_path: str) -> Any:
         return client.documents.create(file_path=file_path)
     except (httpx.ConnectError, httpx.HTTPStatusError, httpx.TimeoutException) as exc:
         raise RuntimeError(f"R2R unavailable: {exc}") from exc
+
+
+def ingest_file_with_pipeline(file_path: str) -> dict:
+    """Run Phase 3 ingestion pipeline, then ingest the original file into R2R.
+
+    Returns combined result: R2R response + quality report.
+    Gracefully falls back to plain R2R ingestion if pipeline fails.
+    """
+    import logging
+    from packages.ingestion.pipeline import run_pipeline
+
+    log = logging.getLogger(__name__)
+    pipeline_result: dict = {}
+    try:
+        pipeline_result = run_pipeline(file_path)
+        log.info(
+            "Pipeline complete: %d chunks, %d tables",
+            len(pipeline_result.get("chunks", [])),
+            pipeline_result.get("report", {}).get("tables_detected", 0),
+        )
+    except Exception as exc:
+        log.warning("Pipeline failed, falling back to direct R2R ingest: %s", exc)
+
+    # Always ingest the raw file into R2R for vector retrieval
+    r2r_result = ingest_file(file_path)
+
+    return {
+        "r2r": str(r2r_result),
+        "quality_report": pipeline_result.get("report"),
+        "document_id": pipeline_result.get("report", {}).get("document_id"),
+    }
