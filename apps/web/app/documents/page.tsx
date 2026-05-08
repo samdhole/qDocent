@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { IngestJob } from "@/lib/types";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -22,6 +22,7 @@ export default function DocumentsPage() {
   const [uploading, setUploading] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  const pollAbortRef = useRef<AbortController | null>(null);
 
   async function readDocuments(signal?: AbortSignal) {
     const res = await fetch(`${API}/documents`, { signal });
@@ -40,6 +41,12 @@ export default function DocumentsPage() {
       })
       .finally(() => setLoadingDocuments(false));
     return () => controller.abort();
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      pollAbortRef.current?.abort();
+    };
   }, []);
 
   async function loadDocuments() {
@@ -70,17 +77,23 @@ export default function DocumentsPage() {
       }
       setJob(data);
       setStatus(`Queued ingest job: ${data.job_id}`);
-      void pollJob(data.job_id);
+      // abort any previous poll
+      pollAbortRef.current?.abort();
+      const controller = new AbortController();
+      pollAbortRef.current = controller;
+      void pollJob(data.job_id, controller.signal);
     } catch (err: unknown) {
       setStatus(err instanceof Error ? err.message : "Upload failed");
       setUploading(false);
     }
   }
 
-  async function pollJob(jobId: string) {
+  async function pollJob(jobId: string, signal: AbortSignal) {
     const maxAttempts = 90;
     for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-      const res = await fetch(`${API}/ingest/jobs/${jobId}`);
+      if (signal.aborted) return;
+      const res = await fetch(`${API}/ingest/jobs/${jobId}`, { signal }).catch(() => null);
+      if (res === null || signal.aborted) return;
       const nextJob = await res.json();
       if (!res.ok) {
         setStatus(`Error: ${nextJob.detail ?? "Could not load ingest job."}`);
@@ -100,7 +113,10 @@ export default function DocumentsPage() {
         setUploading(false);
         return;
       }
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      await new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(resolve, 1000);
+        signal.addEventListener("abort", () => { clearTimeout(timer); resolve(); });
+      });
     }
     setStatus("Ingest is still running. Refresh stored sources in a moment.");
     setUploading(false);
