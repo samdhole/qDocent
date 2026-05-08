@@ -65,7 +65,7 @@ def test_chunk_text_for_r2r_none_fields_produce_empty_string():
     """None values in chunk fields write empty string in header, not the literal 'None'."""
     chunk = {"text": "body", "document_id": None, "source_file": None, "page_start": None}
     text = chunk_text_for_r2r(chunk, chunk_index=0)
-    assert "document_id=;" in text or text.startswith("DocQuery Citation: document_id=;")
+    assert "document_id=;" in text
     assert "source_file=;" in text
     assert "page_start=;" in text
     citation, clean = citation_from_retrieved_text(text)

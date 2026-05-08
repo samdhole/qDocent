@@ -424,16 +424,16 @@ class TestRagQueryFigures:
 
     @mock.patch("apps.api.services.r2r_client.figures_for_response")
     @mock.patch("apps.api.services.r2r_client._client")
-    def test_rag_query_header_page_takes_precedence_over_meta(
+    def test_rag_query_header_fields_take_precedence_over_meta(
         self, mock_client_fn, mock_figures
     ):
-        """arfix.AC1.3: Header page wins over meta.page_start."""
+        """arfix.AC1.3: Header page and section win over meta fields."""
         mock_figures.return_value = []
 
         hit = mock.MagicMock()
         hit.id = "r2r-hit"
         hit.score = 0.91
-        hit.metadata = {"page_start": 10, "page_end": 11}
+        hit.metadata = {"page_start": 10, "page_end": 11, "section_path": "Meta Section"}
         hit.text = (
             "DocQuery Citation: document_id=doc; source_file=doc.pdf; "
             "page_start=4; page_end=5; section_path=Intro; chunk_index=0\n\n"
@@ -451,6 +451,7 @@ class TestRagQueryFigures:
 
         result = rag_query("question?")
 
-        # Header should win: page should be 4 (from header), not 10 (from meta)
+        # Header should win for all fields: page, page_end, section
         assert result["citations"][0]["page"] == 4
         assert result["citations"][0]["page_end"] == 5
+        assert result["citations"][0]["section"] == "Intro"

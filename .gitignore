@@ -41,6 +41,12 @@ Thumbs.db
 # Pytest
 .pytest_cache/
 pytest_results.txt
+pytest_output.txt
+*_resp.json
+
+# Runtime logs
+*.log
+logs/
 
 # Vibecoding artifacts
 HANDOFF.md
