@@ -1,4 +1,5 @@
 """Tests for persisted source PDF lookup."""
+import logging
 import os
 from pathlib import Path
 
@@ -187,8 +188,12 @@ def test_safe_segment_sanitizes_spaces_to_underscores():
 
 
 def test_safe_segment_strips_leading_trailing_dots():
-    """Leading/trailing dots and underscores are stripped."""
+    """Leading/trailing dots are stripped."""
     assert _safe_segment(".abc.") == "abc"
+
+
+def test_safe_segment_strips_leading_trailing_underscores():
+    """Leading/trailing underscores are stripped."""
     assert _safe_segment("_abc_") == "abc"
 
 
@@ -196,7 +201,7 @@ def test_safe_segment_strips_leading_trailing_dots():
 
 
 def test_load_document_manifest_returns_none_on_corrupt_json(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ):
     """Corrupt JSON in manifest.json returns None with warning logged."""
     monkeypatch.setattr(document_store_mod, "DOCUMENTS_DIR", tmp_path / "documents")
@@ -204,9 +209,43 @@ def test_load_document_manifest_returns_none_on_corrupt_json(
     doc_dir.mkdir(parents=True)
     (doc_dir / "manifest.json").write_text("not json", encoding="utf-8")
 
-    result = load_document_manifest("doc123")
+    with caplog.at_level(logging.WARNING, logger="apps.api.services.document_store"):
+        result = load_document_manifest("doc123")
 
     assert result is None
+    assert "Corrupt manifest" in caplog.text
+
+
+def test_load_document_manifest_returns_none_when_json_is_null(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+):
+    """Manifest with JSON null (valid JSON, not a dict) returns None with warning logged."""
+    monkeypatch.setattr(document_store_mod, "DOCUMENTS_DIR", tmp_path / "documents")
+    doc_dir = tmp_path / "documents" / "doc123"
+    doc_dir.mkdir(parents=True)
+    (doc_dir / "manifest.json").write_text("null", encoding="utf-8")
+
+    with caplog.at_level(logging.WARNING, logger="apps.api.services.document_store"):
+        result = load_document_manifest("doc123")
+
+    assert result is None
+    assert "is not a JSON object" in caplog.text
+
+
+def test_load_document_manifest_returns_none_when_json_is_array(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+):
+    """Manifest with JSON array (valid JSON, not a dict) returns None with warning logged."""
+    monkeypatch.setattr(document_store_mod, "DOCUMENTS_DIR", tmp_path / "documents")
+    doc_dir = tmp_path / "documents" / "doc123"
+    doc_dir.mkdir(parents=True)
+    (doc_dir / "manifest.json").write_text("[1, 2, 3]", encoding="utf-8")
+
+    with caplog.at_level(logging.WARNING, logger="apps.api.services.document_store"):
+        result = load_document_manifest("doc123")
+
+    assert result is None
+    assert "is not a JSON object" in caplog.text
 
 
 def test_load_document_manifest_returns_none_when_r2r_ids_is_null(
@@ -244,7 +283,7 @@ def test_load_document_manifest_returns_none_when_r2r_ids_is_string(
 
 
 def test_load_document_manifest_returns_none_when_r2r_ids_missing(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ):
     """Manifest missing r2r_document_ids field returns None."""
     monkeypatch.setattr(document_store_mod, "DOCUMENTS_DIR", tmp_path / "documents")
@@ -255,9 +294,11 @@ def test_load_document_manifest_returns_none_when_r2r_ids_missing(
         encoding="utf-8",
     )
 
-    result = load_document_manifest("doc123")
+    with caplog.at_level(logging.WARNING, logger="apps.api.services.document_store"):
+        result = load_document_manifest("doc123")
 
     assert result is None
+    assert "missing valid r2r_document_ids" in caplog.text
 
 
 def test_load_document_manifest_round_trips_with_valid_schema(

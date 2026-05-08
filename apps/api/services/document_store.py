@@ -53,6 +53,9 @@ def load_document_manifest(document_id: str) -> dict[str, Any] | None:
     except json.JSONDecodeError as exc:
         _log.warning("Corrupt manifest for %r: %s", document_id, exc)
         return None
+    if not isinstance(data, dict):
+        _log.warning("Manifest for %r is not a JSON object (got %s)", document_id, type(data).__name__)
+        return None
     if not isinstance(data.get("r2r_document_ids"), list):
         _log.warning("Manifest for %r missing valid r2r_document_ids field", document_id)
         return None
