@@ -22,7 +22,7 @@ class TestSupportTriageWorkflow:
         mock_search_result.metadata = {"source_file": "policy.pdf", "page_start": 1}
 
         mock_response.search_results = [mock_search_result]
-        mock_response.generated_answer = "Items can be returned within 30 days of purchase."
+        mock_response.generated_answer = "We will process your refund within 30 days of purchase."
 
         mock_r2r = mock.Mock()
         mock_r2r.retrieval.rag.return_value = mock_response
@@ -61,7 +61,7 @@ class TestSupportTriageWorkflow:
         mock_search_result.metadata = {"source_file": "policy.pdf", "page_start": 1}
 
         mock_response.search_results = [mock_search_result]
-        mock_response.generated_answer = "We offer refunds within 30 days."
+        mock_response.generated_answer = "We offer a refund within 30 days."
 
         mock_r2r = mock.Mock()
         mock_r2r.retrieval.rag.return_value = mock_response
