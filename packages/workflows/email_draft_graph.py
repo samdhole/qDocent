@@ -33,13 +33,16 @@ def retrieve_policy(state: SupportState) -> SupportState:
             query=state["customer_message"],
             search_settings=_SEARCH_SETTINGS,
         )
+        inner = getattr(response, "results", response)
+        agg = getattr(inner, "search_results", None)
+        chunks = getattr(agg, "chunk_search_results", None) or [] if agg else []
         contexts = [
             {"text": getattr(r, "text", "")[:300], "score": round(getattr(r, "score", 0.0) or 0.0, 4)}
-            for r in (getattr(response, "search_results", None) or [])
+            for r in chunks
         ]
         citations = [
             {"document": (getattr(r, "metadata", {}) or {}).get("source_file", "unknown")}
-            for r in (getattr(response, "search_results", None) or [])
+            for r in chunks
         ]
     except (httpx.ConnectError, httpx.HTTPStatusError, httpx.TimeoutException) as exc:
         log.warning("R2R retrieval failed: %s", exc, exc_info=True)

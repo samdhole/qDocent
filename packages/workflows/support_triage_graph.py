@@ -78,7 +78,9 @@ def retrieve_context(state: SupportState) -> SupportState:
             query=state["customer_message"],
             search_settings=_SEARCH_SETTINGS,
         )
-        search_results = getattr(response, "search_results", None) or []
+        inner = getattr(response, "results", response)
+        agg = getattr(inner, "search_results", None)
+        search_results = getattr(agg, "chunk_search_results", None) or [] if agg else []
         retrieved_contexts = [
             {
                 "chunk_id": getattr(r, "id", None),
@@ -95,7 +97,7 @@ def retrieve_context(state: SupportState) -> SupportState:
             }
             for r in search_results
         ]
-        answer = getattr(response, "generated_answer", "") or ""
+        answer = getattr(inner, "generated_answer", "") or ""
     except (httpx.ConnectError, httpx.HTTPStatusError, httpx.TimeoutException) as exc:
         log.warning("R2R retrieval failed: %s", exc, exc_info=True)
         retrieved_contexts = []

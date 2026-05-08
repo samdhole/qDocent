@@ -6,6 +6,13 @@ import pytest
 from packages.workflows.email_draft_graph import run_email_draft
 
 
+def _make_r2r_response(search_results: list) -> mock.Mock:
+    """Build a mock matching the new R2R SDK response shape: response.results.*"""
+    resp = mock.Mock()
+    resp.results.search_results.chunk_search_results = search_results
+    return resp
+
+
 class TestEmailDraftWorkflow:
     """Test email draft workflow."""
 
@@ -13,16 +20,13 @@ class TestEmailDraftWorkflow:
     @mock.patch("packages.workflows.email_draft_graph.ChatGoogleGenerativeAI")
     def test_email_draft_always_requires_approval(self, mock_llm_class, mock_r2r_class):
         """Email draft always returns requires_human_approval=True."""
-        mock_response = mock.Mock()
         mock_search_result = mock.Mock()
         mock_search_result.text = "Policy context"
         mock_search_result.score = 0.85
         mock_search_result.metadata = {"source_file": "policy.pdf"}
 
-        mock_response.search_results = [mock_search_result]
-
         mock_r2r = mock.Mock()
-        mock_r2r.retrieval.rag.return_value = mock_response
+        mock_r2r.retrieval.rag.return_value = _make_r2r_response([mock_search_result])
         mock_r2r_class.return_value = mock_r2r
 
         mock_llm = mock.Mock()
@@ -33,7 +37,6 @@ class TestEmailDraftWorkflow:
 
         result = run_email_draft("Draft a reply to customer@example.com")
 
-        # Email draft always requires approval
         assert result["requires_human_approval"] is True
         assert result["final_response"] == "[Awaiting human approval before sending email]"
 
@@ -41,11 +44,8 @@ class TestEmailDraftWorkflow:
     @mock.patch("packages.workflows.email_draft_graph.ChatGoogleGenerativeAI")
     def test_email_draft_returns_full_state(self, mock_llm_class, mock_r2r_class):
         """Email draft returns complete workflow state."""
-        mock_response = mock.Mock()
-        mock_response.search_results = []
-
         mock_r2r = mock.Mock()
-        mock_r2r.retrieval.rag.return_value = mock_response
+        mock_r2r.retrieval.rag.return_value = _make_r2r_response([])
         mock_r2r_class.return_value = mock_r2r
 
         mock_llm = mock.Mock()
@@ -56,7 +56,6 @@ class TestEmailDraftWorkflow:
 
         result = run_email_draft("Write a reply")
 
-        # Verify all state fields are present
         assert "customer_message" in result
         assert "intent" in result
         assert "draft_response" in result
@@ -83,6 +82,5 @@ class TestEmailDraftWorkflow:
 
         result = run_email_draft("Draft a reply")
 
-        # Should succeed and still require approval
         assert result["requires_human_approval"] is True
         assert result["retrieved_contexts"] == []

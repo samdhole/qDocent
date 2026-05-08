@@ -6,6 +6,14 @@ import pytest
 from packages.workflows.support_triage_graph import run_support_triage
 
 
+def _make_r2r_response(answer: str, search_results: list) -> mock.Mock:
+    """Build a mock matching the new R2R SDK response shape: response.results.*"""
+    resp = mock.Mock()
+    resp.results.generated_answer = answer
+    resp.results.search_results.chunk_search_results = search_results
+    return resp
+
+
 class TestSupportTriageWorkflow:
     """Test support triage workflow graph execution."""
 
@@ -13,28 +21,24 @@ class TestSupportTriageWorkflow:
     @mock.patch("packages.workflows.support_triage_graph.ChatGoogleGenerativeAI")
     def test_support_triage_returns_full_state(self, mock_llm_class, mock_r2r_class):
         """run_support_triage returns dict with all 8 SupportState fields."""
-        # Mock R2R response
-        mock_response = mock.Mock()
         mock_search_result = mock.Mock()
         mock_search_result.id = "chunk_1"
         mock_search_result.text = "Return policy: items can be returned within 30 days."
         mock_search_result.score = 0.85
         mock_search_result.metadata = {"source_file": "policy.pdf", "page_start": 1}
 
-        mock_response.search_results = [mock_search_result]
-        mock_response.generated_answer = "We will process your refund within 30 days of purchase."
-
         mock_r2r = mock.Mock()
-        mock_r2r.retrieval.rag.return_value = mock_response
+        mock_r2r.retrieval.rag.return_value = _make_r2r_response(
+            "We will process your refund within 30 days of purchase.",
+            [mock_search_result],
+        )
         mock_r2r_class.return_value = mock_r2r
 
-        # Mock LLM (for classify_intent fallback, not needed here due to rule match)
         mock_llm = mock.Mock()
         mock_llm_class.return_value = mock_llm
 
         result = run_support_triage("I need a refund")
 
-        # Verify all 8 state fields are present
         assert isinstance(result, dict)
         assert "customer_message" in result
         assert "intent" in result
@@ -45,7 +49,6 @@ class TestSupportTriageWorkflow:
         assert "requires_human_approval" in result
         assert "final_response" in result
 
-        # Verify refund triggers approval
         assert result["requires_human_approval"] is True
         assert result["final_response"] == "[Awaiting human approval]"
 
@@ -53,18 +56,17 @@ class TestSupportTriageWorkflow:
     @mock.patch("packages.workflows.support_triage_graph.ChatGoogleGenerativeAI")
     def test_support_triage_refund_requires_approval(self, mock_llm_class, mock_r2r_class):
         """Refund requests trigger requires_human_approval."""
-        mock_response = mock.Mock()
         mock_search_result = mock.Mock()
         mock_search_result.id = "chunk_1"
         mock_search_result.text = "Refund policy information"
         mock_search_result.score = 0.90
         mock_search_result.metadata = {"source_file": "policy.pdf", "page_start": 1}
 
-        mock_response.search_results = [mock_search_result]
-        mock_response.generated_answer = "We offer a refund within 30 days."
-
         mock_r2r = mock.Mock()
-        mock_r2r.retrieval.rag.return_value = mock_response
+        mock_r2r.retrieval.rag.return_value = _make_r2r_response(
+            "We offer a refund within 30 days.",
+            [mock_search_result],
+        )
         mock_r2r_class.return_value = mock_r2r
 
         mock_llm = mock.Mock()
@@ -72,7 +74,6 @@ class TestSupportTriageWorkflow:
 
         result = run_support_triage("I need a refund")
 
-        # Refund keyword → approval required
         assert result["requires_human_approval"] is True
         assert result["final_response"] == "[Awaiting human approval]"
 
@@ -80,26 +81,27 @@ class TestSupportTriageWorkflow:
     @mock.patch("packages.workflows.support_triage_graph.ChatGoogleGenerativeAI")
     def test_support_triage_high_confidence_clean_no_approval(self, mock_llm_class, mock_r2r_class):
         """Clean high-confidence answer does not require approval."""
-        mock_response = mock.Mock()
         mock_search_result = mock.Mock()
         mock_search_result.id = "chunk_2"
         mock_search_result.text = "Business hours are 9am to 5pm Monday through Friday."
         mock_search_result.score = 0.92
         mock_search_result.metadata = {"source_file": "info.pdf", "page_start": 1}
 
-        mock_response.search_results = [mock_search_result]
-        mock_response.generated_answer = "Our office hours are 9am to 5pm Monday through Friday."
-
         mock_r2r = mock.Mock()
-        mock_r2r.retrieval.rag.return_value = mock_response
+        mock_r2r.retrieval.rag.return_value = _make_r2r_response(
+            "Our office hours are 9am to 5pm Monday through Friday.",
+            [mock_search_result],
+        )
         mock_r2r_class.return_value = mock_r2r
 
         mock_llm = mock.Mock()
+        mock_llm_response = mock.Mock()
+        mock_llm_response.content = "general"
+        mock_llm.invoke.return_value = mock_llm_response
         mock_llm_class.return_value = mock_llm
 
         result = run_support_triage("What are your business hours?")
 
-        # High confidence + no sensitive keywords → no approval needed
         assert result["requires_human_approval"] is False
         assert result["final_response"] != "[Awaiting human approval]"
         assert "9am to 5pm" in result["final_response"]
@@ -108,12 +110,8 @@ class TestSupportTriageWorkflow:
     @mock.patch("packages.workflows.support_triage_graph.ChatGoogleGenerativeAI")
     def test_support_triage_no_contexts_requires_approval(self, mock_llm_class, mock_r2r_class):
         """No retrieved contexts triggers approval requirement."""
-        mock_response = mock.Mock()
-        mock_response.search_results = []
-        mock_response.generated_answer = ""
-
         mock_r2r = mock.Mock()
-        mock_r2r.retrieval.rag.return_value = mock_response
+        mock_r2r.retrieval.rag.return_value = _make_r2r_response("", [])
         mock_r2r_class.return_value = mock_r2r
 
         mock_llm = mock.Mock()
@@ -121,7 +119,6 @@ class TestSupportTriageWorkflow:
 
         result = run_support_triage("What is your policy on something unusual?")
 
-        # No contexts + low confidence → approval required
         assert result["requires_human_approval"] is True
         assert result["final_response"] == "[Awaiting human approval]"
         assert result["confidence_label"] == "low"
@@ -141,7 +138,6 @@ class TestSupportTriageWorkflow:
 
         result = run_support_triage("Can I get a discount?")
 
-        # Graceful failure: no contexts → low confidence → approval required
         assert result["retrieved_contexts"] == []
         assert result["citations"] == []
         assert result["confidence_label"] == "low"

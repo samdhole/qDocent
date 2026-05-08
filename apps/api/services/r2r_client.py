@@ -37,11 +37,15 @@ def rag_query(query: str) -> dict[str, Any]:
     except httpx.HTTPError as exc:
         raise RuntimeError(f"R2R unavailable: {exc}") from exc
 
-    # Extract answer text
-    answer = getattr(response, "generated_answer", None) or str(response)
+    # New R2R SDK (>=3.6.6 with core) wraps responses in a .results object
+    inner = getattr(response, "results", response)
 
-    # Extract search results for citations / retrieved contexts
-    search_results = getattr(response, "search_results", None) or []
+    # Extract answer text
+    answer = getattr(inner, "generated_answer", None) or str(inner)
+
+    # Extract chunk search results from AggregateSearchResult
+    agg = getattr(inner, "search_results", None)
+    search_results = getattr(agg, "chunk_search_results", None) or [] if agg else []
     citations = []
     retrieved_contexts = []
     for r in search_results:
