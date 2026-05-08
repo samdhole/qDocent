@@ -10,7 +10,7 @@ class TestEmailDraftWorkflow:
     """Test email draft workflow."""
 
     @mock.patch("packages.workflows.email_draft_graph.R2RClient")
-    @mock.patch("packages.workflows.email_draft_graph.ChatOpenAI")
+    @mock.patch("packages.workflows.email_draft_graph.ChatGoogleGenerativeAI")
     def test_email_draft_always_requires_approval(self, mock_llm_class, mock_r2r_class):
         """Email draft always returns requires_human_approval=True."""
         mock_response = mock.Mock()
@@ -38,7 +38,7 @@ class TestEmailDraftWorkflow:
         assert result["final_response"] == "[Awaiting human approval before sending email]"
 
     @mock.patch("packages.workflows.email_draft_graph.R2RClient")
-    @mock.patch("packages.workflows.email_draft_graph.ChatOpenAI")
+    @mock.patch("packages.workflows.email_draft_graph.ChatGoogleGenerativeAI")
     def test_email_draft_returns_full_state(self, mock_llm_class, mock_r2r_class):
         """Email draft returns complete workflow state."""
         mock_response = mock.Mock()
@@ -66,7 +66,7 @@ class TestEmailDraftWorkflow:
         assert "final_response" in result
 
     @mock.patch("packages.workflows.email_draft_graph.R2RClient")
-    @mock.patch("packages.workflows.email_draft_graph.ChatOpenAI")
+    @mock.patch("packages.workflows.email_draft_graph.ChatGoogleGenerativeAI")
     def test_email_draft_r2r_connection_failure(self, mock_llm_class, mock_r2r_class):
         """Email draft handles R2R connection errors gracefully."""
         import httpx

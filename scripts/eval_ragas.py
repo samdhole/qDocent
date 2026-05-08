@@ -12,7 +12,7 @@ from packages.evals.run_ragas import load_dataset, run_eval
 load_dotenv()
 
 R2R_BASE_URL = os.getenv("R2R_BASE_URL", "http://localhost:7272")
-EVAL_MODEL = os.getenv("RAGAS_EVAL_MODEL", "gpt-4o-mini")
+EVAL_MODEL = os.getenv("RAGAS_EVAL_MODEL", "gemini-3-flash-preview")
 DATASET_PATH = Path("packages/evals/eval_dataset.yaml")
 REPORTS_DIR = Path("reports/evals")
 

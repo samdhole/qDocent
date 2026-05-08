@@ -5,7 +5,7 @@ setup:
 	uv pip install -r requirements.txt
 
 r2r:
-	uv run python -m r2r.serve
+	R2R_CONFIG_PATH=r2r_gemini.toml uv run python -m r2r.serve
 
 api:
 	uv run uvicorn apps.api.main:app --reload --port 8000

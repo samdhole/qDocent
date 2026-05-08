@@ -1,0 +1,111 @@
+[app]
+default_max_documents_per_user = 10_000
+default_max_chunks_per_user = 10_000_000
+default_max_collections_per_user = 5_000
+default_max_upload_size = 214748364800
+
+fast_llm = "gemini/gemini-3-flash-preview"
+quality_llm = "gemini/gemini-3-flash-preview"
+vlm = "gemini/gemini-3-flash-preview"
+audio_lm = "openai/whisper-1"
+reasoning_llm = "gemini/gemini-3-flash-preview"
+planning_llm = "gemini/gemini-3-flash-preview"
+
+[agent]
+rag_agent_static_prompt = "static_rag_agent"
+rag_agent_dynamic_prompt = "dynamic_rag_agent"
+rag_tools = ["search_file_descriptions", "search_file_knowledge", "get_file_content"]
+research_tools = ["rag", "reasoning", "critique", "python_executor"]
+
+[auth]
+provider = "r2r"
+access_token_lifetime_in_minutes = 60000
+refresh_token_lifetime_in_days = 7
+require_authentication = false
+require_email_verification = false
+default_admin_email = "admin@example.com"
+default_admin_password = "change_me_immediately"
+
+[completion]
+provider = "r2r"
+concurrent_request_limit = 64
+request_timeout = 60
+
+  [completion.generation_config]
+  temperature = 0.1
+  top_p = 1
+  max_tokens_to_sample = 4_096
+  stream = false
+  add_generation_kwargs = { }
+
+[crypto]
+provider = "bcrypt"
+
+[file]
+provider = "postgres"
+
+[database]
+default_collection_name = "Default"
+default_collection_description = "Your default collection."
+collection_summary_prompt = "collection_summary"
+
+  [database.graph_creation_settings]
+    graph_entity_description_prompt = "graph_entity_description"
+    graph_extraction_prompt = "graph_extraction"
+    entity_types = []
+    relation_types = []
+    automatic_deduplication = true
+
+  [database.graph_enrichment_settings]
+    graph_communities_prompt = "graph_communities"
+
+  [database.maintenance]
+    vacuum_schedule = "0 3 * * *"
+
+[embedding]
+provider = "litellm"
+base_model = "gemini/gemini-embedding-2"
+base_dimension = 3072
+batch_size = 128
+concurrent_request_limit = 256
+initial_backoff = 1.0
+quantization_settings = { quantization_type = "FP32" }
+
+[completion_embedding]
+provider = "litellm"
+base_model = "gemini/gemini-embedding-2"
+base_dimension = 3072
+batch_size = 128
+concurrent_request_limit = 256
+
+[ingestion]
+provider = "r2r"
+chunking_strategy = "recursive"
+chunk_size = 1_024
+chunk_overlap = 512
+excluded_parsers = []
+automatic_extraction = true
+vlm_batch_size = 20
+max_concurrent_vlm_tasks = 20
+vlm_ocr_one_page_per_chunk = true
+
+  [ingestion.chunk_enrichment_settings]
+    chunk_enrichment_prompt = "chunk_enrichment"
+    enable_chunk_enrichment = false
+    n_chunks = 2
+
+  [ingestion.extra_parsers]
+    pdf = ["zerox", "ocr"]
+
+[ocr]
+provider = "mistral"
+model = "mistral-ocr-latest"
+
+[orchestration]
+provider = "simple"
+
+[email]
+provider = "console_mock"
+
+[scheduler]
+provider = "apscheduler"

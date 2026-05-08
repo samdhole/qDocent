@@ -12,7 +12,7 @@ from typing import Any
 
 import httpx
 from dotenv import load_dotenv
-from langchain_openai import ChatOpenAI
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph.graph import END, START, StateGraph
 from r2r import R2RClient
 
@@ -21,7 +21,7 @@ from packages.workflows.state import SupportState
 load_dotenv()
 
 _R2R_URL = os.getenv("R2R_BASE_URL", "http://localhost:7272")
-_LLM_MODEL = os.getenv("RAGAS_EVAL_MODEL", "gpt-4o-mini")
+_LLM_MODEL = os.getenv("RAGAS_EVAL_MODEL", "gemini-3-flash-preview")
 _SEARCH_SETTINGS: dict[str, Any] = {"limit": 3, "graph_settings": {"enabled": False}}
 
 
@@ -51,7 +51,7 @@ def retrieve_policy(state: SupportState) -> SupportState:
 def draft_email(state: SupportState) -> SupportState:
     """Draft a polite email response using LLM. Always sets approval required."""
     context_text = "\n".join(c["text"] for c in state["retrieved_contexts"][:3])
-    llm = ChatOpenAI(model=_LLM_MODEL, temperature=0.3)
+    llm = ChatGoogleGenerativeAI(model=_LLM_MODEL, temperature=0.3)
     prompt = (
         f"You are a helpful support agent. Draft a polite, professional email response "
         f"to this customer message. Use only the policy context provided.\n\n"

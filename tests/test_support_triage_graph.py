@@ -10,7 +10,7 @@ class TestSupportTriageWorkflow:
     """Test support triage workflow graph execution."""
 
     @mock.patch("packages.workflows.support_triage_graph.R2RClient")
-    @mock.patch("packages.workflows.support_triage_graph.ChatOpenAI")
+    @mock.patch("packages.workflows.support_triage_graph.ChatGoogleGenerativeAI")
     def test_support_triage_returns_full_state(self, mock_llm_class, mock_r2r_class):
         """run_support_triage returns dict with all 8 SupportState fields."""
         # Mock R2R response
@@ -50,7 +50,7 @@ class TestSupportTriageWorkflow:
         assert result["final_response"] == "[Awaiting human approval]"
 
     @mock.patch("packages.workflows.support_triage_graph.R2RClient")
-    @mock.patch("packages.workflows.support_triage_graph.ChatOpenAI")
+    @mock.patch("packages.workflows.support_triage_graph.ChatGoogleGenerativeAI")
     def test_support_triage_refund_requires_approval(self, mock_llm_class, mock_r2r_class):
         """Refund requests trigger requires_human_approval."""
         mock_response = mock.Mock()
@@ -77,7 +77,7 @@ class TestSupportTriageWorkflow:
         assert result["final_response"] == "[Awaiting human approval]"
 
     @mock.patch("packages.workflows.support_triage_graph.R2RClient")
-    @mock.patch("packages.workflows.support_triage_graph.ChatOpenAI")
+    @mock.patch("packages.workflows.support_triage_graph.ChatGoogleGenerativeAI")
     def test_support_triage_high_confidence_clean_no_approval(self, mock_llm_class, mock_r2r_class):
         """Clean high-confidence answer does not require approval."""
         mock_response = mock.Mock()
@@ -105,7 +105,7 @@ class TestSupportTriageWorkflow:
         assert "9am to 5pm" in result["final_response"]
 
     @mock.patch("packages.workflows.support_triage_graph.R2RClient")
-    @mock.patch("packages.workflows.support_triage_graph.ChatOpenAI")
+    @mock.patch("packages.workflows.support_triage_graph.ChatGoogleGenerativeAI")
     def test_support_triage_no_contexts_requires_approval(self, mock_llm_class, mock_r2r_class):
         """No retrieved contexts triggers approval requirement."""
         mock_response = mock.Mock()
@@ -127,7 +127,7 @@ class TestSupportTriageWorkflow:
         assert result["confidence_label"] == "low"
 
     @mock.patch("packages.workflows.support_triage_graph.R2RClient")
-    @mock.patch("packages.workflows.support_triage_graph.ChatOpenAI")
+    @mock.patch("packages.workflows.support_triage_graph.ChatGoogleGenerativeAI")
     def test_support_triage_r2r_failure_graceful(self, mock_llm_class, mock_r2r_class):
         """Support triage handles R2R connection failures gracefully."""
         import httpx

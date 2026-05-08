@@ -10,9 +10,10 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from langchain_openai import ChatOpenAI
+from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
 from r2r import R2RClient
 from ragas import evaluate
+from ragas.embeddings import LangchainEmbeddingsWrapper
 from ragas.integrations.r2r import transform_to_ragas_dataset
 from ragas.llms import LangchainLLMWrapper
 from ragas.metrics import AnswerRelevancy, ContextPrecision, Faithfulness
@@ -35,6 +36,7 @@ def run_eval(
     r2r_base_url: str,
     eval_model: str,
     dataset_path: Path,
+    embedding_model: str = "models/text-embedding-004",
     search_settings: dict[str, Any] | None = None,
 ) -> Any:  # ragas.EvaluationResult
     """Run RAGAS evaluation and return result object (call .to_pandas() on it)."""
@@ -55,9 +57,12 @@ def run_eval(
         references=references,
     )
 
-    evaluator_llm = LangchainLLMWrapper(ChatOpenAI(model=eval_model))
+    evaluator_llm = LangchainLLMWrapper(ChatGoogleGenerativeAI(model=eval_model))
+    evaluator_embeddings = LangchainEmbeddingsWrapper(
+        GoogleGenerativeAIEmbeddings(model=embedding_model)
+    )
     metrics = [
-        AnswerRelevancy(llm=evaluator_llm),
+        AnswerRelevancy(llm=evaluator_llm, embeddings=evaluator_embeddings),
         ContextPrecision(llm=evaluator_llm),
         Faithfulness(llm=evaluator_llm),
     ]

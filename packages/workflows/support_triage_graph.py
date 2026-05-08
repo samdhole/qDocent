@@ -18,7 +18,7 @@ from typing import Any
 
 import httpx
 from dotenv import load_dotenv
-from langchain_openai import ChatOpenAI
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph.graph import END, START, StateGraph
 from r2r import R2RClient
 
@@ -31,7 +31,7 @@ from packages.workflows.state import SupportState
 load_dotenv()
 
 _R2R_URL = os.getenv("R2R_BASE_URL", "http://localhost:7272")
-_LLM_MODEL = os.getenv("RAGAS_EVAL_MODEL", "gpt-4o-mini")
+_LLM_MODEL = os.getenv("RAGAS_EVAL_MODEL", "gemini-3-flash-preview")
 _SEARCH_SETTINGS: dict[str, Any] = {
     "limit": 5,
     "graph_settings": {"enabled": False},
@@ -57,9 +57,9 @@ def classify_intent(state: SupportState) -> SupportState:
         if re.search(pattern, msg):
             return {**state, "intent": intent}
     # LLM fallback — only if API key is available; otherwise default to "general"
-    if not os.getenv("OPENAI_API_KEY"):
+    if not os.getenv("GOOGLE_API_KEY"):
         return {**state, "intent": "general"}
-    llm = ChatOpenAI(model=_LLM_MODEL, temperature=0)
+    llm = ChatGoogleGenerativeAI(model=_LLM_MODEL, temperature=0)
     prompt = (
         f"Classify this customer message into one of: refund_request, pricing_inquiry, "
         f"cancellation_request, support_request, policy_lookup, or general.\n"

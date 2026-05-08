@@ -3,7 +3,7 @@ r2r>=3.6.6
 
 # Evaluation
 ragas>=0.4.3
-langchain-openai>=0.3.0
+langchain-google-genai>=2.0.0
 datasets>=2.20.0
 pandas>=2.0.0
 
