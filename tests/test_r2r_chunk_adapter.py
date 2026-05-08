@@ -59,3 +59,49 @@ def test_citation_from_retrieved_text_falls_back_for_plain_text():
 
     assert citation == {}
     assert clean_text == "Plain retrieved text"
+
+
+def test_chunk_text_for_r2r_none_fields_produce_empty_string():
+    """None values in chunk fields write empty string in header, not the literal 'None'."""
+    chunk = {"text": "body", "document_id": None, "source_file": None, "page_start": None}
+    text = chunk_text_for_r2r(chunk, chunk_index=0)
+    assert "document_id=;" in text or text.startswith("DocQuery Citation: document_id=;")
+    assert "source_file=;" in text
+    assert "page_start=;" in text
+    citation, clean = citation_from_retrieved_text(text)
+    # Empty values in header decode to empty string, not literal "None" or back to None
+    assert citation["document_id"] == ""
+    assert citation["document"] == ""  # source_file was None → empty string in header → empty string on decode
+    assert citation["page"] is None  # _int_or_none("") returns None
+    assert clean == "body"
+
+
+def test_chunk_text_for_r2r_section_path_with_equals_roundtrips():
+    """section_path containing '=' survives encode/decode because split uses maxsplit=1."""
+    chunk = {
+        "text": "body",
+        "document_id": "doc1",
+        "source_file": "doc1.pdf",
+        "page_start": 1,
+        "page_end": 1,
+        "section_path": "k=v style heading",
+    }
+    text = chunk_text_for_r2r(chunk, chunk_index=0)
+    citation, _ = citation_from_retrieved_text(text)
+    assert citation["section"] == "k=v style heading"
+
+
+def test_chunk_text_for_r2r_source_file_with_semicolon_encodes_to_comma():
+    """';' in source_file is replaced with ',' so it cannot break the header split delimiter."""
+    chunk = {
+        "text": "body",
+        "document_id": "doc1",
+        "source_file": "report; final.pdf",
+        "page_start": 1,
+        "page_end": 1,
+        "section_path": "Intro",
+    }
+    text = chunk_text_for_r2r(chunk, chunk_index=0)
+    assert "report, final.pdf" in text  # semicolon replaced
+    citation, _ = citation_from_retrieved_text(text)
+    assert citation["document"] == "report, final.pdf"
