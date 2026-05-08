@@ -15,6 +15,7 @@ uv.lock
 data/do_not_commit/
 data/sample_docs/*.pdf
 data/sample_docs/*.docx
+data/figures/
 
 # Reports with sensitive content
 reports/private/

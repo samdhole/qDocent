@@ -1,4 +1,4 @@
-# pattern: Functional Core
+# pattern: Imperative Shell
 from __future__ import annotations
 
 import json
@@ -47,7 +47,7 @@ def figures_for_response(
       Stage 2 — page-match figures whose (source_file, page_number) overlaps with
                  a citation's (document, page). Load-bearing path for general queries.
     """
-    all_figures = load_figures()
+    all_figures = load_figures()  # TODO: cache when figure corpus grows
     by_id = {f["figure_id"]: f for f in all_figures}
     selected: dict[str, dict[str, Any]] = {}
 

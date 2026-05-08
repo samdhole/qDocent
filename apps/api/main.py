@@ -26,8 +26,8 @@ app.include_router(evals.router)
 app.include_router(reports.router)
 app.include_router(workflows.router)
 
-if Path("data/figures").exists():
-    app.mount("/figures", StaticFiles(directory="data/figures"), name="figures")
+Path("data/figures").mkdir(parents=True, exist_ok=True)
+app.mount("/figures", StaticFiles(directory="data/figures"), name="figures")
 
 
 @app.get("/health")
