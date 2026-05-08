@@ -72,10 +72,6 @@ class TestPipeline:
         assert json_report.exists(), f"JSON report not found at {json_report}"
         assert md_report.exists(), f"MD report not found at {md_report}"
 
-        # Clean up
-        json_report.unlink(missing_ok=True)
-        md_report.unlink(missing_ok=True)
-
     def test_pipeline_report_has_required_fields(self):
         """Report JSON contains expected quality metrics."""
         sample_doc = Path("data/sample_docs/company_policy.pdf")
@@ -89,10 +85,3 @@ class TestPipeline:
         assert "document_id" in report
         assert isinstance(report.get("tables_detected", 0), int)
         assert "document_type" in report
-
-        # Clean up reports
-        if "document_id" in report:
-            report_path = Path("reports/ingestion") / f"{report['document_id']}.json"
-            report_path.unlink(missing_ok=True)
-            md_path = Path("reports/ingestion") / f"{report['document_id']}.md"
-            md_path.unlink(missing_ok=True)

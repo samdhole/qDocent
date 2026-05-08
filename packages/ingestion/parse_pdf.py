@@ -4,8 +4,8 @@ Returns a list of raw page dicts. Chunking happens in chunk_templates.py.
 Table normalization happens in normalize_tables.py.
 
 No LLM calls here — this module is 100% deterministic.
-# pattern: Imperative Shell
 """
+# pattern: Imperative Shell
 from __future__ import annotations
 
 import os

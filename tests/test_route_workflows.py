@@ -40,7 +40,7 @@ class TestWorkflowsRoutes:
             assert data["requires_human_approval"] is True
             assert data["final_response"] == "[Awaiting human approval]"
 
-    def test_post_support_triage_500_on_error(self, client):
+    def test_post_support_triage_503_on_error(self, client):
         """POST /workflows/support/triage returns 503 when workflow fails."""
         with mock.patch("apps.api.routes.workflows.run_support_triage") as mock_triage:
             mock_triage.side_effect = RuntimeError("R2R unavailable")
