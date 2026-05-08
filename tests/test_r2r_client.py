@@ -312,6 +312,9 @@ class TestIngestFileWithPipeline:
         result = ingest_file_with_pipeline("/tmp/tmpXXXX.pdf")
 
         mock_ingest.assert_called_once_with("/tmp/tmpXXXX.pdf")
+        mock_save_source.assert_called_once_with(
+            "/tmp/tmpXXXX.pdf", document_id="doc", source_file="test.pdf"
+        )
         assert result["ingestion_mode"] == "raw_file_fallback"
 
     @mock.patch("apps.api.services.r2r_client.save_source_pdf")

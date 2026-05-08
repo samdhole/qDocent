@@ -1,5 +1,6 @@
 """Tests for /ingest API route."""
 from io import BytesIO
+from pathlib import Path
 from unittest import mock
 
 import pytest
@@ -140,18 +141,33 @@ class TestIngestRoute:
 
         assert response.status_code == 404
 
-    @mock.patch("apps.api.services.ingest_jobs.create_ingest_job")
+    @mock.patch("apps.api.routes.ingest.ingest_jobs.create_ingest_job")
     def test_create_ingest_job_cleans_up_tmpfile_on_exception(
         self, mock_create_job, client, sample_pdf
     ):
         """When create_ingest_job raises, the tmp file is deleted (arfix.AC5.1)."""
+        import tempfile as real_tempfile
+
+        captured_tmp_paths = []
+
+        # Capture the real tmp file path and then raise
+        original_ntf = real_tempfile.NamedTemporaryFile
+
+        def spy_ntf(*args, **kwargs):
+            tmp = original_ntf(*args, **kwargs)
+            captured_tmp_paths.append(tmp.name)
+            return tmp
+
         mock_create_job.side_effect = RuntimeError("Job creation failed")
 
-        with pytest.raises(RuntimeError):
-            client.post(
-                "/ingest/jobs",
-                files={"file": ("test.pdf", sample_pdf, "application/pdf")},
-            )
+        with mock.patch("apps.api.routes.ingest.tempfile.NamedTemporaryFile", side_effect=spy_ntf):
+            with pytest.raises(RuntimeError):
+                client.post(
+                    "/ingest/jobs",
+                    files={"file": ("test.pdf", sample_pdf, "application/pdf")},
+                )
 
-        # Verify the exception was raised (thus tmp file should have been cleaned up)
-        # The test confirms no tmp files are left by virtue of the code reaching the cleanup handler
+        # Verify the tmp file was created and then cleaned up
+        assert len(captured_tmp_paths) == 1
+        tmp_path = Path(captured_tmp_paths[0])
+        assert not tmp_path.exists(), f"Tmp file {tmp_path} was not cleaned up on exception"

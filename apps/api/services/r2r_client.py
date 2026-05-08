@@ -155,8 +155,8 @@ def ingest_prechunked_document(chunks: list[dict[str, Any]], report: dict[str, A
         raise RuntimeError(f"R2R unavailable: {exc}") from exc
 
 
-def _valid_chunks(chunks: list[dict]) -> list[dict]:
-    """Filter out chunks missing required fields for citation header embedding."""
+def _valid_chunks(chunks: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Filter out chunks with missing or empty required fields for citation header embedding."""
     required = {"text", "document_id", "source_file"}
     valid = [c for c in chunks if all(c.get(k) for k in required)]
     if len(valid) < len(chunks):
