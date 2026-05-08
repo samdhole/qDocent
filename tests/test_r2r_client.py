@@ -45,19 +45,21 @@ class TestIngestFileWithPipeline:
     @mock.patch("apps.api.services.r2r_client.write_document_manifest")
     @mock.patch("apps.api.services.r2r_client.ingest_prechunked_document")
     @mock.patch("apps.api.services.r2r_client.save_source_pdf")
+    @mock.patch("apps.api.services.r2r_client.ingest_file")
     @mock.patch("apps.api.services.r2r_client.run_pipeline")
     def test_original_filename_passed_to_pipeline(
-        self, mock_pipeline, mock_save_source, mock_ingest_chunks, mock_manifest
+        self, mock_pipeline, mock_ingest, mock_save_source, mock_ingest_chunks, mock_manifest
     ):
         """original_filename is forwarded to run_pipeline as source_file."""
         mock_pipeline.return_value = {
             "report": {"document_id": "doc", "tables_detected": 0},
-            "chunks": [{"text": "body"}],
+            "chunks": [{"text": "body", "document_id": "doc", "source_file": "report.pdf"}],
             "classifier": {},
             "figures": [],
             "figure_manifest": None,
         }
         mock_ingest_chunks.return_value = "ok"
+        mock_ingest.return_value = "ok"
 
         from apps.api.services.r2r_client import ingest_file_with_pipeline
 
@@ -73,7 +75,7 @@ class TestIngestFileWithPipeline:
         self, mock_pipeline, mock_save_source, mock_ingest_chunks, mock_manifest
     ):
         """Successful pipeline output is sent to R2R as pre-built DocQuery chunks."""
-        chunks = [{"text": "Refunds are available.", "source_file": "report.pdf"}]
+        chunks = [{"text": "Refunds are available.", "document_id": "doc", "source_file": "report.pdf"}]
         report = {"document_id": "doc", "source_file": "report.pdf", "tables_detected": 0}
         mock_pipeline.return_value = {
             "report": report,
@@ -103,7 +105,7 @@ class TestIngestFileWithPipeline:
         self, mock_pipeline, mock_save_source, mock_ingest_chunks, mock_manifest
     ):
         """Source storage uses upload filename when quality report omits source_file."""
-        chunks = [{"text": "Refunds are available.", "source_file": "report.pdf"}]
+        chunks = [{"text": "Refunds are available.", "document_id": "doc", "source_file": "report.pdf"}]
         report = {"document_id": "doc", "tables_detected": 0}
         mock_pipeline.return_value = {
             "report": report,
@@ -134,7 +136,7 @@ class TestIngestFileWithPipeline:
         """Figure manifest is ingested after the primary pre-chunked document."""
         mock_pipeline.return_value = {
             "report": {"document_id": "doc", "tables_detected": 0},
-            "chunks": [{"text": "body"}],
+            "chunks": [{"text": "body", "document_id": "doc", "source_file": "test.pdf"}],
             "classifier": {},
             "figures": [{"figure_id": "fig1"}],
             "figure_manifest": "/data/figures/doc/figures.md",
@@ -161,7 +163,7 @@ class TestIngestFileWithPipeline:
         """Manifest ingest failure does not raise; returns figures_r2r=None."""
         mock_pipeline.return_value = {
             "report": {"document_id": "doc", "tables_detected": 0},
-            "chunks": [{"text": "body"}],
+            "chunks": [{"text": "body", "document_id": "doc", "source_file": "test.pdf"}],
             "classifier": {},
             "figures": [{"figure_id": "fig1"}],
             "figure_manifest": "/data/figures/doc/figures.md",
@@ -187,7 +189,7 @@ class TestIngestFileWithPipeline:
         """When figure_manifest is None, only pre-chunked document ingest runs."""
         mock_pipeline.return_value = {
             "report": {"document_id": "doc", "tables_detected": 0},
-            "chunks": [{"text": "body"}],
+            "chunks": [{"text": "body", "document_id": "doc", "source_file": "test.pdf"}],
             "classifier": {},
             "figures": [],
             "figure_manifest": None,
@@ -352,7 +354,7 @@ class TestIngestFileWithPipeline:
         self, mock_pipeline, mock_save_source, mock_ingest_chunks, mock_ingest, mock_manifest
     ):
         """Ingest stores R2R IDs so delete can clean vectors later."""
-        chunks = [{"text": "Refunds are available.", "source_file": "report.pdf"}]
+        chunks = [{"text": "Refunds are available.", "document_id": "doc", "source_file": "report.pdf"}]
         report = {"document_id": "doc", "source_file": "report.pdf", "tables_detected": 0}
         primary = mock.Mock()
         primary.results.document_id = "r2r-primary"
