@@ -1,7 +1,7 @@
 # pattern: Imperative Shell
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from threading import Lock
 from typing import Any, Callable
@@ -13,10 +13,23 @@ IngestFunc = Callable[[str, str], dict[str, Any]]
 
 _JOBS: dict[str, dict[str, Any]] = {}
 _LOCK = Lock()
+_JOB_TTL = timedelta(minutes=60)
 
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _is_expired(job: dict[str, Any]) -> bool:
+    """Return True if a terminal job is older than _JOB_TTL."""
+    terminal = job.get("status") in ("completed", "failed")
+    if not terminal:
+        return False
+    try:
+        updated = datetime.fromisoformat(job["updated_at"])
+        return datetime.now(timezone.utc) - updated > _JOB_TTL
+    except (KeyError, ValueError):
+        return False
 
 
 def create_ingest_job(filename: str) -> dict[str, Any]:
@@ -38,7 +51,12 @@ def create_ingest_job(filename: str) -> dict[str, Any]:
 def get_ingest_job(job_id: str) -> dict[str, Any] | None:
     with _LOCK:
         job = _JOBS.get(job_id)
-        return dict(job) if job else None
+        if job is None:
+            return None
+        if _is_expired(job):
+            del _JOBS[job_id]
+            return None
+        return dict(job)
 
 
 def _update_job(job_id: str, **changes: Any) -> None:

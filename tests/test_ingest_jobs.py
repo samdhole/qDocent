@@ -1,7 +1,9 @@
 """Tests for async ingest job tracking."""
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from apps.api.services import ingest_jobs
+from apps.api.services.ingest_jobs import _JOBS
 
 
 def test_ingest_job_completes_with_result(tmp_path):
@@ -48,3 +50,73 @@ def test_ingest_job_failure_records_error_and_deletes_temp_file(tmp_path):
 def test_unknown_ingest_job_returns_none():
     """get_ingest_job returns None for missing job IDs."""
     assert ingest_jobs.get_ingest_job("missing") is None
+
+
+def test_expired_completed_job_is_pruned():
+    """Terminal job (completed) older than 60 minutes is pruned and returns None."""
+    _JOBS.clear()
+    job = ingest_jobs.create_ingest_job("sample.pdf")
+    job_id = job["job_id"]
+
+    # Simulate a completed job 2 hours in the past
+    two_hours_ago = datetime.now(timezone.utc) - timedelta(hours=2)
+    _JOBS[job_id]["status"] = "completed"
+    _JOBS[job_id]["updated_at"] = two_hours_ago.isoformat()
+
+    result = ingest_jobs.get_ingest_job(job_id)
+
+    assert result is None
+    assert job_id not in _JOBS
+
+
+def test_expired_failed_job_is_pruned():
+    """Terminal job (failed) older than 60 minutes is pruned and returns None."""
+    _JOBS.clear()
+    job = ingest_jobs.create_ingest_job("sample.pdf")
+    job_id = job["job_id"]
+
+    # Simulate a failed job 2 hours in the past
+    two_hours_ago = datetime.now(timezone.utc) - timedelta(hours=2)
+    _JOBS[job_id]["status"] = "failed"
+    _JOBS[job_id]["updated_at"] = two_hours_ago.isoformat()
+
+    result = ingest_jobs.get_ingest_job(job_id)
+
+    assert result is None
+    assert job_id not in _JOBS
+
+
+def test_non_terminal_job_is_never_pruned():
+    """Non-terminal job (running) older than 60 minutes is NOT pruned."""
+    _JOBS.clear()
+    job = ingest_jobs.create_ingest_job("sample.pdf")
+    job_id = job["job_id"]
+
+    # Simulate a running job 2 hours in the past
+    two_hours_ago = datetime.now(timezone.utc) - timedelta(hours=2)
+    _JOBS[job_id]["status"] = "running"
+    _JOBS[job_id]["updated_at"] = two_hours_ago.isoformat()
+
+    result = ingest_jobs.get_ingest_job(job_id)
+
+    assert result is not None
+    assert result["status"] == "running"
+    assert job_id in _JOBS
+
+
+def test_recent_completed_job_is_not_pruned():
+    """Terminal job (completed) within 60 minutes is NOT pruned."""
+    _JOBS.clear()
+    job = ingest_jobs.create_ingest_job("sample.pdf")
+    job_id = job["job_id"]
+
+    # Simulate a completed job 30 minutes ago
+    thirty_minutes_ago = datetime.now(timezone.utc) - timedelta(minutes=30)
+    _JOBS[job_id]["status"] = "completed"
+    _JOBS[job_id]["updated_at"] = thirty_minutes_ago.isoformat()
+
+    result = ingest_jobs.get_ingest_job(job_id)
+
+    assert result is not None
+    assert result["status"] == "completed"
+    assert job_id in _JOBS
