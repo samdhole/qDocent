@@ -3,15 +3,27 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Loader2, ArrowUp, Plus } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import AnswerCard from "@/components/AnswerCard";
-import { useConversation } from "@/lib/useConversation";
+import { useConversationStream } from "@/lib/useConversationStream";
+import type { StreamPhase } from "@/lib/useConversationStream";
+
+function phaseLabel(phase: StreamPhase): string {
+  switch (phase) {
+    case "searching": return "Searching documents…";
+    case "found_results": return "Reading citations…";
+    case "generating": return "Generating answer…";
+    default: return "Thinking…";
+  }
+}
 
 export default function ConversationView() {
-  const { messages, pending, sendMessage, reset } = useConversation();
+  const { messages, pending, phase, partialText, sendMessage, reset } = useConversationStream();
   const [draft, setDraft] = useState("");
   const scrollEndRef = useRef<HTMLDivElement>(null);
 
@@ -73,9 +85,18 @@ export default function ConversationView() {
         })}
 
         {pending && (
-          <div className="flex items-center text-sm text-muted-foreground gap-2">
-            <Loader2 className="size-4 animate-spin" />
-            Thinking…
+          <div className="space-y-2">
+            <div className="flex items-center text-xs text-muted-foreground gap-2">
+              <Loader2 className="size-3 animate-spin" />
+              {phaseLabel(phase)}
+            </div>
+            {partialText && (
+              <Card>
+                <CardContent className="pt-4 text-sm prose prose-sm max-w-none">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{partialText}</ReactMarkdown>
+                </CardContent>
+              </Card>
+            )}
           </div>
         )}
         <div ref={scrollEndRef} />
