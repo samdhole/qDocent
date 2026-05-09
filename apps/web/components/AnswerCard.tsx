@@ -1,10 +1,12 @@
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import type { Components } from "react-markdown";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CitationProvider } from "@/components/CitationContext";
 import { CitationBadge } from "@/components/CitationBadge";
+import { remarkCitationBadges } from "@/lib/remarkCitationBadges";
 
 import type { AskResponse, SelectedCitation } from "@/lib/types";
 
@@ -25,6 +27,12 @@ type Props = {
 export default function AnswerCard({ result, onSelectCitation }: Props) {
   const isLowConfidenceNoContext =
     result.confidence_label === "low" && result.retrieved_contexts.length === 0;
+
+  const markdownComponents = {
+    "cite-ref": ({ "data-num": num }: { "data-num"?: string }) => (
+      <CitationBadge variant="inline" index={Number(num)} />
+    ),
+  } as unknown as Components;
 
   return (
     <CitationProvider
@@ -55,7 +63,12 @@ export default function AnswerCard({ result, onSelectCitation }: Props) {
             </CardTitle>
           </CardHeader>
           <CardContent className="text-sm prose prose-sm max-w-none dark:prose-invert">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>{result.answer}</ReactMarkdown>
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm, remarkCitationBadges]}
+              components={markdownComponents}
+            >
+              {result.answer}
+            </ReactMarkdown>
           </CardContent>
         </Card>
 

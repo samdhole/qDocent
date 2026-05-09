@@ -6,6 +6,7 @@ import dynamic from "next/dynamic";
 import { Loader2, ArrowUp, Plus } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import type { Components } from "react-markdown";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,6 +14,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import AnswerCard from "@/components/AnswerCard";
 import { SuggestedQuestions } from "@/components/SuggestedQuestions";
+import { CitationBadge } from "@/components/CitationBadge";
+import { CitationProvider } from "@/components/CitationContext";
+import { remarkCitationBadges } from "@/lib/remarkCitationBadges";
 import { useConversationStream } from "@/lib/useConversationStream";
 import type { StreamPhase } from "@/lib/useConversationStream";
 import type { SelectedCitation } from "@/lib/types";
@@ -37,6 +41,12 @@ export default function ConversationView() {
   const [draft, setDraft] = useState("");
   const [selectedCitation, setSelectedCitation] = useState<SelectedCitation | null>(null);
   const scrollEndRef = useRef<HTMLDivElement>(null);
+
+  const partialMarkdownComponents = {
+    "cite-ref": ({ "data-num": num }: { "data-num"?: string }) => (
+      <CitationBadge variant="inline" index={Number(num)} />
+    ),
+  } as unknown as Components;
 
   useEffect(() => {
     scrollEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -114,7 +124,14 @@ export default function ConversationView() {
             {partialText && (
               <Card>
                 <CardContent className="pt-4 text-sm prose prose-sm max-w-none">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{partialText}</ReactMarkdown>
+                  <CitationProvider citations={[]} retrievedContexts={[]}>
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm, remarkCitationBadges]}
+                      components={partialMarkdownComponents}
+                    >
+                      {partialText}
+                    </ReactMarkdown>
+                  </CitationProvider>
                 </CardContent>
               </Card>
             )}
