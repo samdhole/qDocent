@@ -4,6 +4,8 @@ import remarkParse from "remark-parse"
 import { remarkCitationBadges } from "@/lib/remarkCitationBadges"
 import type { Node } from "unist"
 
+type CiteNode = { data?: { hProperties?: { "data-num"?: string } } }
+
 function parseWithPlugin(md: string) {
   return unified()
     .use(remarkParse)
@@ -47,7 +49,7 @@ describe("remarkCitationBadges", () => {
       const citationRefs = findNodes(tree, "citationRef")
 
       expect(citationRefs).toHaveLength(4)
-      expect(citationRefs.map((n: any) => n.data?.hProperties?.["data-num"])).toEqual(
+      expect(citationRefs.map((n) => (n as CiteNode).data?.hProperties?.["data-num"])).toEqual(
         ["1", "2", "3", "4"]
       )
     })
