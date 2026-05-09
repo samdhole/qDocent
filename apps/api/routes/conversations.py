@@ -25,6 +25,8 @@ class MessageRequest(BaseModel):
     """Request body for POST /conversations/{id}/messages."""
 
     message: str
+    doc_only: bool = False
+    document_id: str | None = None
 
 
 @router.post("", response_model=CreateConversationResponse)
@@ -41,7 +43,12 @@ def create_conversation(body: CreateConversationRequest) -> CreateConversationRe
 def post_message(conversation_id: str, body: MessageRequest) -> dict:
     """Send a message in a conversation and return the agent response."""
     try:
-        return r2r_agent.agent_query(message=body.message, conversation_id=conversation_id)
+        return r2r_agent.agent_query(
+            message=body.message,
+            conversation_id=conversation_id,
+            doc_only=body.doc_only,
+            document_id=body.document_id,
+        )
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
@@ -55,6 +62,8 @@ def post_message_stream(conversation_id: str, body: MessageRequest) -> Streaming
     generator = r2r_agent.agent_stream(
         message=body.message,
         conversation_id=conversation_id,
+        doc_only=body.doc_only,
+        document_id=body.document_id,
     )
     return StreamingResponse(
         generator,

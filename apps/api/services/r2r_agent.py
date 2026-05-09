@@ -23,6 +23,21 @@ from apps.api.services.r2r_client_helpers import _label_from_score
 
 log = logging.getLogger(__name__)
 
+_DOC_ONLY_NOT_FOUND = "I couldn't find this in your documents."
+
+
+def _apply_doc_only_check(result: dict[str, Any], doc_only: bool) -> dict[str, Any]:
+    """Replace the answer with the strict not-found string when doc_only is True
+    and retrieval is empty or low-confidence. Mutates and returns the same dict."""
+    if doc_only and (
+        not result.get("retrieved_contexts")
+        or result.get("confidence_label") == "low"
+    ):
+        result["answer"] = _DOC_ONLY_NOT_FOUND
+        result["confidence_label"] = "low"
+        result["needs_human_review"] = True
+    return result
+
 
 def create_conversation(name: str | None = None) -> str:
     """Create a new R2R conversation, return its ID."""
@@ -39,9 +54,17 @@ def create_conversation(name: str | None = None) -> str:
     return str(conversation_id)
 
 
-def agent_query(message: str, conversation_id: str) -> dict[str, Any]:
+def agent_query(
+    message: str,
+    conversation_id: str,
+    doc_only: bool = False,
+    document_id: str | None = None,
+) -> dict[str, Any]:
     """Send one user message in a conversation. Returns the same response
     shape as r2r_client.rag_query() so the frontend can render it identically.
+
+    When doc_only=True, applies post-hoc check: if retrieval is empty or low-confidence,
+    replaces answer with strict "I couldn't find this in your documents." string.
     """
     try:
         response = get_client().retrieval.agent(
@@ -51,7 +74,8 @@ def agent_query(message: str, conversation_id: str) -> dict[str, Any]:
         )
     except (httpx.HTTPError, R2RException) as exc:
         raise RuntimeError(f"R2R unavailable: {exc}") from exc
-    return _adapt_agent_response(message, response)
+    result = _adapt_agent_response(message, response)
+    return _apply_doc_only_check(result, doc_only)
 
 
 def _adapt_agent_response(question: str, response: Any) -> dict[str, Any]:
@@ -174,7 +198,12 @@ def _adapt_agent_response(question: str, response: Any) -> dict[str, Any]:
     }
 
 
-def agent_stream(message: str, conversation_id: str) -> Generator[str, None, None]:
+def agent_stream(
+    message: str,
+    conversation_id: str,
+    doc_only: bool = False,
+    document_id: str | None = None,
+) -> Generator[str, None, None]:
     """Stream agent events as SSE-formatted strings.
 
     Yields raw SSE frames (each a `data: <json>\\n\\n` line) so the route can
@@ -185,6 +214,8 @@ def agent_stream(message: str, conversation_id: str) -> Generator[str, None, Non
     - `token`: a token delta from the message stream
     - `final`: the final adapter-shaped dict (same as agent_query() return value)
     - `error`: if R2R errors mid-stream
+
+    When doc_only=True, applies post-hoc check to final frame (same as agent_query).
     """
     try:
         stream = get_client().retrieval.agent(
@@ -225,17 +256,14 @@ def agent_stream(message: str, conversation_id: str) -> Generator[str, None, Non
             elif event_type == "FinalAnswerEvent":
                 # The final event contains the assembled answer + citations.
                 payload = _event_payload(event)
-                yield _sse(
-                    {
-                        "type": "final",
-                        "result": _adapt_final_event(
-                            question=message,
-                            payload=payload,
-                            fallback_text="".join(full_text_parts),
-                            search_results=last_search_results,
-                        ),
-                    }
+                adapted = _adapt_final_event(
+                    question=message,
+                    payload=payload,
+                    fallback_text="".join(full_text_parts),
+                    search_results=last_search_results,
                 )
+                adapted = _apply_doc_only_check(adapted, doc_only)
+                yield _sse({"type": "final", "result": adapted})
                 return
     except (httpx.HTTPError, R2RException) as exc:
         yield _sse({"type": "error", "detail": f"R2R stream interrupted: {exc}"})
@@ -247,17 +275,14 @@ def agent_stream(message: str, conversation_id: str) -> Generator[str, None, Non
 
     # If we exited the loop without a FinalAnswerEvent, synthesize one from
     # what we collected (defensive — the SDK is documented to always emit one).
-    yield _sse(
-        {
-            "type": "final",
-            "result": _adapt_final_event(
-                question=message,
-                payload={},
-                fallback_text="".join(full_text_parts),
-                search_results=last_search_results,
-            ),
-        }
+    adapted = _adapt_final_event(
+        question=message,
+        payload={},
+        fallback_text="".join(full_text_parts),
+        search_results=last_search_results,
     )
+    adapted = _apply_doc_only_check(adapted, doc_only)
+    yield _sse({"type": "final", "result": adapted})
 
 
 def _sse(data: dict) -> str:
