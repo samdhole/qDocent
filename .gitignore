@@ -21,6 +21,9 @@ data/documents/
 # Reports with sensitive content
 reports/private/
 
+# Temporary ingestion artifacts
+reports/ingestion/tmp*
+
 # R2R upstream clone
 external/
 
