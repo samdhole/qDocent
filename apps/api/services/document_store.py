@@ -62,6 +62,46 @@ def load_document_manifest(document_id: str) -> dict[str, Any] | None:
     return data
 
 
+def write_chunks_manifest(document_id: str, chunks: list[dict[str, Any]]) -> Path:
+    """Persist chunk-level metadata (bbox, page, section) for source-panel highlights.
+
+    Stored shape per chunk: {chunk_index, page_start, page_end, bbox, section_path, text_preview}.
+    `bbox` is verbatim from packages.ingestion (pdfplumber coordinates: [x0, top, x1, bottom] in points).
+    """
+    target_dir = DOCUMENTS_DIR / _safe_segment(document_id)
+    target_dir.mkdir(parents=True, exist_ok=True)
+    minimal = [
+        {
+            "chunk_index": i,
+            "page_start": chunk.get("page_start"),
+            "page_end": chunk.get("page_end"),
+            "bbox": chunk.get("bbox"),
+            "section_path": chunk.get("section_path"),
+            "text_preview": (chunk.get("text") or "")[:200],
+        }
+        for i, chunk in enumerate(chunks)
+    ]
+    target = target_dir / "chunks.json"
+    target.write_text(json.dumps({"chunks": minimal}, indent=2), encoding="utf-8")
+    return target
+
+
+def load_chunks_manifest(document_id: str) -> list[dict[str, Any]] | None:
+    """Load persisted chunk metadata. Returns None if missing or corrupt."""
+    path = DOCUMENTS_DIR / _safe_segment(document_id) / "chunks.json"
+    if not path.exists():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        _log.warning("Corrupt chunks manifest for %r: %s", document_id, exc)
+        return None
+    chunks = data.get("chunks") if isinstance(data, dict) else None
+    if not isinstance(chunks, list):
+        return None
+    return chunks
+
+
 def source_pdf_path(document_id: str) -> Path | None:
     """Return the stored source PDF for a document ID, if present."""
     target_dir = DOCUMENTS_DIR / _safe_segment(document_id)

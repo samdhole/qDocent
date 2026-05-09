@@ -10,10 +10,12 @@ from apps.api.services.document_store import (
     _safe_pdf_name,
     _safe_segment,
     delete_source_document,
+    load_chunks_manifest,
     load_document_manifest,
     list_source_documents,
     save_source_pdf,
     source_pdf_path,
+    write_chunks_manifest,
     write_document_manifest,
 )
 
@@ -351,3 +353,137 @@ def test_load_document_manifest_round_trips_with_valid_schema(
     assert loaded == manifest
     assert loaded is not None
     assert isinstance(loaded.get("r2r_document_ids"), list)
+
+
+# Tests for write_chunks_manifest and load_chunks_manifest (Task 2)
+
+
+def test_write_chunks_manifest_persists_minimal_shape(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    """Task 2: chunk metadata is persisted in minimal shape."""
+    monkeypatch.setattr(document_store_mod, "DOCUMENTS_DIR", tmp_path / "documents")
+
+    chunks = [
+        {
+            "page_start": 1,
+            "page_end": 1,
+            "bbox": [10, 20, 30, 40],
+            "section_path": "intro",
+            "text": "hello world",
+        }
+    ]
+    result = write_chunks_manifest("doc1", chunks)
+
+    assert result == tmp_path / "documents" / "doc1" / "chunks.json"
+    content = result.read_text(encoding="utf-8")
+    data = __import__("json").loads(content)
+
+    assert "chunks" in data
+    assert len(data["chunks"]) == 1
+    assert data["chunks"][0]["chunk_index"] == 0
+    assert data["chunks"][0]["page_start"] == 1
+    assert data["chunks"][0]["page_end"] == 1
+    assert data["chunks"][0]["bbox"] == [10, 20, 30, 40]
+    assert data["chunks"][0]["section_path"] == "intro"
+    assert data["chunks"][0]["text_preview"] == "hello world"
+
+
+def test_load_chunks_manifest_returns_none_when_missing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    """Task 2: load_chunks_manifest returns None when file is missing."""
+    monkeypatch.setattr(document_store_mod, "DOCUMENTS_DIR", tmp_path / "documents")
+
+    result = load_chunks_manifest("nonexistent")
+
+    assert result is None
+
+
+def test_load_chunks_manifest_returns_none_on_corrupt_json(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+):
+    """Task 2: load_chunks_manifest returns None on invalid JSON with warning logged."""
+    monkeypatch.setattr(document_store_mod, "DOCUMENTS_DIR", tmp_path / "documents")
+    doc_dir = tmp_path / "documents" / "doc1"
+    doc_dir.mkdir(parents=True)
+    (doc_dir / "chunks.json").write_text("not json", encoding="utf-8")
+
+    with caplog.at_level(logging.WARNING, logger="apps.api.services.document_store"):
+        result = load_chunks_manifest("doc1")
+
+    assert result is None
+    assert "Corrupt chunks manifest" in caplog.text
+
+
+def test_load_chunks_manifest_returns_none_when_chunks_field_missing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    """Task 2: load_chunks_manifest returns None when chunks field is missing."""
+    monkeypatch.setattr(document_store_mod, "DOCUMENTS_DIR", tmp_path / "documents")
+    doc_dir = tmp_path / "documents" / "doc1"
+    doc_dir.mkdir(parents=True)
+    (doc_dir / "chunks.json").write_text('{"other": "thing"}', encoding="utf-8")
+
+    result = load_chunks_manifest("doc1")
+
+    assert result is None
+
+
+def test_chunks_manifest_round_trips(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    """Task 2: chunks manifest round-trips write/load correctly."""
+    monkeypatch.setattr(document_store_mod, "DOCUMENTS_DIR", tmp_path / "documents")
+
+    chunks = [
+        {
+            "page_start": 1,
+            "page_end": 1,
+            "bbox": [10, 20, 30, 40],
+            "section_path": "intro",
+            "text": "hello world",
+        },
+        {
+            "page_start": 2,
+            "page_end": 2,
+            "bbox": [50, 60, 70, 80],
+            "section_path": "body",
+            "text": "more text",
+        },
+    ]
+    write_chunks_manifest("doc1", chunks)
+
+    loaded = load_chunks_manifest("doc1")
+
+    assert loaded is not None
+    assert len(loaded) == 2
+    assert loaded[0]["chunk_index"] == 0
+    assert loaded[1]["chunk_index"] == 1
+    assert loaded[0]["page_start"] == 1
+    assert loaded[1]["page_start"] == 2
+
+
+def test_text_preview_truncates_to_200_chars(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    """Task 2: text_preview is truncated to 200 characters."""
+    monkeypatch.setattr(document_store_mod, "DOCUMENTS_DIR", tmp_path / "documents")
+
+    long_text = "x" * 500
+    chunks = [
+        {
+            "page_start": 1,
+            "page_end": 1,
+            "bbox": None,
+            "section_path": None,
+            "text": long_text,
+        }
+    ]
+    write_chunks_manifest("doc1", chunks)
+
+    loaded = load_chunks_manifest("doc1")
+
+    assert loaded is not None
+    assert len(loaded[0]["text_preview"]) == 200
+    assert loaded[0]["text_preview"] == "x" * 200

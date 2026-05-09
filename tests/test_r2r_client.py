@@ -386,6 +386,56 @@ class TestIngestFileWithPipeline:
         )
         assert result["r2r_document_ids"] == ["r2r-primary", "r2r-figures"]
 
+    @mock.patch("apps.api.services.r2r_client.write_chunks_manifest")
+    @mock.patch("apps.api.services.r2r_client.write_document_manifest")
+    @mock.patch("apps.api.services.r2r_client.save_source_pdf")
+    @mock.patch("apps.api.services.r2r_client.ingest_prechunked_document")
+    @mock.patch("apps.api.services.r2r_client.run_pipeline")
+    def test_ingest_file_with_pipeline_writes_chunks_manifest_on_pre_chunked_path(
+        self, mock_pipeline, mock_ingest_chunks, mock_save_source, mock_doc_manifest, mock_chunks_manifest
+    ):
+        """Task 2: write_chunks_manifest is called on pre-chunked path with correct document_id."""
+        chunks = [{"text": "Content", "page_start": 1, "bbox": [0, 0, 100, 100], "document_id": "doc1", "source_file": "test.pdf"}]
+        report = {"document_id": "doc1", "source_file": "test.pdf"}
+        mock_pipeline.return_value = {
+            "report": report,
+            "chunks": chunks,
+            "classifier": {},
+            "figures": [],
+            "figure_manifest": None,
+        }
+        mock_ingest_chunks.return_value = mock.Mock()
+
+        from apps.api.services.r2r_client import ingest_file_with_pipeline
+
+        ingest_file_with_pipeline("/tmp/tmpXXXX.pdf")
+
+        mock_chunks_manifest.assert_called_once_with("doc1", chunks)
+
+    @mock.patch("apps.api.services.r2r_client.write_chunks_manifest")
+    @mock.patch("apps.api.services.r2r_client.write_document_manifest")
+    @mock.patch("apps.api.services.r2r_client.save_source_pdf")
+    @mock.patch("apps.api.services.r2r_client.ingest_file")
+    @mock.patch("apps.api.services.r2r_client.run_pipeline")
+    def test_ingest_file_with_pipeline_does_not_write_chunks_manifest_on_fallback_path(
+        self, mock_pipeline, mock_ingest, mock_save_source, mock_doc_manifest, mock_chunks_manifest
+    ):
+        """Task 2: write_chunks_manifest is NOT called on fallback path (no chunks)."""
+        mock_pipeline.return_value = {
+            "report": {"document_id": "doc1", "source_file": "test.pdf"},
+            "chunks": [],  # Empty chunks trigger fallback
+            "classifier": {},
+            "figures": [],
+            "figure_manifest": None,
+        }
+        mock_ingest.return_value = "ok"
+
+        from apps.api.services.r2r_client import ingest_file_with_pipeline
+
+        ingest_file_with_pipeline("/tmp/tmpXXXX.pdf")
+
+        mock_chunks_manifest.assert_not_called()
+
 
 class TestIngestPrechunkedDocument:
     """Test ingest_prechunked_document() metadata handling."""

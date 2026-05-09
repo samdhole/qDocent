@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 from r2r import R2RClient
 from shared.abstractions.exception import R2RException
 
-from apps.api.services.document_store import save_source_pdf, write_document_manifest
+from apps.api.services.document_store import save_source_pdf, write_chunks_manifest, write_document_manifest
 from apps.api.services.figure_store import figures_for_response
 from apps.api.services.r2r_chunk_adapter import (
     chunks_for_r2r,
@@ -251,6 +251,7 @@ def ingest_file_with_pipeline(
             ),
             r2r_document_ids=r2r_document_ids,
         )
+        write_chunks_manifest(report["document_id"], chunks)
 
     return {
         "r2r": str(r2r_result),
