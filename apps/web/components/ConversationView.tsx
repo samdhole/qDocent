@@ -16,8 +16,10 @@ import AnswerCard from "@/components/AnswerCard";
 import { SuggestedQuestions } from "@/components/SuggestedQuestions";
 import { CitationBadge } from "@/components/CitationBadge";
 import { CitationProvider } from "@/components/CitationContext";
+import { QueryModeToggle } from "@/components/QueryModeToggle";
 import { remarkCitationBadges } from "@/lib/remarkCitationBadges";
 import { useConversationStream } from "@/lib/useConversationStream";
+import { useQueryMode } from "@/lib/useQueryMode";
 import type { StreamPhase } from "@/lib/useConversationStream";
 import type { SelectedCitation } from "@/lib/types";
 
@@ -38,6 +40,7 @@ function phaseLabel(phase: StreamPhase): string {
 
 export default function ConversationView() {
   const { messages, pending, phase, partialText, sendMessage, reset } = useConversationStream();
+  const [queryMode, setQueryMode] = useQueryMode();
   const [draft, setDraft] = useState("");
   const [selectedCitation, setSelectedCitation] = useState<SelectedCitation | null>(null);
   const scrollEndRef = useRef<HTMLDivElement>(null);
@@ -57,7 +60,7 @@ export default function ConversationView() {
     const text = draft.trim();
     if (!text) return;
     setDraft("");
-    void sendMessage(text);
+    void sendMessage(text, { docOnly: queryMode === "documents" });
   }
 
   function onNewConversation() {
@@ -103,7 +106,11 @@ export default function ConversationView() {
           }
           return (
             <div key={m.id}>
-              <AnswerCard result={m.result} onSelectCitation={setSelectedCitation} />
+              <AnswerCard
+                result={m.result}
+                onSelectCitation={setSelectedCitation}
+                onSwitchToGeneral={() => setQueryMode("general")}
+              />
             </div>
           );
         })}
@@ -140,18 +147,24 @@ export default function ConversationView() {
         <div ref={scrollEndRef} />
       </div>
 
-      <form onSubmit={onSubmit} className="flex gap-2 mt-4 pt-4 border-t">
-        <Input
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          placeholder={messages.length === 0 ? "What is the refund policy?" : "Ask a follow-up…"}
-          disabled={pending}
-        />
-        <Button type="submit" disabled={pending || !draft.trim()}>
-          {pending ? <Loader2 className="size-4 animate-spin" /> : <ArrowUp className="size-4" />}
-          <span className="sr-only">Send</span>
-        </Button>
-      </form>
+      <div className="mt-4 pt-4 border-t space-y-2">
+        <div className="flex items-center justify-end">
+          <QueryModeToggle mode={queryMode} onChange={setQueryMode} />
+        </div>
+        <form onSubmit={onSubmit} className="flex gap-2">
+          <Input
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            placeholder={messages.length === 0 ? "What is the refund policy?" : "Ask a follow-up…"}
+            disabled={pending}
+            className="flex-1"
+          />
+          <Button type="submit" disabled={pending || !draft.trim()}>
+            {pending ? <Loader2 className="size-4 animate-spin" /> : <ArrowUp className="size-4" />}
+            <span className="sr-only">Send</span>
+          </Button>
+        </form>
+      </div>
 
       <SourcePanel citation={selectedCitation} onClose={() => setSelectedCitation(null)} />
     </div>
