@@ -18,38 +18,31 @@ from apps.api.services.r2r_chunk_adapter import (
     chunks_for_r2r,
     citation_from_retrieved_text,
 )
+from apps.api.services.citation_marker_rewriter import rewrite_brackets
 from apps.api.services.r2r_client_helpers import _label_from_score, _valid_chunks
 from packages.ingestion.pipeline import run_pipeline
 
 load_dotenv()
 
 _BASE_URL = os.getenv("R2R_BASE_URL", "http://localhost:7272")
-_SEARCH_SETTINGS: dict[str, Any] = {
+DEFAULT_SEARCH_SETTINGS: dict[str, Any] = {
     "limit": 5,
     "graph_settings": {"enabled": False},
 }
 
 
-def _client() -> R2RClient:
-    return R2RClient(base_url=_BASE_URL)
-
-
 def get_client() -> R2RClient:
     """Public factory for the R2R SDK client. Use from other service modules."""
-    return _client()
-
-
-# Public alias for search settings (used by other service modules)
-DEFAULT_SEARCH_SETTINGS = _SEARCH_SETTINGS
+    return R2RClient(base_url=_BASE_URL)
 
 
 def rag_query(query: str) -> dict[str, Any]:
     """Ask a RAG question. Returns structured dict for the /ask route."""
     try:
-        client = _client()
+        client = get_client()
         response = client.retrieval.rag(
             query=query,
-            search_settings=_SEARCH_SETTINGS,
+            search_settings=DEFAULT_SEARCH_SETTINGS,
         )
     except (httpx.HTTPError, R2RException) as exc:
         raise RuntimeError(f"R2R unavailable: {exc}") from exc
@@ -109,6 +102,10 @@ def rag_query(query: str) -> dict[str, Any]:
     if known_citations:
         citations = known_citations
 
+    answer, citations, retrieved_contexts = rewrite_brackets(
+        answer, citations, retrieved_contexts
+    )
+
     figures = figures_for_response(citations, retrieved_contexts)
 
     return {
@@ -125,7 +122,7 @@ def rag_query(query: str) -> dict[str, Any]:
 def ingest_file(file_path: str) -> Any:
     """Ingest a single file into R2R. Returns raw SDK response."""
     try:
-        client = _client()
+        client = get_client()
         return client.documents.create(file_path=file_path)
     except (httpx.HTTPError, R2RException) as exc:
         raise RuntimeError(f"R2R unavailable: {exc}") from exc
@@ -136,7 +133,7 @@ def delete_r2r_documents(document_ids: list[str]) -> dict[str, list[str]]:
     deleted: list[str] = []
     failed: list[str] = []
     try:
-        client = _client()
+        client = get_client()
     except Exception:
         return {"deleted": [], "failed": list(document_ids)}
     for document_id in document_ids:
@@ -152,7 +149,7 @@ def delete_r2r_documents(document_ids: list[str]) -> dict[str, list[str]]:
 def ingest_prechunked_document(chunks: list[dict[str, Any]], report: dict[str, Any]) -> Any:
     """Ingest DocQuery-produced chunks into R2R so retrieval keeps citation headers."""
     try:
-        client = _client()
+        client = get_client()
         metadata = {
             "docquery_document_id": report.get("document_id"),
             "source_file": report.get("source_file"),

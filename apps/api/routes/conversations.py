@@ -26,7 +26,7 @@ class MessageRequest(BaseModel):
 
     message: str
     doc_only: bool = False
-    document_id: str | None = None
+    document_ids: list[str] | None = None
 
 
 @router.post("", response_model=CreateConversationResponse)
@@ -47,7 +47,7 @@ def post_message(conversation_id: str, body: MessageRequest) -> dict:
             message=body.message,
             conversation_id=conversation_id,
             doc_only=body.doc_only,
-            document_id=body.document_id,
+            document_ids=body.document_ids,
         )
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
@@ -63,7 +63,7 @@ def post_message_stream(conversation_id: str, body: MessageRequest) -> Streaming
         message=body.message,
         conversation_id=conversation_id,
         doc_only=body.doc_only,
-        document_id=body.document_id,
+        document_ids=body.document_ids,
     )
     return StreamingResponse(
         generator,

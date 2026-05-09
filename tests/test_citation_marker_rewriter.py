@@ -1,16 +1,17 @@
 # pattern: Functional Core Tests
 """Tests for citation_marker_rewriter Functional Core module."""
 import unittest
+from uuid import UUID
 
 from apps.api.services.citation_marker_rewriter import rewrite_brackets
 
 
-def _cit(chunk_id: str, doc: str = "doc.pdf") -> dict:
+def _cit(chunk_id: object, doc: str = "doc.pdf") -> dict:
     """Helper to build a minimal citation dict."""
     return {"chunk_id": chunk_id, "document": doc, "page": 1}
 
 
-def _ctx(chunk_id: str, text: str = "text") -> dict:
+def _ctx(chunk_id: object, text: str = "text") -> dict:
     """Helper to build a minimal retrieved context dict."""
     return {"chunk_id": chunk_id, "text": text, "score": 0.85}
 
@@ -181,6 +182,21 @@ class TestCitationMarkerRewriter(unittest.TestCase):
         self.assertEqual(rewritten, "Text with [1].")
         # Citation without chunk_id should remain (reordered at end or untouched)
         self.assertEqual(len(reordered_cits), 2)
+
+    def test_uuid_chunk_ids_are_supported(self):
+        """R2R SDK may return UUID objects instead of string chunk IDs."""
+        chunk_id = UUID("aaa11111-1111-1111-1111-111111111111")
+        answer = "See [aaa1111]."
+        citations = [_cit(chunk_id)]
+        retrieved_contexts = [_ctx(chunk_id)]
+
+        rewritten, reordered_cits, reordered_ctxs = rewrite_brackets(
+            answer, citations, retrieved_contexts
+        )
+
+        self.assertEqual(rewritten, "See [1].")
+        self.assertEqual(reordered_cits[0]["chunk_id"], chunk_id)
+        self.assertEqual(reordered_ctxs[0]["chunk_id"], chunk_id)
 
 
 if __name__ == "__main__":

@@ -138,7 +138,7 @@ export default function ConversationView() {
                       remarkPlugins={[remarkGfm, remarkCitationBadges]}
                       components={partialMarkdownComponents}
                     >
-                      {partialText}
+                      {partialText.replace(/ ?\[[0-9a-f]{6,8}\]/g, "")}
                     </ReactMarkdown>
                   </CitationProvider>
                 </CardContent>
@@ -159,7 +159,7 @@ export default function ConversationView() {
           onSubmit={(text, attached) => {
             void sendMessage(text, {
               docOnly: queryMode === "documents",
-              documentId: attached?.document_id,
+              documentIds: attached?.map((doc) => doc.document_id),
             })
           }}
         />

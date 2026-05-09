@@ -104,7 +104,7 @@ describe("ChatInput", () => {
       expect(screen.queryByRole("listbox")).not.toBeInTheDocument()
 
       // Chip should appear
-      const chip = screen.getByRole("button", { name: /Remove attached document/ })
+      const chip = screen.getByRole("button", { name: /Remove / })
       expect(chip).toBeInTheDocument()
 
       // Input value should be cleared of the #token
@@ -120,7 +120,7 @@ describe("ChatInput", () => {
       await user.keyboard("{Enter}")
 
       // Chip should appear for first matching document
-      const chip = screen.getByRole("button", { name: /Remove attached document/ })
+      const chip = screen.getByRole("button", { name: /Remove / })
       expect(chip).toBeInTheDocument()
     })
   })
@@ -137,7 +137,7 @@ describe("ChatInput", () => {
       await user.keyboard("{Enter}")
 
       // Verify chip is there
-      expect(screen.getByRole("button", { name: /Remove attached document/ })).toBeInTheDocument()
+      expect(screen.getByRole("button", { name: /Remove / })).toBeInTheDocument()
 
       // Type message and submit
       await user.type(input, "What is the policy?")
@@ -148,12 +148,35 @@ describe("ChatInput", () => {
       expect(onSubmit).toHaveBeenCalledTimes(1)
       const [text, attached] = onSubmit.mock.calls[0]
       expect(text).toBe("What is the policy?")
-      expect(attached?.document_id).toBe("doc1") // refund_policy.pdf
+      expect(attached?.[0]?.document_id).toBe("doc1") // refund_policy.pdf
 
       // After submit, chip should be gone
       // (component clears state immediately, so next render has no chip)
       // We verify this by checking the input is empty again
       expect(input).toHaveValue("")
+    })
+
+    it("selecting multiple documents submits an array and excludes duplicates from picker", async () => {
+      const user = userEvent.setup()
+      const onSubmit = vi.fn()
+      renderChatInput(onSubmit)
+
+      const input = screen.getByRole("combobox")
+      await user.type(input, "#refund")
+      await user.keyboard("{Enter}")
+      expect(screen.getByRole("button", { name: /Remove refund_policy.pdf/ })).toBeInTheDocument()
+
+      await user.type(input, "#pdf")
+      const options = screen.getAllByRole("option")
+      expect(options.some((option) => option.textContent === "refund_policy.pdf")).toBe(false)
+      await user.keyboard("{Enter}")
+      expect(screen.getByRole("button", { name: /Remove annual_report.pdf/ })).toBeInTheDocument()
+
+      await user.type(input, "Compare these")
+      await user.click(screen.getByRole("button", { name: /Send/ }))
+
+      const [, attached] = onSubmit.mock.calls[0]
+      expect(attached.map((doc: SourceDocument) => doc.document_id)).toEqual(["doc1", "doc2"])
     })
   })
 
@@ -175,7 +198,7 @@ describe("ChatInput", () => {
       expect(screen.queryByRole("listbox")).not.toBeInTheDocument()
 
       // No chip should appear
-      expect(screen.queryByRole("button", { name: /Remove attached document/ })).not.toBeInTheDocument()
+      expect(screen.queryByRole("button", { name: /Remove / })).not.toBeInTheDocument()
 
       // Input text should be unchanged
       expect(input).toHaveValue("#pdf")
@@ -198,7 +221,7 @@ describe("ChatInput", () => {
       expect(screen.queryByRole("listbox")).not.toBeInTheDocument()
 
       // No chip should appear
-      expect(screen.queryByRole("button", { name: /Remove attached document/ })).not.toBeInTheDocument()
+      expect(screen.queryByRole("button", { name: /Remove / })).not.toBeInTheDocument()
     })
   })
 
@@ -246,14 +269,14 @@ describe("ChatInput", () => {
       await user.keyboard("{Enter}")
 
       // Chip should exist
-      const chipButton = screen.getByRole("button", { name: /Remove attached document/ })
+      const chipButton = screen.getByRole("button", { name: /Remove / })
       expect(chipButton).toBeInTheDocument()
 
       // Click the X button inside the chip
       await user.click(chipButton)
 
       // Chip should be gone
-      expect(screen.queryByRole("button", { name: /Remove attached document/ })).not.toBeInTheDocument()
+      expect(screen.queryByRole("button", { name: /Remove / })).not.toBeInTheDocument()
     })
 
     it("placeholder changes when document is attached", async () => {
@@ -269,7 +292,7 @@ describe("ChatInput", () => {
       await user.keyboard("{Enter}")
 
       // Placeholder should change
-      expect(input.placeholder).toBe("Ask about this document…")
+      expect(input.placeholder).toBe("Ask about selected documents...")
     })
 
     it("pending state disables input and button", () => {
@@ -283,3 +306,4 @@ describe("ChatInput", () => {
     })
   })
 })
+

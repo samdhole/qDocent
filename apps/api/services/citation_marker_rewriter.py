@@ -8,9 +8,14 @@ from typing import Any
 _SHORTID_RE = re.compile(r"\[([0-9a-f]{6,8})\]")
 
 
-def _shortid_from_chunk_id(chunk_id: str) -> str:
+def _chunk_id_key(chunk_id: Any) -> str:
+    """Normalize SDK chunk IDs (str or UUID-like) for dictionary matching."""
+    return str(chunk_id)
+
+
+def _shortid_from_chunk_id(chunk_id: Any) -> str:
     """Derive the 7-char hex shortid R2R embeds in answer text from a full chunk UUID."""
-    return chunk_id.replace("-", "")[:7]
+    return _chunk_id_key(chunk_id).replace("-", "")[:7]
 
 
 def rewrite_brackets(
@@ -66,13 +71,13 @@ def rewrite_brackets(
 
     # Align retrieved_contexts by chunk_id (robust to pre-filter length mismatch)
     ctx_by_chunk_id: dict[str, dict[str, Any]] = {
-        ctx["chunk_id"]: ctx
+        _chunk_id_key(ctx["chunk_id"]): ctx
         for ctx in retrieved_contexts
         if ctx.get("chunk_id")
     }
     reordered_contexts = [
         ctx_by_chunk_id.get(
-            citations[i].get("chunk_id") or "",
+            _chunk_id_key(citations[i].get("chunk_id") or ""),
             {"chunk_id": None, "text": "", "score": 0.0},
         )
         for i in new_order

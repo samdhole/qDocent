@@ -440,7 +440,7 @@ class TestIngestFileWithPipeline:
 class TestIngestPrechunkedDocument:
     """Test ingest_prechunked_document() metadata handling."""
 
-    @mock.patch("apps.api.services.r2r_client._client")
+    @mock.patch("apps.api.services.r2r_client.get_client")
     def test_none_valued_metadata_fields_are_included(self, mock_client_fn):
         """When document_id and source_file are None, metadata includes None values (arfix.AC8.1)."""
         mock_client = mock.MagicMock()
@@ -465,7 +465,7 @@ class TestIngestPrechunkedDocument:
         assert metadata["source_file"] is None
         assert metadata["ingestion_mode"] == "docquery_pre_chunked"
 
-    @mock.patch("apps.api.services.r2r_client._client")
+    @mock.patch("apps.api.services.r2r_client.get_client")
     def test_passes_chunks_as_strings_with_citation_headers(self, mock_client_fn):
         """chunks_for_r2r output is passed verbatim to client.documents.create (arfix.AC15.1)."""
         mock_client = mock_client_fn.return_value
@@ -496,7 +496,7 @@ class TestIngestPrechunkedDocument:
             "each chunk string must begin with the citation header prefix"
         )
 
-    @mock.patch("apps.api.services.r2r_client._client")
+    @mock.patch("apps.api.services.r2r_client.get_client")
     def test_metadata_contains_required_fields(self, mock_client_fn):
         """metadata dict passed to R2R contains ingestion_mode, docquery_document_id, source_file (arfix.AC15.2)."""
         mock_client = mock_client_fn.return_value
@@ -517,7 +517,7 @@ class TestIngestPrechunkedDocument:
         assert "source_file" in metadata
         assert metadata["source_file"] == "test.pdf"
 
-    @mock.patch("apps.api.services.r2r_client._client")
+    @mock.patch("apps.api.services.r2r_client.get_client")
     def test_raises_runtime_error_when_client_construction_fails(self, mock_client_fn):
         """RuntimeError is raised when R2R client cannot be constructed (arfix.AC15.3)."""
         import httpx
@@ -532,7 +532,7 @@ class TestIngestPrechunkedDocument:
 
 
 class TestDeleteR2RDocuments:
-    @mock.patch("apps.api.services.r2r_client._client")
+    @mock.patch("apps.api.services.r2r_client.get_client")
     def test_delete_r2r_documents_calls_sdk_delete_for_each_id(self, mock_client_fn):
         """delete_r2r_documents delegates every known R2R ID to the SDK."""
         from apps.api.services.r2r_client import delete_r2r_documents
@@ -545,7 +545,7 @@ class TestDeleteR2RDocuments:
             mock.call("r2r-figures"),
         ]
 
-    @mock.patch("apps.api.services.r2r_client._client")
+    @mock.patch("apps.api.services.r2r_client.get_client")
     def test_delete_r2r_documents_returns_failed_when_client_construction_fails(self, mock_client_fn):
         """AC11.1: Client construction failure returns all IDs in failed[], no raise."""
         import httpx
@@ -558,7 +558,7 @@ class TestDeleteR2RDocuments:
 
         assert result == {"deleted": [], "failed": ["r2r-primary", "r2r-figures"]}
 
-    @mock.patch("apps.api.services.r2r_client._client")
+    @mock.patch("apps.api.services.r2r_client.get_client")
     def test_delete_r2r_documents_handles_partial_per_doc_failure(self, mock_client_fn):
         """AC11.2: Per-document deletion failure is caught; successful deletions proceed."""
         import httpx
@@ -583,7 +583,7 @@ class TestRagQueryFigures:
     """Test rag_query() response enrichment."""
 
     @mock.patch("apps.api.services.r2r_client.figures_for_response")
-    @mock.patch("apps.api.services.r2r_client._client")
+    @mock.patch("apps.api.services.r2r_client.get_client")
     def test_rag_query_includes_figures_key(self, mock_client_fn, mock_figures):
         """rag_query() return dict must contain 'figures' key."""
         mock_figures.return_value = []
@@ -604,7 +604,7 @@ class TestRagQueryFigures:
         assert isinstance(result["figures"], list)
 
     @mock.patch("apps.api.services.r2r_client.figures_for_response")
-    @mock.patch("apps.api.services.r2r_client._client")
+    @mock.patch("apps.api.services.r2r_client.get_client")
     def test_rag_query_uses_docquery_citation_header(self, mock_client_fn, mock_figures):
         """rag_query recovers document/page metadata embedded in retrieved text."""
         mock_figures.return_value = []
@@ -636,7 +636,7 @@ class TestRagQueryFigures:
         assert result["retrieved_contexts"][0]["text"] == "Refund policy body."
 
     @mock.patch("apps.api.services.r2r_client.figures_for_response")
-    @mock.patch("apps.api.services.r2r_client._client")
+    @mock.patch("apps.api.services.r2r_client.get_client")
     def test_rag_query_suppresses_legacy_unknown_citations_when_known_exists(
         self, mock_client_fn, mock_figures
     ):
@@ -674,7 +674,7 @@ class TestRagQueryFigures:
         assert result["citations"][0]["document"] == "policy.pdf"
 
     @mock.patch("apps.api.services.r2r_client.figures_for_response")
-    @mock.patch("apps.api.services.r2r_client._client")
+    @mock.patch("apps.api.services.r2r_client.get_client")
     def test_rag_query_header_document_takes_precedence_over_meta(
         self, mock_client_fn, mock_figures
     ):
@@ -706,7 +706,7 @@ class TestRagQueryFigures:
         assert result["citations"][0]["document"] == "header_doc.pdf"
 
     @mock.patch("apps.api.services.r2r_client.figures_for_response")
-    @mock.patch("apps.api.services.r2r_client._client")
+    @mock.patch("apps.api.services.r2r_client.get_client")
     def test_rag_query_meta_fallback_when_no_header(
         self, mock_client_fn, mock_figures
     ):
@@ -734,7 +734,7 @@ class TestRagQueryFigures:
         assert result["citations"][0]["document"] == "fallback_doc.pdf"
 
     @mock.patch("apps.api.services.r2r_client.figures_for_response")
-    @mock.patch("apps.api.services.r2r_client._client")
+    @mock.patch("apps.api.services.r2r_client.get_client")
     def test_rag_query_header_fields_take_precedence_over_meta(
         self, mock_client_fn, mock_figures
     ):
@@ -768,7 +768,7 @@ class TestRagQueryFigures:
         assert result["citations"][0]["section"] == "Intro"
 
     @mock.patch("apps.api.services.r2r_client.figures_for_response")
-    @mock.patch("apps.api.services.r2r_client._client")
+    @mock.patch("apps.api.services.r2r_client.get_client")
     def test_rag_query_includes_chunk_index_from_header(
         self, mock_client_fn, mock_figures
     ):
@@ -800,7 +800,7 @@ class TestRagQueryFigures:
         assert result["citations"][0]["chunk_index"] == 7
 
     @mock.patch("apps.api.services.r2r_client.figures_for_response")
-    @mock.patch("apps.api.services.r2r_client._client")
+    @mock.patch("apps.api.services.r2r_client.get_client")
     def test_rag_query_chunk_index_is_none_when_header_missing(
         self, mock_client_fn, mock_figures
     ):
@@ -827,3 +827,85 @@ class TestRagQueryFigures:
 
         assert len(result["citations"]) == 1
         assert result["citations"][0]["chunk_index"] is None
+
+
+class TestRagQueryBracketRewrite:
+    @mock.patch("apps.api.services.r2r_client.figures_for_response", return_value=[])
+    @mock.patch("apps.api.services.r2r_client.get_client")
+    def test_hex_markers_rewritten_to_ordinal(self, mock_client_fn, mock_figures):
+        chunk_id = "a1b2c3d-0000-0000-0000-000000000000"
+
+        mock_chunk = mock.MagicMock()
+        mock_chunk.score = 0.9
+        mock_chunk.text = "The policy content."
+        mock_chunk.metadata = {
+            "chunk_id": chunk_id,
+            "source_file": "policy.pdf",
+            "page_start": 1,
+            "page_end": 1,
+        }
+        mock_chunk.id = chunk_id
+
+        mock_agg = mock.MagicMock()
+        mock_agg.chunk_search_results = [mock_chunk]
+        mock_result = mock.MagicMock()
+        mock_result.generated_answer = "The policy covers [a1b2c3d] events."
+        mock_result.search_results = mock_agg
+
+        mock_response = mock.MagicMock()
+        mock_response.results = mock_result
+        mock_client_fn.return_value.retrieval.rag.return_value = mock_response
+
+        from apps.api.services.r2r_client import rag_query
+
+        result = rag_query("What is the policy?")
+
+        assert result["answer"] == "The policy covers [1] events."
+        assert result["citations"][0]["chunk_id"] == chunk_id
+
+    @mock.patch("apps.api.services.r2r_client.figures_for_response", return_value=[])
+    @mock.patch("apps.api.services.r2r_client.get_client")
+    def test_no_hex_markers_answer_unchanged(self, mock_client_fn, mock_figures):
+        mock_chunk = mock.MagicMock()
+        mock_chunk.score = 0.7
+        mock_chunk.text = "Some content."
+        mock_chunk.metadata = {"source_file": "doc.pdf"}
+        mock_chunk.id = "bbbbbbbb-0000-0000-0000-000000000000"
+
+        mock_agg = mock.MagicMock()
+        mock_agg.chunk_search_results = [mock_chunk]
+        mock_result = mock.MagicMock()
+        mock_result.generated_answer = "The answer has no inline markers."
+        mock_result.search_results = mock_agg
+
+        mock_response = mock.MagicMock()
+        mock_response.results = mock_result
+        mock_client_fn.return_value.retrieval.rag.return_value = mock_response
+
+        from apps.api.services.r2r_client import rag_query
+
+        result = rag_query("What is it?")
+
+        assert result["answer"] == "The answer has no inline markers."
+        assert len(result["citations"]) == 1
+        assert result["citations"][0]["chunk_id"] == "bbbbbbbb-0000-0000-0000-000000000000"
+
+    @mock.patch("apps.api.services.r2r_client.figures_for_response", return_value=[])
+    @mock.patch("apps.api.services.r2r_client.get_client")
+    def test_empty_citations_answer_unchanged(self, mock_client_fn, mock_figures):
+        mock_agg = mock.MagicMock()
+        mock_agg.chunk_search_results = []
+        mock_result = mock.MagicMock()
+        mock_result.generated_answer = "No citations available [cccccccc]."
+        mock_result.search_results = mock_agg
+
+        mock_response = mock.MagicMock()
+        mock_response.results = mock_result
+        mock_client_fn.return_value.retrieval.rag.return_value = mock_response
+
+        from apps.api.services.r2r_client import rag_query
+
+        result = rag_query("Anything?")
+
+        assert result["answer"] == "No citations available [cccccccc]."
+        assert result["citations"] == []

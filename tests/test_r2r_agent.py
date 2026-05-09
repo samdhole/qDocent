@@ -767,7 +767,7 @@ class TestDocumentFilter:
 
                 from apps.api.services.r2r_agent import agent_query
 
-                result = agent_query("What is the answer?", "conv-1", document_id="doc1")
+                result = agent_query("What is the answer?", "conv-1", document_ids=["doc1"])
 
                 # Verify that the agent was called with filters
                 call_kwargs = mock_client_factory.return_value.retrieval.agent.call_args.kwargs
@@ -802,7 +802,7 @@ class TestDocumentFilter:
 
                 from apps.api.services.r2r_agent import agent_query
 
-                result = agent_query("What is the answer?", "conv-1", document_id="doc1")
+                result = agent_query("What is the answer?", "conv-1", document_ids=["doc1"])
 
                 # Verify that search_settings does NOT contain filters key
                 call_kwargs = mock_client_factory.return_value.retrieval.agent.call_args.kwargs
@@ -833,7 +833,7 @@ class TestDocumentFilter:
 
                 from apps.api.services.r2r_agent import agent_query
 
-                result = agent_query("What is the answer?", "conv-1", document_id="doc1")
+                result = agent_query("What is the answer?", "conv-1", document_ids=["doc1"])
 
                 # Verify that search_settings does NOT contain filters key
                 call_kwargs = mock_client_factory.return_value.retrieval.agent.call_args.kwargs
@@ -907,7 +907,7 @@ class TestDocumentFilter:
                 from apps.api.services.r2r_agent import agent_stream
 
                 # Consume the generator to trigger the actual call
-                frames = list(agent_stream("What?", "conv-1", document_id="doc1"))
+                frames = list(agent_stream("What?", "conv-1", document_ids=["doc1"]))
 
                 # Verify that the agent was called with filters
                 call_kwargs = mock_client_factory.return_value.retrieval.agent.call_args.kwargs
@@ -917,3 +917,21 @@ class TestDocumentFilter:
                 assert search_settings["filters"] == {
                     "document_id": {"$in": ["r2r-uuid-1"]}
                 }
+
+    def test_multi_document_filter_merges_manifests(self):
+        """Two document IDs produce one combined R2R $in filter."""
+        manifest_a = {"r2r_document_ids": ["r2r-uuid-a1", "r2r-uuid-a2"]}
+        manifest_b = {"r2r_document_ids": ["r2r-uuid-b1"]}
+
+        with mock.patch(
+            "apps.api.services.r2r_agent.load_document_manifest",
+            side_effect=[manifest_a, manifest_b],
+        ):
+            from apps.api.services.r2r_agent import _build_search_settings
+
+            settings = _build_search_settings(["doc-a", "doc-b"])
+
+        assert settings["filters"] == {
+            "document_id": {"$in": ["r2r-uuid-a1", "r2r-uuid-a2", "r2r-uuid-b1"]}
+        }
+

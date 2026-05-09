@@ -10,6 +10,7 @@ from apps.api.services.document_store import (
     list_source_documents,
     source_pdf_path,
 )
+from apps.api.services.question_generator import generate_questions
 
 router = APIRouter(prefix="/documents")
 
@@ -52,3 +53,18 @@ def delete_document(document_id: str) -> dict:
         "document_id": document_id,
         "r2r_delete": r2r_delete,
     }
+
+
+@router.get("/{document_id}/questions")
+def get_document_questions(document_id: str) -> dict:
+    """Generate suggested questions from a document's chunk previews via LLM."""
+    chunks = load_chunks_manifest(document_id)
+    if chunks is None:
+        raise HTTPException(status_code=404, detail=f"No chunk manifest for '{document_id}'.")
+    text_previews = [
+        chunk["text_preview"]
+        for chunk in chunks
+        if isinstance(chunk.get("text_preview"), str) and chunk["text_preview"].strip()
+    ]
+    questions = generate_questions(text_previews)
+    return {"document_id": document_id, "questions": questions}

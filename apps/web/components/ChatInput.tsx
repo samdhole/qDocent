@@ -2,7 +2,7 @@
 "use client"
 
 import * as React from "react"
-import { ArrowUp, Loader2, X } from "lucide-react"
+import { ArrowUp, FileText, Loader2, X } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -12,12 +12,12 @@ import type { SourceDocument } from "@/lib/types"
 type Props = {
   pending: boolean
   documents: SourceDocument[]
-  onSubmit: (text: string, attached?: SourceDocument) => void
+  onSubmit: (text: string, attached?: SourceDocument[]) => void
 }
 
 export function ChatInput({ pending, documents, onSubmit }: Props) {
   const [text, setText] = React.useState("")
-  const [attachedDoc, setAttachedDoc] = React.useState<SourceDocument | null>(null)
+  const [attachedDocs, setAttachedDocs] = React.useState<SourceDocument[]>([])
   const [pickerOpen, setPickerOpen] = React.useState(false)
   const [pickerQuery, setPickerQuery] = React.useState("")
   const [highlightIndex, setHighlightIndex] = React.useState(0)
@@ -30,12 +30,15 @@ export function ChatInput({ pending, documents, onSubmit }: Props) {
     () =>
       pickerQuery
         ? documents
+            .filter((d) => !attachedDocs.some((a) => a.document_id === d.document_id))
             .filter((d) =>
               d.source_file.toLowerCase().includes(pickerQuery.toLowerCase())
             )
             .slice(0, 8)
-        : documents.slice(0, 8),
-    [documents, pickerQuery]
+        : documents
+            .filter((d) => !attachedDocs.some((a) => a.document_id === d.document_id))
+            .slice(0, 8),
+    [attachedDocs, documents, pickerQuery]
   )
 
   // Extract # token from text up to caret
@@ -71,10 +74,16 @@ export function ChatInput({ pending, documents, onSubmit }: Props) {
     if (hashToken !== null) {
       setText(text.slice(0, hashToken.start) + text.slice(hashToken.start + hashToken.token.length + 1))
     }
-    setAttachedDoc(doc)
+    setAttachedDocs((prev) =>
+      prev.some((d) => d.document_id === doc.document_id) ? prev : [...prev, doc]
+    )
     setPickerOpen(false)
     setPickerQuery("")
     inputRef.current?.focus()
+  }
+
+  function removeDoc(documentId: string) {
+    setAttachedDocs((prev) => prev.filter((d) => d.document_id !== documentId))
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
@@ -97,11 +106,10 @@ export function ChatInput({ pending, documents, onSubmit }: Props) {
     e.preventDefault()
     const trimmed = text.trim()
     if (!trimmed) return
-    const attached = attachedDoc
-    // AC4.4: clear chip before/regardless of stream outcome
+    const attached = attachedDocs.length > 0 ? attachedDocs : undefined
     setText("")
-    setAttachedDoc(null)
-    onSubmit(trimmed, attached ?? undefined)
+    setAttachedDocs([])
+    onSubmit(trimmed, attached)
   }
 
   const activeDescendant = pickerOpen && filtered[highlightIndex]
@@ -110,20 +118,22 @@ export function ChatInput({ pending, documents, onSubmit }: Props) {
 
   return (
     <form onSubmit={handleSubmit} className="relative flex flex-col gap-2 mt-4 pt-4 border-t">
-      {/* Attached doc chip */}
-      {attachedDoc && (
-        <div className="flex items-center gap-1.5">
-          <Badge variant="secondary" className="flex items-center gap-1 text-xs max-w-xs truncate">
-            <span className="truncate">{attachedDoc.source_file}</span>
-            <button
-              type="button"
-              onClick={() => setAttachedDoc(null)}
-              aria-label="Remove attached document"
-              className="ml-0.5 hover:text-destructive"
-            >
-              <X className="size-3" />
-            </button>
-          </Badge>
+      {attachedDocs.length > 0 && (
+        <div className="flex flex-wrap gap-1 px-1 pt-1">
+          {attachedDocs.map((doc) => (
+            <Badge key={doc.document_id} variant="secondary" className="gap-1 text-xs">
+              <FileText className="size-3" />
+              <span className="max-w-[120px] truncate">{doc.source_file}</span>
+              <button
+                type="button"
+                onClick={() => removeDoc(doc.document_id)}
+                aria-label={`Remove ${doc.source_file}`}
+                className="ml-1 rounded-full hover:bg-muted"
+              >
+                <X className="size-3" />
+              </button>
+            </Badge>
+          ))}
         </div>
       )}
 
@@ -160,7 +170,7 @@ export function ChatInput({ pending, documents, onSubmit }: Props) {
           value={text}
           onChange={handleChange}
           onKeyDown={handleKeyDown}
-          placeholder={attachedDoc ? "Ask about this document…" : "What is the refund policy?"}
+          placeholder={attachedDocs.length > 0 ? "Ask about selected documents..." : "What is the refund policy?"}
           disabled={pending}
           role="combobox"
           aria-haspopup="listbox"

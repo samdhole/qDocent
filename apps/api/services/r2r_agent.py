@@ -41,21 +41,23 @@ def _apply_doc_only_check(result: dict[str, Any], doc_only: bool) -> dict[str, A
     return result
 
 
-def _build_search_settings(document_id: str | None) -> dict[str, Any]:
-    """Return a per-request search-settings dict merging DEFAULT_SEARCH_SETTINGS
-    with an optional document_id filter. Never mutates DEFAULT_SEARCH_SETTINGS."""
-    settings = dict(DEFAULT_SEARCH_SETTINGS)  # shallow copy is sufficient — we only set top-level keys
-    if not document_id:
+def _build_search_settings(document_ids: list[str] | None) -> dict[str, Any]:
+    """Return search settings with an optional combined multi-document filter."""
+    settings = dict(DEFAULT_SEARCH_SETTINGS)
+    if not document_ids:
         return settings
-    manifest = load_document_manifest(document_id)
-    r2r_ids = (manifest or {}).get("r2r_document_ids") or []
-    if r2r_ids:
-        settings["filters"] = {"document_id": {"$in": r2r_ids}}
-    else:
-        log.warning(
-            "document_id %s has no r2r_document_ids in manifest; falling back to unscoped retrieval",
-            document_id,
-        )
+    combined_r2r_ids: list[str] = []
+    for document_id in document_ids:
+        manifest = load_document_manifest(document_id)
+        r2r_ids = (manifest or {}).get("r2r_document_ids") or []
+        combined_r2r_ids.extend(r2r_ids)
+        if not r2r_ids:
+            log.warning(
+                "document_id %s has no r2r_document_ids in manifest; skipping filter for this document",
+                document_id,
+            )
+    if combined_r2r_ids:
+        settings["filters"] = {"document_id": {"$in": combined_r2r_ids}}
     return settings
 
 
@@ -78,7 +80,7 @@ def agent_query(
     message: str,
     conversation_id: str,
     doc_only: bool = False,
-    document_id: str | None = None,
+    document_ids: list[str] | None = None,
 ) -> dict[str, Any]:
     """Send one user message in a conversation. Returns the same response
     shape as r2r_client.rag_query() so the frontend can render it identically.
@@ -86,7 +88,7 @@ def agent_query(
     When doc_only=True, applies post-hoc check: if retrieval is empty or low-confidence,
     replaces answer with strict "I couldn't find this in your documents." string.
     """
-    search_settings = _build_search_settings(document_id)
+    search_settings = _build_search_settings(document_ids)
     try:
         response = get_client().retrieval.agent(
             message={"role": "user", "content": message},
@@ -223,7 +225,7 @@ def agent_stream(
     message: str,
     conversation_id: str,
     doc_only: bool = False,
-    document_id: str | None = None,
+    document_ids: list[str] | None = None,
 ) -> Generator[str, None, None]:
     """Stream agent events as SSE-formatted strings.
 
@@ -238,7 +240,7 @@ def agent_stream(
 
     When doc_only=True, applies post-hoc check to final frame (same as agent_query).
     """
-    search_settings = _build_search_settings(document_id)
+    search_settings = _build_search_settings(document_ids)
     try:
         stream = get_client().retrieval.agent(
             message={"role": "user", "content": message},
@@ -355,3 +357,4 @@ def _adapt_final_event(
         }
     }
     return _adapt_agent_response(question, fake_response)
+

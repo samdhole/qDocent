@@ -1,16 +1,29 @@
 // pattern: Imperative Shell
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import type { AskResponse, ChatMessage, ConversationStartResponse } from "@/lib/types";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+const MESSAGES_KEY = "docquery.messages";
 
 export type StreamPhase = "idle" | "searching" | "found_results" | "generating";
 
 export function useConversationStream() {
   const [conversationId, setConversationId] = useState<string | null>(null);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      const stored = localStorage.getItem(MESSAGES_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored) as ChatMessage[];
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch {
+      // Corrupt or unavailable storage starts a fresh visible history.
+    }
+    return [];
+  });
   const [pending, setPending] = useState(false);
   const [phase, setPhase] = useState<StreamPhase>("idle");
   const [partialText, setPartialText] = useState("");
@@ -22,7 +35,24 @@ export function useConversationStream() {
     setPartialText("");
     setPhase("idle");
     partialTextRef.current = "";
+    try {
+      localStorage.removeItem(MESSAGES_KEY);
+    } catch {
+      // Ignore storage errors on reset.
+    }
   }, []);
+
+  useEffect(() => {
+    try {
+      if (messages.length === 0) {
+        localStorage.removeItem(MESSAGES_KEY);
+        return;
+      }
+      localStorage.setItem(MESSAGES_KEY, JSON.stringify(messages));
+    } catch {
+      // Storage quota exceeded or unavailable.
+    }
+  }, [messages]);
 
   function appendPartial(text: string) {
     partialTextRef.current += text;
@@ -35,7 +65,7 @@ export function useConversationStream() {
   }
 
   const sendMessage = useCallback(
-    async (text: string, opts?: { docOnly?: boolean; documentId?: string }) => {
+    async (text: string, opts?: { docOnly?: boolean; documentIds?: string[] }) => {
       const trimmed = text.trim();
       if (!trimmed || pending) return;
       setPending(true);
@@ -75,7 +105,7 @@ export function useConversationStream() {
             body: JSON.stringify({
               message: trimmed,
               ...(opts?.docOnly && { doc_only: true }),
-              ...(opts?.documentId && { document_id: opts.documentId }),
+              ...(opts?.documentIds?.length && { document_ids: opts.documentIds }),
             }),
           },
         );

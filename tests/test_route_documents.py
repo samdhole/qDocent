@@ -209,3 +209,24 @@ def test_get_document_chunks_returns_empty_for_corrupt_manifest(
     data = response.json()
     assert data["document_id"] == "doc1"
     assert data["chunks"] == []
+
+
+@mock.patch("apps.api.routes.documents.generate_questions", return_value=["What is the policy?"])
+@mock.patch("apps.api.routes.documents.load_chunks_manifest")
+def test_get_document_questions_success(mock_chunks, mock_generate, client: TestClient):
+    mock_chunks.return_value = [{"text_preview": "Policy content here.", "chunk_index": 0}]
+
+    response = client.get("/documents/test-doc-id/questions")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["document_id"] == "test-doc-id"
+    assert data["questions"] == ["What is the policy?"]
+    mock_generate.assert_called_once_with(["Policy content here."])
+
+
+@mock.patch("apps.api.routes.documents.load_chunks_manifest", return_value=None)
+def test_get_document_questions_not_found(mock_chunks, client: TestClient):
+    response = client.get("/documents/nonexistent/questions")
+
+    assert response.status_code == 404

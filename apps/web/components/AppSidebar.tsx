@@ -3,7 +3,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { MessageSquareText, FileText, Workflow, BarChart3, Home } from "lucide-react";
+import { BarChart3, FileText, Home, LogOut, MessageSquareText, Moon, Sun, Workflow } from "lucide-react";
+import { useTheme } from "next-themes";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -17,8 +18,14 @@ const NAV_ITEMS = [
   { href: "/evals", label: "Evaluations", icon: BarChart3 },
 ] as const;
 
-export function AppSidebar() {
+type Props = {
+  onLogout?: () => void;
+};
+
+export function AppSidebar({ onLogout }: Props) {
   const pathname = usePathname();
+  const { resolvedTheme, setTheme } = useTheme();
+
   return (
     <aside className="hidden md:flex w-56 shrink-0 border-r flex-col bg-background">
       <div className="px-4 h-14 flex items-center font-semibold">DocQuery</div>
@@ -41,6 +48,29 @@ export function AppSidebar() {
           );
         })}
       </nav>
+      <div className="mt-auto p-2 border-t space-y-1">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="w-full justify-start gap-2 h-9"
+          onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
+          aria-label="Toggle dark mode"
+        >
+          {resolvedTheme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
+          {resolvedTheme === "dark" ? "Light mode" : "Dark mode"}
+        </Button>
+        {onLogout && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full justify-start gap-2 h-9 text-muted-foreground"
+            onClick={onLogout}
+          >
+            <LogOut className="size-4" />
+            Sign out
+          </Button>
+        )}
+      </div>
     </aside>
   );
 }
