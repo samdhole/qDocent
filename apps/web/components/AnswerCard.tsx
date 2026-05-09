@@ -4,7 +4,7 @@ import remarkGfm from "remark-gfm";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
-import type { AskResponse } from "@/lib/types";
+import type { AskResponse, SelectedCitation } from "@/lib/types";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -15,7 +15,10 @@ const LABEL_VARIANT: Record<string, "default" | "secondary" | "destructive" | "o
   needs_review: "outline",
 };
 
-type Props = { result: AskResponse };
+type Props = {
+  result: AskResponse;
+  onSelectCitation?: (citation: SelectedCitation) => void;
+};
 
 function sourceHref(documentId: string, page?: number) {
   return `${API}/documents/${encodeURIComponent(documentId)}/source${
@@ -23,7 +26,7 @@ function sourceHref(documentId: string, page?: number) {
   }`;
 }
 
-export default function AnswerCard({ result }: Props) {
+export default function AnswerCard({ result, onSelectCitation }: Props) {
   const isLowConfidenceNoContext =
     result.confidence_label === "low" && result.retrieved_contexts.length === 0;
 
@@ -68,7 +71,23 @@ export default function AnswerCard({ result }: Props) {
                 }`;
                 return (
                   <li key={c.chunk_id != null ? `${c.document_id ?? "doc"}-${c.chunk_id}-${i}` : i}>
-                    {c.document_id ? (
+                    {c.document_id && onSelectCitation && c.page != null ? (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          onSelectCitation({
+                            documentId: c.document_id!,
+                            documentName: c.document,
+                            pageStart: c.page!,
+                            pageEnd: c.page_end ?? null,
+                            chunkIndex: c.chunk_index ?? null,
+                          })
+                        }
+                        className="text-blue-700 hover:underline text-left"
+                      >
+                        {label}
+                      </button>
+                    ) : c.document_id ? (
                       <a
                         href={sourceHref(c.document_id, c.page ?? undefined)}
                         target="_blank"

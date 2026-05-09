@@ -2,6 +2,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { Loader2, ArrowUp, Plus } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -14,6 +15,13 @@ import AnswerCard from "@/components/AnswerCard";
 import { SuggestedQuestions } from "@/components/SuggestedQuestions";
 import { useConversationStream } from "@/lib/useConversationStream";
 import type { StreamPhase } from "@/lib/useConversationStream";
+import type { SelectedCitation } from "@/lib/types";
+
+// Lazy-load: pdfjs is heavy (~80kb gz). Only loads when a citation is clicked.
+const SourcePanel = dynamic(() => import("@/components/SourcePanel"), {
+  ssr: false,
+  loading: () => null,
+});
 
 function phaseLabel(phase: StreamPhase): string {
   switch (phase) {
@@ -27,6 +35,7 @@ function phaseLabel(phase: StreamPhase): string {
 export default function ConversationView() {
   const { messages, pending, phase, partialText, sendMessage, reset } = useConversationStream();
   const [draft, setDraft] = useState("");
+  const [selectedCitation, setSelectedCitation] = useState<SelectedCitation | null>(null);
   const scrollEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -84,7 +93,7 @@ export default function ConversationView() {
           }
           return (
             <div key={m.id}>
-              <AnswerCard result={m.result} />
+              <AnswerCard result={m.result} onSelectCitation={setSelectedCitation} />
             </div>
           );
         })}
@@ -126,6 +135,8 @@ export default function ConversationView() {
           <span className="sr-only">Send</span>
         </Button>
       </form>
+
+      <SourcePanel citation={selectedCitation} onClose={() => setSelectedCitation(null)} />
     </div>
   );
 }
