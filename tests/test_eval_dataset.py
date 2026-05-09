@@ -24,9 +24,10 @@ def test_eval_dataset_has_commercial_demo_breadth():
 
 
 def test_eval_dataset_covers_answerable_and_refusal_cases():
-    """Eval dataset includes policy, pricing, architecture, and refusal cases."""
+    """Eval dataset includes policy, pricing, architecture, refusal, and support_history cases."""
     items = _question_items()
     categories = {item["category"] for item in items}
 
-    assert {"policy", "pricing", "architecture", "refusal"} <= categories
+    assert {"policy", "pricing", "architecture", "refusal", "support_history"} <= categories
     assert sum(1 for item in items if item["category"] == "refusal") >= 2
+    assert sum(1 for item in items if item["category"] == "support_history") >= 4
