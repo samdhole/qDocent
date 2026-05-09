@@ -328,6 +328,7 @@ class TestDocOnly:
                 assert result["answer"] == "I couldn't find this in your documents."
                 assert result["confidence_label"] == "low"
                 assert result["needs_human_review"] is True
+                assert result["doc_only_not_found"] is True
 
     def test_ac3_3_doc_only_low_score_chunk(self):
         """AC3.3: doc_only=True with low-score chunk (score < 0.50) → strict not-found string."""
@@ -369,6 +370,7 @@ class TestDocOnly:
                 assert result["answer"] == "I couldn't find this in your documents."
                 assert result["confidence_label"] == "low"
                 assert result["needs_human_review"] is True
+                assert result["doc_only_not_found"] is True
 
     def test_ac3_4_doc_only_high_score_chunk(self):
         """AC3.4: doc_only=True with high-score chunk (score >= 0.80) → original LLM answer unchanged."""
@@ -410,6 +412,8 @@ class TestDocOnly:
                 assert result["answer"] == "The refund policy is 30 days."
                 assert result["confidence_label"] == "high"
                 assert result["needs_human_review"] is False
+                # doc_only_not_found should not be set (or be False/absent)
+                assert not result.get("doc_only_not_found")
 
     def test_ac3_5_doc_only_false_empty_retrieval(self):
         """AC3.5: doc_only=False (general mode) with empty retrieval → original LLM answer (no substitution)."""
@@ -438,6 +442,86 @@ class TestDocOnly:
                 assert result["answer"] == "Based on general knowledge, refund periods vary by industry."
                 assert result["confidence_label"] == "low"  # Still low because no retrieval
                 assert result["needs_human_review"] is True  # Still needs review due to low confidence
+                # doc_only_not_found should not be set in general mode
+                assert not result.get("doc_only_not_found")
+
+    def test_ac3_2_doc_only_stream_empty_retrieval(self):
+        """AC3.2 stream path: doc_only=True with empty retrieval → not-found string + low confidence."""
+        with mock.patch("apps.api.services.r2r_agent.get_client") as mock_client_factory, \
+             mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures, \
+             mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
+                # Empty retrieval via streaming — LLM tries to answer from knowledge
+                events = [
+                    SearchResultsEvent([]),  # Empty retrieval
+                    MessageEvent("Based on my knowledge, the refund period is 30 days."),
+                    FinalAnswerEvent("Based on my knowledge, the refund period is 30 days.", "conv-1"),
+                ]
+                mock_client_factory.return_value.retrieval.agent.return_value = iter(events)
+                mock_figures.return_value = []
+
+                from apps.api.services.r2r_agent import agent_stream
+
+                frames = list(agent_stream("What is the refund policy?", "conv-1", doc_only=True))
+
+                # Extract final frame
+                final_frames = [
+                    json.loads(f.split("data: ")[1])
+                    for f in frames
+                    if "data: " in f and json.loads(f.split("data: ")[1]).get("type") == "final"
+                ]
+
+                assert len(final_frames) == 1
+                result = final_frames[0]["result"]
+                # Post-hoc check should replace LLM answer with strict not-found string
+                assert result["answer"] == "I couldn't find this in your documents."
+                assert result["confidence_label"] == "low"
+                assert result["needs_human_review"] is True
+                assert result.get("doc_only_not_found") is True
+
+    def test_ac3_4_doc_only_stream_high_score(self):
+        """AC3.4 stream path: doc_only=True with high-score chunk → original LLM answer preserved."""
+        with mock.patch("apps.api.services.r2r_agent.get_client") as mock_client_factory, \
+             mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures, \
+             mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
+                # High-score chunk via streaming — post-hoc check should NOT trigger
+                events = [
+                    SearchResultsEvent([
+                        {
+                            "text": "DocQuery Citation: document_id=doc1; source_file=policy.pdf; page_start=1; page_end=1; section_path=Refunds; chunk_index=0\n\nRefund policy details: 30 days",
+                            "metadata": {
+                                "chunk_id": "chunk-1",
+                                "source_file": "policy.pdf",
+                                "page_start": 1,
+                            },
+                            "score": 0.85,  # High score → confidence_label="high"
+                            "id": "chunk-1",
+                        }
+                    ]),
+                    MessageEvent("The refund policy is 30 days."),
+                    FinalAnswerEvent("The refund policy is 30 days.", "conv-1"),
+                ]
+                mock_client_factory.return_value.retrieval.agent.return_value = iter(events)
+                mock_figures.return_value = []
+
+                from apps.api.services.r2r_agent import agent_stream
+
+                frames = list(agent_stream("What is the refund policy?", "conv-1", doc_only=True))
+
+                # Extract final frame
+                final_frames = [
+                    json.loads(f.split("data: ")[1])
+                    for f in frames
+                    if "data: " in f and json.loads(f.split("data: ")[1]).get("type") == "final"
+                ]
+
+                assert len(final_frames) == 1
+                result = final_frames[0]["result"]
+                # High confidence + doc_only=True → post-hoc check does NOT trigger
+                assert result["answer"] == "The refund policy is 30 days."
+                assert result["confidence_label"] == "high"
+                assert result["needs_human_review"] is False
+                # doc_only_not_found should not be set (or be False/absent)
+                assert not result.get("doc_only_not_found")
 
 
 class TestAgentStream:

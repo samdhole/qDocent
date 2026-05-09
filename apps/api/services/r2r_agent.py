@@ -36,6 +36,7 @@ def _apply_doc_only_check(result: dict[str, Any], doc_only: bool) -> dict[str, A
         result["answer"] = _DOC_ONLY_NOT_FOUND
         result["confidence_label"] = "low"
         result["needs_human_review"] = True
+        result["doc_only_not_found"] = True
     return result
 
 

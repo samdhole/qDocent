@@ -16,6 +16,7 @@ export function useQueryMode(): [QueryMode, (m: QueryMode) => void] {
     try {
       const stored = localStorage.getItem(STORAGE_KEY) as QueryMode | null
       if (stored === "documents" || stored === "general") {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setModeState(stored)
       }
     } catch {

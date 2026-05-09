@@ -1,3 +1,4 @@
+// pattern: Imperative Shell
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { Components } from "react-markdown";
@@ -11,9 +12,6 @@ import { remarkCitationBadges } from "@/lib/remarkCitationBadges";
 import type { AskResponse, SelectedCitation } from "@/lib/types";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
-
-// Must match _DOC_ONLY_NOT_FOUND in apps/api/services/r2r_agent.py exactly.
-const DOC_ONLY_NOT_FOUND = "I couldn't find this in your documents.";
 
 const LABEL_VARIANT: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
   high: "default",
@@ -32,7 +30,7 @@ export default function AnswerCard({ result, onSelectCitation, onSwitchToGeneral
   const isLowConfidenceNoContext =
     result.confidence_label === "low" && result.retrieved_contexts.length === 0;
 
-  const isDocOnlyNotFound = result.answer === DOC_ONLY_NOT_FOUND;
+  const isDocOnlyNotFound = Boolean(result.doc_only_not_found);
 
   const markdownComponents = {
     "cite-ref": ({ "data-num": num }: { "data-num"?: string }) => (

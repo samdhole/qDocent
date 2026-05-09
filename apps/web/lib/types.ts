@@ -30,6 +30,7 @@ export type AskResponse = {
   figures: FigureAsset[];
   confidence_label: "high" | "medium" | "low" | "needs_review";
   needs_human_review: boolean;
+  doc_only_not_found?: boolean;
 };
 
 export type WorkflowResponse = {
