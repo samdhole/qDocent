@@ -1,6 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { Loader2 } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
 import type { WorkflowResponse } from "@/lib/types";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -59,129 +67,136 @@ export default function WorkflowsPage() {
   }
 
   return (
-    <main className="max-w-5xl mx-auto p-8">
-      <div className="mb-6">
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-          LangGraph workflow
+    <div className="max-w-3xl mx-auto p-6 md:p-8">
+      <header className="mb-6">
+        <h1 className="text-2xl font-semibold">Workflows</h1>
+        <p className="text-sm text-muted-foreground mt-1">
+          LangGraph workflows for support automation.
         </p>
-        <h1 className="text-2xl font-bold">Support Automation Review</h1>
-      </div>
+      </header>
 
-      <div className="grid gap-6 lg:grid-cols-[360px_1fr]">
+      <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
         <section className="space-y-4">
-          <div className="flex rounded border overflow-hidden text-sm">
-            {(["triage", "email"] as WorkflowMode[]).map((item) => (
-              <button
-                key={item}
-                type="button"
-                onClick={() => setMode(item)}
-                className={`flex-1 px-3 py-2 ${
-                  mode === item
-                    ? "bg-gray-900 text-white"
-                    : "bg-white text-gray-700 hover:bg-gray-50"
-                }`}
-              >
-                {MODES[item].label}
-              </button>
-            ))}
-          </div>
+          <Tabs value={mode} onValueChange={(value) => setMode(value as WorkflowMode)}>
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="triage">Triage</TabsTrigger>
+              <TabsTrigger value="email">Email</TabsTrigger>
+            </TabsList>
+          </Tabs>
 
           <form onSubmit={submit} className="space-y-3">
-            <textarea
+            <Input
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               placeholder={MODES[mode].placeholder}
-              className="w-full min-h-44 border rounded px-3 py-2 text-sm resize-y"
+              className="h-32 p-3"
             />
-            <button
-              type="submit"
-              disabled={loading || !message.trim()}
-              className="w-full bg-blue-600 text-white px-4 py-2 rounded text-sm disabled:opacity-50"
-            >
-              {loading ? "Running..." : "Run workflow"}
-            </button>
+            <Button type="submit" disabled={loading || !message.trim()} className="w-full">
+              {loading ? (
+                <>
+                  <Loader2 className="size-4 animate-spin mr-2" />
+                  Running...
+                </>
+              ) : (
+                "Run workflow"
+              )}
+            </Button>
           </form>
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {error && (
+            <Card className="border-destructive/50 bg-destructive/5">
+              <CardContent className="pt-4 text-sm text-destructive">{error}</CardContent>
+            </Card>
+          )}
         </section>
 
-        <section className="min-h-96 border rounded p-4">
+        <section>
           {!result ? (
-            <div className="h-full flex items-center justify-center text-sm text-gray-500">
-              Run a workflow to review the approval gate, draft output, and retrieval context.
-            </div>
+            <Card className="min-h-96 flex items-center justify-center">
+              <CardContent className="text-sm text-muted-foreground text-center">
+                Run a workflow to review the approval gate, draft output, and retrieval context.
+              </CardContent>
+            </Card>
           ) : (
-            <div className="space-y-5">
-              <div className="flex flex-wrap gap-2 text-xs">
-                <span className="border rounded px-2 py-1">
-                  Intent: {result.intent || "general"}
-                </span>
-                <span className="border rounded px-2 py-1">
-                  Confidence: {result.confidence_label}
-                </span>
-                <span
-                  className={`rounded px-2 py-1 ${
-                    result.requires_human_approval
-                      ? "bg-amber-100 text-amber-900"
-                      : "bg-green-100 text-green-900"
-                  }`}
+            <div className="space-y-4">
+              <div className="flex flex-wrap gap-2">
+                <Badge variant="outline">Intent: {result.intent || "general"}</Badge>
+                <Badge variant="outline">Confidence: {result.confidence_label}</Badge>
+                <Badge
+                  variant={
+                    result.requires_human_approval ? "destructive" : "default"
+                  }
                 >
                   {approvalLabel(result)}
-                </span>
+                </Badge>
               </div>
 
-              <div>
-                <h2 className="text-sm font-semibold mb-2">Draft</h2>
-                <pre className="whitespace-pre-wrap rounded bg-gray-50 p-3 text-sm">
-                  {result.draft_response || result.final_response}
-                </pre>
-              </div>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">Draft</CardTitle>
+                </CardHeader>
+                <CardContent className="text-sm">
+                  <pre className="whitespace-pre-wrap rounded bg-muted p-3">
+                    {result.draft_response || result.final_response}
+                  </pre>
+                </CardContent>
+              </Card>
 
-              <div>
-                <h2 className="text-sm font-semibold mb-2">Final response</h2>
-                <p className="rounded border p-3 text-sm">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">Final response</CardTitle>
+                </CardHeader>
+                <CardContent className="text-sm">
                   {result.final_response || "No final response returned."}
-                </p>
-              </div>
+                </CardContent>
+              </Card>
 
               <div className="grid gap-4 md:grid-cols-2">
-                <div>
-                  <h2 className="text-sm font-semibold mb-2">Citations</h2>
-                  {result.citations.length === 0 ? (
-                    <p className="text-sm text-gray-500">No citations returned.</p>
-                  ) : (
-                    <ul className="space-y-2 text-sm">
-                      {result.citations.map((citation, i) => (
-                        <li key={`${citation.document}-${i}`} className="border rounded p-2">
-                          <span className="font-medium">{citation.document}</span>
-                          {citation.page && (
-                            <span className="text-gray-500"> page {citation.page}</span>
-                          )}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm">Citations</CardTitle>
+                  </CardHeader>
+                  <CardContent className="text-sm">
+                    {result.citations.length === 0 ? (
+                      <p className="text-muted-foreground">No citations returned.</p>
+                    ) : (
+                      <ul className="space-y-2">
+                        {result.citations.map((citation, i) => (
+                          <li key={`${citation.document}-${i}`} className="border rounded p-2">
+                            <span className="font-medium">{citation.document}</span>
+                            {citation.page && (
+                              <span className="text-muted-foreground"> page {citation.page}</span>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </CardContent>
+                </Card>
 
-                <div>
-                  <h2 className="text-sm font-semibold mb-2">Retrieved context</h2>
-                  {result.retrieved_contexts.length === 0 ? (
-                    <p className="text-sm text-gray-500">No context returned.</p>
-                  ) : (
-                    <ul className="space-y-2 text-sm">
-                      {result.retrieved_contexts.slice(0, 3).map((context, i) => (
-                        <li key={`${context.chunk_id ?? "context"}-${i}`} className="border rounded p-2">
-                          <p className="text-xs text-gray-500 mb-1">Score {context.score}</p>
-                          <p>{context.text}</p>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm">Retrieved context</CardTitle>
+                  </CardHeader>
+                  <CardContent className="text-sm">
+                    {result.retrieved_contexts.length === 0 ? (
+                      <p className="text-muted-foreground">No context returned.</p>
+                    ) : (
+                      <ul className="space-y-2">
+                        {result.retrieved_contexts.slice(0, 3).map((context, i) => (
+                          <li key={`${context.chunk_id ?? "context"}-${i}`} className="border rounded p-2">
+                            <p className="text-xs text-muted-foreground mb-1">Score {context.score}</p>
+                            <p>{context.text}</p>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </CardContent>
+                </Card>
               </div>
             </div>
           )}
         </section>
       </div>
-    </main>
+    </div>
   );
 }
