@@ -1,0 +1,44 @@
+{
+  "_meta": {
+    "note": "R2R is running and documents are ingested. This is the actual agent() response shape captured on 2026-05-09.",
+    "conversation_created_via": "client.conversations.create(name='spike')",
+    "message_sent": {
+      "role": "user",
+      "content": "What does the document say?"
+    },
+    "search_settings": {
+      "limit": 5,
+      "graph_settings": {
+        "enabled": false
+      }
+    }
+  },
+  "results": {
+    "messages": [
+      {
+        "role": "assistant",
+        "content": "Please specify which document you are referring to. You can identify the document by its title or ID.\n",
+        "name": null,
+        "function_call": null,
+        "tool_calls": null,
+        "tool_call_id": null,
+        "metadata": {
+          "citations": [],
+          "tool_calls": [],
+          "aggregated_search_result": "[]"
+        },
+        "structured_content": null,
+        "image_url": null,
+        "image_data": null
+      }
+    ],
+    "conversation_id": "e1544e2e-c7ad-4862-b94f-ff2cbb13baa2"
+  },
+  "_shape_analysis": {
+    "answer_text_path": "results.messages[-1].content",
+    "citations_path": "results.messages[-1].metadata.citations",
+    "chunk_search_results_path": "results.messages[-1].metadata.aggregated_search_result (NOTE: appears to be a string '[]' not an object with chunk_search_results field)",
+    "conversation_id_path": "results.conversation_id",
+    "actual_shape_divergence_note": "The SDK example claims citations at messages[-1].metadata.citations and chunks at aggregated_search_results.chunk_search_results. The actual shape shows: (1) citations is an empty list [], (2) aggregated_search_result is a STRING '[]' not an object. This is different from the expected structure. When real chunks are returned, we need to verify if aggregated_search_result becomes a parsed object or remains a string."
+  }
+}
