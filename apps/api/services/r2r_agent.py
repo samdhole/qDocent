@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Generator
 from typing import Any
 
 import httpx
@@ -164,3 +165,138 @@ def _adapt_agent_response(question: str, response: Any) -> dict[str, Any]:
         "needs_human_review": needs_review,
         "conversation_id": str(conversation_id) if conversation_id else None,
     }
+
+
+def agent_stream(message: str, conversation_id: str) -> Generator[str, None, None]:
+    """Stream agent events as SSE-formatted strings.
+
+    Yields raw SSE frames (each a `data: <json>\\n\\n` line) so the route can
+    pass them to `StreamingResponse` without further transformation.
+
+    Event types we emit (matches R2R's typed events plus a final `done`):
+    - `status`: synthesized progress beat ("searching" / "generating") for the UI
+    - `token`: a token delta from the message stream
+    - `final`: the final adapter-shaped dict (same as agent_query() return value)
+    - `error`: if R2R errors mid-stream
+    """
+    try:
+        stream = get_client().retrieval.agent(
+            message={"role": "user", "content": message},
+            conversation_id=conversation_id,
+            search_settings=DEFAULT_SEARCH_SETTINGS,
+            rag_generation_config={"stream": True},
+        )
+    except (httpx.HTTPError, R2RException) as exc:
+        yield _sse({"type": "error", "detail": f"R2R unavailable: {exc}"})
+        return
+
+    yield _sse({"type": "status", "phase": "searching"})
+
+    full_text_parts: list[str] = []
+    last_search_results: dict[str, Any] = {}
+    citations_seen = False
+    generation_started = False
+
+    try:
+        for event in stream:
+            event_type = type(event).__name__
+            if event_type == "SearchResultsEvent":
+                payload = _event_payload(event)
+                last_search_results = payload.get("data", payload) or {}
+                yield _sse({"type": "status", "phase": "found_results"})
+            elif event_type == "MessageEvent":
+                payload = _event_payload(event)
+                delta = (payload.get("data", {}) or {}).get("delta", {}) or {}
+                content_parts = delta.get("content") or []
+                for part in content_parts:
+                    text = (part or {}).get("payload", {}).get("value", "") or ""
+                    if text:
+                        if not generation_started:
+                            generation_started = True
+                            yield _sse({"type": "status", "phase": "generating"})
+                        full_text_parts.append(text)
+                        yield _sse({"type": "token", "text": text})
+            elif event_type == "CitationEvent":
+                citations_seen = True
+            elif event_type == "FinalAnswerEvent":
+                # The final event contains the assembled answer + citations.
+                payload = _event_payload(event)
+                yield _sse(
+                    {
+                        "type": "final",
+                        "result": _adapt_final_event(
+                            question=message,
+                            payload=payload,
+                            fallback_text="".join(full_text_parts),
+                            search_results=last_search_results,
+                        ),
+                    }
+                )
+                return
+    except (httpx.HTTPError, R2RException) as exc:
+        yield _sse({"type": "error", "detail": f"R2R stream interrupted: {exc}"})
+        return
+
+    # If we exited the loop without a FinalAnswerEvent, synthesize one from
+    # what we collected (defensive — the SDK is documented to always emit one).
+    yield _sse(
+        {
+            "type": "final",
+            "result": _adapt_final_event(
+                question=message,
+                payload={},
+                fallback_text="".join(full_text_parts),
+                search_results=last_search_results,
+            ),
+        }
+    )
+
+
+def _sse(data: dict) -> str:
+    """Format a dict as an SSE data frame."""
+    return f"data: {json.dumps(data)}\n\n"
+
+
+def _event_payload(event: Any) -> dict[str, Any]:
+    """Extract payload from an R2R event (pydantic model or dict)."""
+    if hasattr(event, "model_dump"):
+        return event.model_dump()
+    if isinstance(event, dict):
+        return event
+    return {}
+
+
+def _adapt_final_event(
+    question: str,
+    payload: dict[str, Any],
+    fallback_text: str,
+    search_results: dict[str, Any],
+) -> dict[str, Any]:
+    """Build the same dict shape `agent_query` returns, from streaming events.
+
+    Re-uses the citation/header/figure logic from _adapt_agent_response by
+    constructing a synthetic 'response' object — keeps the adapter logic in
+    one place (DRY).
+    """
+    final_answer = (
+        (payload.get("data") or {}).get("generated_answer")
+        or (payload.get("data") or {}).get("answer")
+        or fallback_text
+    )
+
+    # Build a fake "messages[-1].metadata.aggregated_search_results" so we can
+    # call the same adapter the non-streaming path uses. SearchResultsEvent
+    # already has the same structure under .data.
+    fake_response = {
+        "results": {
+            "messages": [
+                {
+                    "role": "assistant",
+                    "content": final_answer,
+                    "metadata": {"aggregated_search_results": search_results},
+                }
+            ],
+            "conversation_id": (payload.get("data") or {}).get("conversation_id"),
+        }
+    }
+    return _adapt_agent_response(question, fake_response)

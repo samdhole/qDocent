@@ -205,3 +205,157 @@ class TestAgentQuery:
                 assert len(result["citations"]) == 1
                 assert result["citations"][0]["document"] == "guide.pdf"
                 assert result["conversation_id"] == "conv-dict"
+
+
+class MessageEvent:
+    """Fake MessageEvent for testing agent_stream."""
+
+    def __init__(self, text):
+        self._text = text
+
+    def model_dump(self):
+        return {"data": {"delta": {"content": [{"payload": {"value": self._text}}]}}}
+
+
+class SearchResultsEvent:
+    """Fake SearchResultsEvent for testing agent_stream."""
+
+    def __init__(self, chunk_search_results=None):
+        self._results = chunk_search_results or []
+
+    def model_dump(self):
+        return {"data": {"chunk_search_results": self._results}}
+
+
+class FinalAnswerEvent:
+    """Fake FinalAnswerEvent for testing agent_stream."""
+
+    def __init__(self, generated_answer=None, conversation_id=None):
+        self._answer = generated_answer
+        self._conv_id = conversation_id
+
+    def model_dump(self):
+        return {
+            "data": {
+                "generated_answer": self._answer,
+                "conversation_id": self._conv_id,
+            }
+        }
+
+
+class TestAgentStream:
+    """Test agent_stream generator for SSE-formatted event streaming."""
+
+    def test_agent_stream_yields_status_first(self):
+        """agent_stream() yields status=searching as first frame."""
+        with mock.patch("apps.api.services.r2r_agent.get_client") as mock_client_factory:
+            mock_client_factory.return_value.retrieval.agent.return_value = iter([])
+
+            from apps.api.services.r2r_agent import agent_stream
+
+            frames = list(agent_stream("test?", "conv-1"))
+
+            assert len(frames) >= 1
+            first_frame = json.loads(frames[0].split("data: ")[1])
+            assert first_frame["type"] == "status"
+            assert first_frame["phase"] == "searching"
+
+    def test_agent_stream_emits_token_events_per_message_event(self):
+        """agent_stream() yields token frame for each MessageEvent content delta."""
+        with mock.patch("apps.api.services.r2r_agent.get_client") as mock_client_factory:
+            with mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures:
+                events = [
+                    MessageEvent("Hello "),
+                    MessageEvent("world"),
+                ]
+                mock_client_factory.return_value.retrieval.agent.return_value = iter(events)
+                mock_figures.return_value = []
+
+                from apps.api.services.r2r_agent import agent_stream
+
+                frames = list(agent_stream("test?", "conv-1"))
+
+                token_frames = [
+                    json.loads(f.split("data: ")[1])
+                    for f in frames
+                    if "data: " in f
+                ]
+                token_frames = [f for f in token_frames if f.get("type") == "token"]
+
+                assert len(token_frames) == 2
+                assert token_frames[0]["text"] == "Hello "
+                assert token_frames[1]["text"] == "world"
+
+    def test_agent_stream_emits_final_event_with_adapted_dict(self):
+        """agent_stream() yields final frame with adapted response dict."""
+        with mock.patch("apps.api.services.r2r_agent.get_client") as mock_client_factory:
+            with mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures:
+                events = [
+                    MessageEvent("The answer is 42."),
+                    FinalAnswerEvent("The answer is 42.", "conv-1"),
+                ]
+                mock_client_factory.return_value.retrieval.agent.return_value = iter(events)
+                mock_figures.return_value = []
+
+                from apps.api.services.r2r_agent import agent_stream
+
+                frames = list(agent_stream("What is the answer?", "conv-1"))
+
+                final_frames = [
+                    json.loads(f.split("data: ")[1])
+                    for f in frames
+                    if "data: " in f
+                ]
+                final_frames = [f for f in final_frames if f.get("type") == "final"]
+
+                assert len(final_frames) == 1
+                result = final_frames[0]["result"]
+                assert result["answer"] == "The answer is 42."
+                assert result["question"] == "What is the answer?"
+                assert "citations" in result
+                assert "retrieved_contexts" in result
+
+    def test_agent_stream_emits_error_when_sdk_raises(self):
+        """agent_stream() yields error frame when retrieval.agent raises."""
+        with mock.patch("apps.api.services.r2r_agent.get_client") as mock_client_factory:
+            import httpx
+
+            mock_client_factory.return_value.retrieval.agent.side_effect = httpx.ConnectError(
+                "R2R connection failed"
+            )
+
+            from apps.api.services.r2r_agent import agent_stream
+
+            frames = list(agent_stream("test?", "conv-1"))
+
+            assert len(frames) >= 1
+            first_frame = json.loads(frames[0].split("data: ")[1])
+            assert first_frame["type"] == "error"
+            assert "R2R unavailable" in first_frame["detail"]
+
+    def test_agent_stream_emits_error_mid_stream(self):
+        """agent_stream() yields tokens then error frame when stream raises."""
+        with mock.patch("apps.api.services.r2r_agent.get_client") as mock_client_factory:
+            import httpx
+
+            def failing_generator():
+                yield MessageEvent("Partial ")
+                yield MessageEvent("answer")
+                raise httpx.ReadError("Network error")
+
+            mock_client_factory.return_value.retrieval.agent.return_value = failing_generator()
+
+            from apps.api.services.r2r_agent import agent_stream
+
+            frames = list(agent_stream("test?", "conv-1"))
+
+            frame_list = [json.loads(f.split("data: ")[1]) for f in frames if "data: " in f]
+
+            token_frames = [f for f in frame_list if f.get("type") == "token"]
+            error_frames = [f for f in frame_list if f.get("type") == "error"]
+
+            assert len(token_frames) >= 2
+            assert token_frames[0]["text"] == "Partial "
+            assert token_frames[1]["text"] == "answer"
+            assert len(error_frames) == 1
+            assert "stream interrupted" in error_frames[0]["detail"]
