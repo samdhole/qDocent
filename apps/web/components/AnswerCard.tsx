@@ -12,6 +12,9 @@ import type { AskResponse, SelectedCitation } from "@/lib/types";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
+// Must match _DOC_ONLY_NOT_FOUND in apps/api/services/r2r_agent.py exactly.
+const DOC_ONLY_NOT_FOUND = "I couldn't find this in your documents.";
+
 const LABEL_VARIANT: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
   high: "default",
   medium: "secondary",
@@ -22,11 +25,14 @@ const LABEL_VARIANT: Record<string, "default" | "secondary" | "destructive" | "o
 type Props = {
   result: AskResponse;
   onSelectCitation?: (citation: SelectedCitation) => void;
+  onSwitchToGeneral?: () => void;
 };
 
-export default function AnswerCard({ result, onSelectCitation }: Props) {
+export default function AnswerCard({ result, onSelectCitation, onSwitchToGeneral }: Props) {
   const isLowConfidenceNoContext =
     result.confidence_label === "low" && result.retrieved_contexts.length === 0;
+
+  const isDocOnlyNotFound = result.answer === DOC_ONLY_NOT_FOUND;
 
   const markdownComponents = {
     "cite-ref": ({ "data-num": num }: { "data-num"?: string }) => (
@@ -41,11 +47,23 @@ export default function AnswerCard({ result, onSelectCitation }: Props) {
       onSelectCitation={onSelectCitation}
     >
       <div className="space-y-4">
-        {isLowConfidenceNoContext && (
+        {(isLowConfidenceNoContext || isDocOnlyNotFound) && (
           <Card className="border-amber-300 bg-amber-50">
-            <CardContent className="pt-4 text-sm text-amber-700">
-              This question could not be answered from the available documents. The information
-              may not be in the ingested content.
+            <CardContent className="pt-4 text-sm text-amber-700 space-y-2">
+              <p>
+                {isDocOnlyNotFound
+                  ? "I couldn't find this in your documents."
+                  : "This question could not be answered from the available documents. The information may not be in the ingested content."}
+              </p>
+              {isDocOnlyNotFound && onSwitchToGeneral && (
+                <button
+                  type="button"
+                  onClick={onSwitchToGeneral}
+                  className="text-amber-800 underline hover:text-amber-900 text-xs font-medium"
+                >
+                  Switch to General knowledge to broaden →
+                </button>
+              )}
             </CardContent>
           </Card>
         )}
