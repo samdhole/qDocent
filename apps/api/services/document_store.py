@@ -65,6 +65,10 @@ def load_document_manifest(document_id: str) -> dict[str, Any] | None:
 def write_chunks_manifest(document_id: str, chunks: list[dict[str, Any]]) -> Path:
     """Persist chunk-level metadata (bbox, page, section) for source-panel highlights.
 
+    Note: text chunks (heading/clause) currently receive the full page bbox from the ingestion pipeline.
+    Only table chunks have real region bboxes. This causes the overlay to cover the full page for text chunks —
+    a follow-up ingestion phase should compute paragraph/word-level bboxes.
+
     Stored shape per chunk: {chunk_index, page_start, page_end, bbox, section_path, text_preview}.
     `bbox` is verbatim from packages.ingestion (pdfplumber coordinates: [x0, top, x1, bottom] in points).
     """

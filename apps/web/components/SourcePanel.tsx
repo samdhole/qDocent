@@ -9,7 +9,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Button } from "@/components/ui/button";
 
 import type { ChunkManifestEntry, ChunksResponse, SelectedCitation } from "@/lib/types";
-import { bboxToCssBox } from "@/lib/bboxConversion";
+import { bboxToCssBox, findOverlayChunk } from "@/lib/bboxConversion";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -47,22 +47,10 @@ export default function SourcePanel({ citation, onClose }: Props) {
     return () => ctrl.abort();
   }, [citation]);
 
-  const overlayChunk = useMemo<ChunkManifestEntry | null>(() => {
-    if (!citation || pageNum == null || chunks.length === 0) return null;
-    if (citation.chunkIndex != null) {
-      const exact = chunks.find((c) => c.chunk_index === citation.chunkIndex);
-      if (exact && (exact.page_start ?? 0) <= pageNum && pageNum <= (exact.page_end ?? exact.page_start ?? 0)) {
-        return exact;
-      }
-    }
-    // Fallback: find any chunk whose page range covers pageNum
-    return chunks.find(
-      (c) =>
-        c.bbox != null &&
-        (c.page_start ?? 0) <= pageNum &&
-        pageNum <= (c.page_end ?? c.page_start ?? 0),
-    ) ?? null;
-  }, [chunks, citation, pageNum]);
+  const overlayChunk = useMemo(
+    () => findOverlayChunk(chunks, citation, pageNum),
+    [chunks, citation, pageNum]
+  );
 
   const overlayCss = useMemo(() => {
     if (!overlayChunk?.bbox || !pageDims) return null;
@@ -77,6 +65,7 @@ export default function SourcePanel({ citation, onClose }: Props) {
   const open = citation !== null;
 
   function handlePageLoadSuccess(page: { width: number; height: number; originalWidth: number; originalHeight: number }) {
+    if (!page.originalWidth || !page.originalHeight) return;
     setPageDims({
       width: page.width,
       height: page.height,
@@ -136,6 +125,7 @@ export default function SourcePanel({ citation, onClose }: Props) {
               </Document>
               {overlayCss && (
                 <div
+                  // bbox may cover the full page for non-table chunks; ingestion pipeline improvement is tracked as a follow-up
                   className="absolute pointer-events-none border-2 border-yellow-400 bg-yellow-300/30"
                   style={{
                     left: overlayCss.left,

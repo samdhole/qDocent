@@ -4,6 +4,8 @@
 // react-pdf renders the page at a fixed pixel width; we scale by the rendered page's
 // width / the PDF page's natural width (in points) — both available at render time.
 
+import type { ChunkManifestEntry, SelectedCitation } from "@/lib/types";
+
 export type BBox = [number, number, number, number];
 
 export type RenderedPageDimensions = {
@@ -25,4 +27,30 @@ export function bboxToCssBox(bbox: BBox, dims: RenderedPageDimensions): CssBox {
     width: (x1 - x0) * scaleX,
     height: (bottom - top) * scaleY,
   };
+}
+
+export function findOverlayChunk(
+  chunks: ChunkManifestEntry[],
+  citation: SelectedCitation | null,
+  pageNum: number | null,
+): ChunkManifestEntry | null {
+  if (!citation || pageNum == null || chunks.length === 0) return null;
+  if (citation.chunkIndex != null) {
+    const exact = chunks.find((c) => c.chunk_index === citation.chunkIndex);
+    if (
+      exact &&
+      (exact.page_start ?? 0) <= pageNum &&
+      pageNum <= (exact.page_end ?? exact.page_start ?? 0)
+    ) {
+      return exact;
+    }
+  }
+  return (
+    chunks.find(
+      (c) =>
+        c.bbox != null &&
+        (c.page_start ?? 0) <= pageNum &&
+        pageNum <= (c.page_end ?? c.page_start ?? 0),
+    ) ?? null
+  );
 }
