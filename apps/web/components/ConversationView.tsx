@@ -9,7 +9,9 @@ import remarkGfm from "remark-gfm";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import AnswerCard from "@/components/AnswerCard";
+import { SuggestedQuestions } from "@/components/SuggestedQuestions";
 import { useConversationStream } from "@/lib/useConversationStream";
 import type { StreamPhase } from "@/lib/useConversationStream";
 
@@ -59,10 +61,13 @@ export default function ConversationView() {
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto space-y-6 pr-2">
-        {messages.length === 0 && (
+        {messages.length === 0 && !pending && (
           <Card>
-            <CardContent className="pt-6 text-sm text-muted-foreground">
-              Ask a question about your ingested documents.
+            <CardContent className="pt-6 space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Ask a question about your ingested documents, or pick one to start:
+              </p>
+              <SuggestedQuestions onSelect={(q) => void sendMessage(q)} disabled={pending} />
             </CardContent>
           </Card>
         )}
@@ -90,6 +95,13 @@ export default function ConversationView() {
               <Loader2 className="size-3 animate-spin" />
               {phaseLabel(phase)}
             </div>
+            {!partialText && (
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-3/4" />
+                <Skeleton className="h-4 w-2/3" />
+                <Skeleton className="h-4 w-5/6" />
+              </div>
+            )}
             {partialText && (
               <Card>
                 <CardContent className="pt-4 text-sm prose prose-sm max-w-none">
