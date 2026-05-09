@@ -736,3 +736,138 @@ class TestAgentStream:
                 assert result["question"] == "What is the refund policy?"
                 assert "citations" in result
                 assert "retrieved_contexts" in result
+
+
+class TestDocumentFilter:
+    """Test document_id filter behavior for AC4.3 and AC4.7."""
+
+    def test_ac4_3_agent_query_with_document_id_applies_filter(self):
+        """AC4.3: agent_query with document_id applies r2r document ID filter."""
+        with mock.patch("apps.api.services.r2r_agent.get_client") as mock_client_factory, \
+             mock.patch("apps.api.services.r2r_agent.load_document_manifest") as mock_manifest, \
+             mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures, \
+             mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
+                # Mock manifest returns a list of r2r document IDs
+                mock_manifest.return_value = {
+                    "r2r_document_ids": ["r2r-uuid-1", "r2r-uuid-2"]
+                }
+
+                mock_message = mock.MagicMock()
+                mock_message.content = "The answer is here."
+                mock_message.metadata = {
+                    "aggregated_search_result": json.dumps({"chunk_search_results": []})
+                }
+
+                mock_response = mock.MagicMock()
+                mock_response.results.messages = [mock_message]
+                mock_response.results.conversation_id = "conv-1"
+
+                mock_client_factory.return_value.retrieval.agent.return_value = mock_response
+                mock_figures.return_value = []
+
+                from apps.api.services.r2r_agent import agent_query
+
+                result = agent_query("What is the answer?", "conv-1", document_id="doc1")
+
+                # Verify that the agent was called with filters
+                call_kwargs = mock_client_factory.return_value.retrieval.agent.call_args.kwargs
+                assert "search_settings" in call_kwargs
+                search_settings = call_kwargs["search_settings"]
+                assert "filters" in search_settings
+                assert search_settings["filters"] == {
+                    "document_id": {"$in": ["r2r-uuid-1", "r2r-uuid-2"]}
+                }
+
+    def test_ac4_7_agent_query_manifest_returns_none(self):
+        """AC4.7: agent_query with document_id where manifest is None → no filters key."""
+        with mock.patch("apps.api.services.r2r_agent.get_client") as mock_client_factory, \
+             mock.patch("apps.api.services.r2r_agent.load_document_manifest") as mock_manifest, \
+             mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures, \
+             mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
+                # Manifest returns None (document has no r2r_document_ids)
+                mock_manifest.return_value = None
+
+                mock_message = mock.MagicMock()
+                mock_message.content = "Fallback answer without filters."
+                mock_message.metadata = {
+                    "aggregated_search_result": json.dumps({"chunk_search_results": []})
+                }
+
+                mock_response = mock.MagicMock()
+                mock_response.results.messages = [mock_message]
+                mock_response.results.conversation_id = "conv-1"
+
+                mock_client_factory.return_value.retrieval.agent.return_value = mock_response
+                mock_figures.return_value = []
+
+                from apps.api.services.r2r_agent import agent_query
+
+                result = agent_query("What is the answer?", "conv-1", document_id="doc1")
+
+                # Verify that search_settings does NOT contain filters key
+                call_kwargs = mock_client_factory.return_value.retrieval.agent.call_args.kwargs
+                search_settings = call_kwargs["search_settings"]
+                assert "filters" not in search_settings
+
+    def test_ac4_7_agent_query_manifest_returns_empty_list(self):
+        """AC4.7: agent_query with document_id where manifest has empty r2r_document_ids → no filters."""
+        with mock.patch("apps.api.services.r2r_agent.get_client") as mock_client_factory, \
+             mock.patch("apps.api.services.r2r_agent.load_document_manifest") as mock_manifest, \
+             mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures, \
+             mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
+                # Manifest returns dict with empty list
+                mock_manifest.return_value = {"r2r_document_ids": []}
+
+                mock_message = mock.MagicMock()
+                mock_message.content = "Fallback answer without filters."
+                mock_message.metadata = {
+                    "aggregated_search_result": json.dumps({"chunk_search_results": []})
+                }
+
+                mock_response = mock.MagicMock()
+                mock_response.results.messages = [mock_message]
+                mock_response.results.conversation_id = "conv-1"
+
+                mock_client_factory.return_value.retrieval.agent.return_value = mock_response
+                mock_figures.return_value = []
+
+                from apps.api.services.r2r_agent import agent_query
+
+                result = agent_query("What is the answer?", "conv-1", document_id="doc1")
+
+                # Verify that search_settings does NOT contain filters key
+                call_kwargs = mock_client_factory.return_value.retrieval.agent.call_args.kwargs
+                search_settings = call_kwargs["search_settings"]
+                assert "filters" not in search_settings
+
+    def test_no_op_when_document_id_is_none(self):
+        """No-op: agent_query without document_id → no filters, load_document_manifest not called."""
+        with mock.patch("apps.api.services.r2r_agent.get_client") as mock_client_factory, \
+             mock.patch("apps.api.services.r2r_agent.load_document_manifest") as mock_manifest, \
+             mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures, \
+             mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
+                mock_message = mock.MagicMock()
+                mock_message.content = "Answer without document scope."
+                mock_message.metadata = {
+                    "aggregated_search_result": json.dumps({"chunk_search_results": []})
+                }
+
+                mock_response = mock.MagicMock()
+                mock_response.results.messages = [mock_message]
+                mock_response.results.conversation_id = "conv-1"
+
+                mock_client_factory.return_value.retrieval.agent.return_value = mock_response
+                mock_figures.return_value = []
+
+                from apps.api.services.r2r_agent import agent_query
+
+                # Call without document_id
+                result = agent_query("What is the answer?", "conv-1")
+
+                # Verify that load_document_manifest was NOT called
+                mock_manifest.assert_not_called()
+
+                # Verify that search_settings does NOT contain filters key
+                call_kwargs = mock_client_factory.return_value.retrieval.agent.call_args.kwargs
+                search_settings = call_kwargs["search_settings"]
+                assert "filters" not in search_settings
