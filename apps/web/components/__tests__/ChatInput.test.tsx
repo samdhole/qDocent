@@ -246,7 +246,7 @@ describe("ChatInput", () => {
       await user.keyboard("{Enter}")
 
       // Chip should exist
-      let chipButton = screen.getByRole("button", { name: /Remove attached document/ })
+      const chipButton = screen.getByRole("button", { name: /Remove attached document/ })
       expect(chipButton).toBeInTheDocument()
 
       // Click the X button inside the chip

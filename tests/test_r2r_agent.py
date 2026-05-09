@@ -871,3 +871,49 @@ class TestDocumentFilter:
                 call_kwargs = mock_client_factory.return_value.retrieval.agent.call_args.kwargs
                 search_settings = call_kwargs["search_settings"]
                 assert "filters" not in search_settings
+
+    def test_ac4_3_agent_stream_with_document_id_applies_filter(self):
+        """AC4.3 stream path: agent_stream with document_id applies r2r document ID filter."""
+        with mock.patch("apps.api.services.r2r_agent.get_client") as mock_client_factory, \
+             mock.patch("apps.api.services.r2r_agent.load_document_manifest") as mock_manifest, \
+             mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures, \
+             mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
+                # Mock manifest returns a list of r2r document IDs
+                mock_manifest.return_value = {
+                    "r2r_document_ids": ["r2r-uuid-1"]
+                }
+
+                # Mock streaming events with a SearchResultsEvent (doc_id "doc1", score 0.85)
+                # followed by message and final answer
+                events = [
+                    SearchResultsEvent([
+                        {
+                            "text": "DocQuery Citation: document_id=doc1; source_file=filtered.pdf; page_start=1; page_end=1; section_path=Results; chunk_index=0\n\nFiltered result",
+                            "metadata": {
+                                "chunk_id": "chunk-1",
+                                "source_file": "filtered.pdf",
+                                "page_start": 1,
+                            },
+                            "score": 0.85,
+                            "id": "chunk-1",
+                        }
+                    ]),
+                    MessageEvent("This is from the filtered document."),
+                    FinalAnswerEvent("This is from the filtered document.", "conv-1"),
+                ]
+                mock_client_factory.return_value.retrieval.agent.return_value = iter(events)
+                mock_figures.return_value = []
+
+                from apps.api.services.r2r_agent import agent_stream
+
+                # Consume the generator to trigger the actual call
+                frames = list(agent_stream("What?", "conv-1", document_id="doc1"))
+
+                # Verify that the agent was called with filters
+                call_kwargs = mock_client_factory.return_value.retrieval.agent.call_args.kwargs
+                assert "search_settings" in call_kwargs
+                search_settings = call_kwargs["search_settings"]
+                assert "filters" in search_settings
+                assert search_settings["filters"] == {
+                    "document_id": {"$in": ["r2r-uuid-1"]}
+                }

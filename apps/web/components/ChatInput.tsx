@@ -52,6 +52,9 @@ export function ChatInput({ pending, documents, onSubmit }: Props) {
     const caret = e.target.selectionStart ?? value.length
     const hashToken = getHashToken(value, caret)
 
+    // Bare # (empty token) is intentional — opens the full list for browsing
+    // rather than requiring a character first. This improves UX by allowing users
+    // to discover available documents immediately.
     if (hashToken !== null && documents.length > 0) {
       setPickerQuery(hashToken.token)
       setPickerOpen(true)
