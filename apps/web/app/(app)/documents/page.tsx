@@ -95,7 +95,7 @@ export default function DocumentsPage() {
             <EmptyState
               icon={Upload}
               title="No documents yet"
-              body="Drop a PDF onto the area above to get started."
+              body="Drop PDFs onto the area above to get started."
             />
           ) : (
             <Table>

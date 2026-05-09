@@ -1,5 +1,5 @@
 // pattern: Imperative Shell
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import type { IngestJob } from "@/lib/types";
@@ -34,34 +34,42 @@ export function useUploadQueue(onCompleted: () => void) {
     setItemsAndRef(queueRef.current.map((it) => (it.id === id ? { ...it, ...patch } : it)));
   }, [setItemsAndRef]);
 
+  // processItem is a stable reference (defined in this scope, never recreated)
+  const runIfIdle = useCallback(
+    async () => {
+      if (runningRef.current) return;
+      runningRef.current = true;
+      try {
+        while (true) {
+          const next = queueRef.current.find((it) => it.status === "queued");
+          if (!next) break;
+          await processItem(next);
+        }
+      } finally {
+        runningRef.current = false;
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+
   const enqueue = useCallback((files: File[]) => {
     const newItems: UploadItem[] = files.map((f) => ({
-      id: `${Date.now()}-${f.name}-${Math.random().toString(36).slice(2, 7)}`,
+      id: crypto.randomUUID(),
       file: f,
       status: "queued",
       progress: 0,
     }));
     setItemsAndRef([...queueRef.current, ...newItems]);
     void runIfIdle();
-  }, [setItemsAndRef]);
+  }, [setItemsAndRef, runIfIdle]);
 
+  /**
+   * Only call for terminal items (completed/failed). Aborting an in-flight item is not supported — the X button is hidden for non-terminal states in UploadQueueList.
+   */
   const removeItem = useCallback((id: string) => {
     setItemsAndRef(queueRef.current.filter((it) => it.id !== id));
   }, [setItemsAndRef]);
-
-  async function runIfIdle() {
-    if (runningRef.current) return;
-    runningRef.current = true;
-    try {
-      while (true) {
-        const next = queueRef.current.find((it) => it.status === "queued");
-        if (!next) break;
-        await processItem(next);
-      }
-    } finally {
-      runningRef.current = false;
-    }
-  }
 
   async function processItem(item: UploadItem) {
     updateItem(item.id, { status: "uploading", progress: 10 });
@@ -105,6 +113,10 @@ export function useUploadQueue(onCompleted: () => void) {
         toast.error(`Failed to ingest ${item.file.name}: ${finalJob.error ?? "unknown error"}`);
       }
     } catch (err: unknown) {
+      // Swallow AbortError — cancelled uploads should silently stop, not show as failed
+      if (err instanceof Error && err.name === "AbortError") {
+        return;
+      }
       const message = err instanceof Error ? err.message : "Upload failed.";
       updateItem(item.id, { status: "failed", progress: 100, error: message });
       toast.error(`Failed to upload ${item.file.name}: ${message}`);
@@ -120,8 +132,8 @@ export function useUploadQueue(onCompleted: () => void) {
     for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
       if (signal.aborted) throw new Error("Upload cancelled.");
       const res = await fetch(`${API}/ingest/jobs/${jobId}`, { signal });
-      const job: IngestJob = await res.json();
       if (!res.ok) throw new Error(`Could not load ingest job (${res.status})`);
+      const job: IngestJob = await res.json();
       if (job.status === "completed" || job.status === "failed") return job;
       onTick(job.status === "running");
       await new Promise<void>((resolve) => {
@@ -136,8 +148,7 @@ export function useUploadQueue(onCompleted: () => void) {
   }
 
   // On unmount, abort any in-flight upload
-  // Caller should wire `useEffect(() => () => abortRef.current?.abort(), [])` if needed.
-  // We don't auto-wire here because the hook itself can't tell if a re-render is mount-vs-unmount.
+  useEffect(() => () => abortRef.current?.abort(), []);
 
   return { items, enqueue, removeItem };
 }
