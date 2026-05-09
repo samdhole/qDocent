@@ -1,6 +1,9 @@
 "use client";
 import { useEffect, useState } from "react";
 
+import { BarChart3 } from "lucide-react";
+import { EmptyState } from "@/components/EmptyState";
+
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 type Row = {
@@ -31,7 +34,15 @@ export default function EvalTable() {
       .catch((e: Error) => setError(e.message));
   }, []);
 
-  if (error) return <p className="text-sm text-red-600">{error}</p>;
+  if (error) {
+    return (
+      <EmptyState
+        icon={BarChart3}
+        title="No evaluation reports yet"
+        body="Run `make eval` from the project root to generate a RAGAS report. Reports appear here automatically."
+      />
+    );
+  }
   if (!rows.length) return <p className="text-sm text-gray-500">Loading...</p>;
 
   const metrics = ["answer_relevancy", "context_precision", "faithfulness"];
