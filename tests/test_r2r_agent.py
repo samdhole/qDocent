@@ -41,8 +41,9 @@ class TestAgentQuery:
 
     def test_agent_query_extracts_answer_and_citations(self):
         """agent_query() extracts answer, citations, and retrieved_contexts from agent response."""
-        with mock.patch("apps.api.services.r2r_agent.get_client") as mock_client_factory:
-            with mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures:
+        with mock.patch("apps.api.services.r2r_agent.get_client") as mock_client_factory, \
+             mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures, \
+             mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
                 # Create a fake agent response matching actual spike shape:
                 # aggregated_search_result is a JSON string, not a dict
                 mock_message = mock.MagicMock()
@@ -86,8 +87,9 @@ class TestAgentQuery:
 
     def test_agent_query_returns_conversation_id(self):
         """agent_query() includes conversation_id in response dict."""
-        with mock.patch("apps.api.services.r2r_agent.get_client") as mock_client_factory:
-            with mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures:
+        with mock.patch("apps.api.services.r2r_agent.get_client") as mock_client_factory, \
+             mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures, \
+             mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
                 mock_message = mock.MagicMock()
                 mock_message.content = "Answer"
                 mock_message.metadata = {
@@ -109,8 +111,9 @@ class TestAgentQuery:
 
     def test_agent_query_handles_no_chunks(self):
         """agent_query() handles empty chunk_search_results gracefully."""
-        with mock.patch("apps.api.services.r2r_agent.get_client") as mock_client_factory:
-            with mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures:
+        with mock.patch("apps.api.services.r2r_agent.get_client") as mock_client_factory, \
+             mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures, \
+             mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
                 mock_message = mock.MagicMock()
                 mock_message.content = "I don't have enough information."
                 mock_message.metadata = {
@@ -135,8 +138,9 @@ class TestAgentQuery:
 
     def test_agent_query_handles_empty_list_from_json_parse(self):
         """agent_query() handles when json.loads returns a list (e.g., '[]')."""
-        with mock.patch("apps.api.services.r2r_agent.get_client") as mock_client_factory:
-            with mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures:
+        with mock.patch("apps.api.services.r2r_agent.get_client") as mock_client_factory, \
+             mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures, \
+             mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
                 # This is the critical C1 scenario: aggregated_search_result is "[]" string
                 # which parses to a Python list, not a dict
                 mock_message = mock.MagicMock()
@@ -164,8 +168,9 @@ class TestAgentQuery:
 
     def test_agent_query_handles_dict_response_shape(self):
         """agent_query() extracts from plain dict response (no .results attribute)."""
-        with mock.patch("apps.api.services.r2r_agent.get_client") as mock_client_factory:
-            with mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures:
+        with mock.patch("apps.api.services.r2r_agent.get_client") as mock_client_factory, \
+             mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures, \
+             mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
                 # Return a plain dict instead of an object with .results attribute
                 response_dict = {
                     "results": {
@@ -208,8 +213,9 @@ class TestAgentQuery:
 
     def test_agent_query_includes_chunk_index_from_header(self):
         """Task 1: chunk_index from DocQuery citation header is included in citations."""
-        with mock.patch("apps.api.services.r2r_agent.get_client") as mock_client_factory:
-            with mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures:
+        with mock.patch("apps.api.services.r2r_agent.get_client") as mock_client_factory, \
+             mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures, \
+             mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
                 mock_message = mock.MagicMock()
                 mock_message.content = "The policy is 30 days."
                 mock_message.metadata = {
@@ -311,8 +317,9 @@ class TestAgentStream:
 
     def test_agent_stream_emits_token_events_per_message_event(self):
         """agent_stream() yields token frame for each MessageEvent content delta."""
-        with mock.patch("apps.api.services.r2r_agent.get_client") as mock_client_factory:
-            with mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures:
+        with mock.patch("apps.api.services.r2r_agent.get_client") as mock_client_factory, \
+             mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures, \
+             mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
                 events = [
                     MessageEvent("Hello "),
                     MessageEvent("world"),
@@ -337,8 +344,9 @@ class TestAgentStream:
 
     def test_agent_stream_emits_final_event_with_adapted_dict(self):
         """agent_stream() yields final frame with adapted response dict."""
-        with mock.patch("apps.api.services.r2r_agent.get_client") as mock_client_factory:
-            with mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures:
+        with mock.patch("apps.api.services.r2r_agent.get_client") as mock_client_factory, \
+             mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures, \
+             mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
                 events = [
                     MessageEvent("The answer is 42."),
                     FinalAnswerEvent("The answer is 42.", "conv-1"),
@@ -420,8 +428,9 @@ class TestAgentStream:
         preserving monotonic forward-only phase progression:
         "Searching…" → "Reading citations…" → "Generating…"
         """
-        with mock.patch("apps.api.services.r2r_agent.get_client") as mock_client_factory:
-            with mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures:
+        with mock.patch("apps.api.services.r2r_agent.get_client") as mock_client_factory, \
+             mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures, \
+             mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
                 events = [
                     SearchResultsEvent([]),  # Announces "found_results"
                     MessageEvent("hello"),   # Start generation
@@ -462,8 +471,9 @@ class TestAgentStream:
 
     def test_agent_stream_synthesizes_final_frame_when_no_final_event(self):
         """Defensive branch: loop exits without FinalAnswerEvent; synthesizes final frame from accumulated text."""
-        with mock.patch("apps.api.services.r2r_agent.get_client") as mock_client_factory:
-            with mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures:
+        with mock.patch("apps.api.services.r2r_agent.get_client") as mock_client_factory, \
+             mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures, \
+             mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
                 # Events: search result and message delta, but no FinalAnswerEvent
                 events = [
                     SearchResultsEvent([

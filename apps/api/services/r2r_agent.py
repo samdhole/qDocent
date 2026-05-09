@@ -15,6 +15,7 @@ from typing import Any
 import httpx
 from shared.abstractions.exception import R2RException
 
+from apps.api.services.citation_marker_rewriter import rewrite_brackets
 from apps.api.services.figure_store import figures_for_response
 from apps.api.services.r2r_chunk_adapter import citation_from_retrieved_text
 from apps.api.services.r2r_client import DEFAULT_SEARCH_SETTINGS, get_client
@@ -148,6 +149,11 @@ def _adapt_agent_response(question: str, response: Any) -> dict[str, Any]:
     ]
     if known_citations:
         citations = known_citations
+
+    # Rewrite [shortid] → [N] and reorder citations/contexts to match prose order
+    answer, citations, retrieved_contexts = rewrite_brackets(
+        answer, citations, retrieved_contexts
+    )
 
     figures = figures_for_response(citations, retrieved_contexts)
 
