@@ -18,6 +18,7 @@ import { CitationProvider } from "@/components/CitationContext";
 import { QueryModeToggle } from "@/components/QueryModeToggle";
 import { ChatInput } from "@/components/ChatInput";
 import { remarkCitationBadges } from "@/lib/remarkCitationBadges";
+import { stripHexShortIds } from "@/lib/stripHexShortIds";
 import { useConversationStream } from "@/lib/useConversationStream";
 import { useQueryMode } from "@/lib/useQueryMode";
 import type { StreamPhase } from "@/lib/useConversationStream";
@@ -138,7 +139,7 @@ export default function ConversationView() {
                       remarkPlugins={[remarkGfm, remarkCitationBadges]}
                       components={partialMarkdownComponents}
                     >
-                      {partialText.replace(/ ?\[[0-9a-f]{6,8}\]/g, "")}
+                      {stripHexShortIds(partialText)}
                     </ReactMarkdown>
                   </CitationProvider>
                 </CardContent>
