@@ -23,20 +23,27 @@ export default function SourcePanel({ citation, onClose }: Props) {
   const [pageNum, setPageNum] = useState<number | null>(null);
   const [pageDims, setPageDims] = useState<{ width: number; height: number; naturalWidth: number; naturalHeight: number } | null>(null);
 
-  // Load chunks manifest when a new citation is selected
+  // Load chunks manifest and set initial page number when citation changes.
   useEffect(() => {
     if (!citation) {
-      setChunks([]);
-      setPageDims(null);
-      setPageNum(null);
       return;
     }
+
+    // Set initial page number when citation changes
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setPageNum(citation.pageStart);
+
+    // Fetch chunks manifest
     const ctrl = new AbortController();
     fetch(`${API}/documents/${citation.documentId}/chunks`, { signal: ctrl.signal })
       .then((r) => (r.ok ? r.json() : { chunks: [] }))
-      .then((data: ChunksResponse) => setChunks(data.chunks ?? []))
-      .catch(() => setChunks([])); // AC7.5: missing/empty manifest → no overlay
+      .then((data: ChunksResponse) => {
+        setChunks(data.chunks ?? []);
+      })
+      .catch(() => {
+        setChunks([]);
+      }); // AC7.5: missing/empty manifest → no overlay
+
     return () => ctrl.abort();
   }, [citation]);
 
