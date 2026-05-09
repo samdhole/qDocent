@@ -3,13 +3,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import { Loader2, ArrowUp, Plus } from "lucide-react";
+import { Plus, Loader2 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { Components } from "react-markdown";
 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import AnswerCard from "@/components/AnswerCard";
@@ -17,17 +16,20 @@ import { SuggestedQuestions } from "@/components/SuggestedQuestions";
 import { CitationBadge } from "@/components/CitationBadge";
 import { CitationProvider } from "@/components/CitationContext";
 import { QueryModeToggle } from "@/components/QueryModeToggle";
+import { ChatInput } from "@/components/ChatInput";
 import { remarkCitationBadges } from "@/lib/remarkCitationBadges";
 import { useConversationStream } from "@/lib/useConversationStream";
 import { useQueryMode } from "@/lib/useQueryMode";
 import type { StreamPhase } from "@/lib/useConversationStream";
-import type { SelectedCitation } from "@/lib/types";
+import type { SelectedCitation, SourceDocument } from "@/lib/types";
 
 // Lazy-load: pdfjs is heavy (~80kb gz). Only loads when a citation is clicked.
 const SourcePanel = dynamic(() => import("@/components/SourcePanel"), {
   ssr: false,
   loading: () => null,
 });
+
+const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"
 
 function phaseLabel(phase: StreamPhase): string {
   switch (phase) {
@@ -41,9 +43,18 @@ function phaseLabel(phase: StreamPhase): string {
 export default function ConversationView() {
   const { messages, pending, phase, partialText, sendMessage, reset } = useConversationStream();
   const [queryMode, setQueryMode] = useQueryMode();
-  const [draft, setDraft] = useState("");
+  const [documents, setDocuments] = useState<SourceDocument[]>([]);
   const [selectedCitation, setSelectedCitation] = useState<SelectedCitation | null>(null);
   const scrollEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const ctrl = new AbortController()
+    fetch(`${API}/documents`, { signal: ctrl.signal })
+      .then((r) => r.json())
+      .then((data) => setDocuments(data.documents ?? []))
+      .catch(() => {}) // fail silently — picker just shows nothing; AbortError also lands here
+    return () => ctrl.abort()
+  }, []) // fetch once on mount
 
   const partialMarkdownComponents = {
     "cite-ref": ({ "data-num": num }: { "data-num"?: string }) => (
@@ -55,17 +66,8 @@ export default function ConversationView() {
     scrollEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages.length, pending]);
 
-  function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    const text = draft.trim();
-    if (!text) return;
-    setDraft("");
-    void sendMessage(text, { docOnly: queryMode === "documents" });
-  }
-
   function onNewConversation() {
     reset();
-    setDraft("");
   }
 
   return (
@@ -151,19 +153,16 @@ export default function ConversationView() {
         <div className="flex items-center justify-end">
           <QueryModeToggle mode={queryMode} onChange={setQueryMode} />
         </div>
-        <form onSubmit={onSubmit} className="flex gap-2">
-          <Input
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            placeholder={messages.length === 0 ? "What is the refund policy?" : "Ask a follow-up…"}
-            disabled={pending}
-            className="flex-1"
-          />
-          <Button type="submit" disabled={pending || !draft.trim()}>
-            {pending ? <Loader2 className="size-4 animate-spin" /> : <ArrowUp className="size-4" />}
-            <span className="sr-only">Send</span>
-          </Button>
-        </form>
+        <ChatInput
+          pending={pending}
+          documents={documents}
+          onSubmit={(text, attached) => {
+            void sendMessage(text, {
+              docOnly: queryMode === "documents",
+              documentId: attached?.document_id,
+            })
+          }}
+        />
       </div>
 
       <SourcePanel citation={selectedCitation} onClose={() => setSelectedCitation(null)} />
