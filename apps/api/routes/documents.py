@@ -5,6 +5,7 @@ from fastapi.responses import FileResponse
 from apps.api.services import r2r_client
 from apps.api.services.document_store import (
     delete_source_document,
+    load_chunks_manifest,
     load_document_manifest,
     list_source_documents,
     source_pdf_path,
@@ -26,6 +27,13 @@ def source_document(document_id: str) -> FileResponse:
     if path is None:
         raise HTTPException(status_code=404, detail=f"No source PDF for '{document_id}'.")
     return FileResponse(path, media_type="application/pdf", filename=path.name)
+
+
+@router.get("/{document_id}/chunks")
+def get_document_chunks(document_id: str) -> dict:
+    """Return chunk metadata (bbox, page, section) for the source panel."""
+    chunks = load_chunks_manifest(document_id)
+    return {"document_id": document_id, "chunks": chunks or []}
 
 
 @router.delete("/{document_id}")

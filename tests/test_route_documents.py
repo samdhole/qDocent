@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 
 import apps.api.services.document_store as document_store_mod
 from apps.api.main import app
-from apps.api.services.document_store import write_document_manifest
+from apps.api.services.document_store import write_chunks_manifest, write_document_manifest
 
 
 @pytest.fixture
@@ -152,3 +152,60 @@ def test_delete_document_returns_404_for_unknown_document(
     response = client.delete("/documents/missing")
 
     assert response.status_code == 404
+
+
+def test_get_document_chunks_returns_persisted_chunks(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, client: TestClient
+):
+    """Task 3: GET /documents/{document_id}/chunks returns persisted chunks."""
+    monkeypatch.setattr(document_store_mod, "DOCUMENTS_DIR", tmp_path / "documents")
+    chunks = [
+        {
+            "page_start": 1,
+            "page_end": 1,
+            "bbox": [10, 20, 30, 40],
+            "section_path": "intro",
+            "text": "hello world",
+        }
+    ]
+    write_chunks_manifest("doc1", chunks)
+
+    response = client.get("/documents/doc1/chunks")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["document_id"] == "doc1"
+    assert len(data["chunks"]) == 1
+    assert data["chunks"][0]["chunk_index"] == 0
+    assert data["chunks"][0]["page_start"] == 1
+
+
+def test_get_document_chunks_returns_empty_when_no_manifest(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, client: TestClient
+):
+    """Task 3: GET /documents/{document_id}/chunks returns empty chunks when no manifest."""
+    monkeypatch.setattr(document_store_mod, "DOCUMENTS_DIR", tmp_path / "documents")
+
+    response = client.get("/documents/missing/chunks")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["document_id"] == "missing"
+    assert data["chunks"] == []
+
+
+def test_get_document_chunks_returns_empty_for_corrupt_manifest(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, client: TestClient
+):
+    """Task 3: GET /documents/{document_id}/chunks returns empty chunks for corrupt manifest."""
+    monkeypatch.setattr(document_store_mod, "DOCUMENTS_DIR", tmp_path / "documents")
+    doc_dir = tmp_path / "documents" / "doc1"
+    doc_dir.mkdir(parents=True)
+    (doc_dir / "chunks.json").write_text("not json", encoding="utf-8")
+
+    response = client.get("/documents/doc1/chunks")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["document_id"] == "doc1"
+    assert data["chunks"] == []
