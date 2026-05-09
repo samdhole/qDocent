@@ -16,9 +16,11 @@ R2R_BASE_URL = os.getenv("R2R_BASE_URL", "http://localhost:7272")
 def _r2r_reachable() -> bool:
     # Use the R2R SDK rather than a raw HTTP probe so the check works regardless
     # of which API version the installed R2R server exposes.
+    # Cap timeout to 0.5 seconds to avoid slowing pytest collection when R2R is unreachable.
     try:
+        import httpx
         from r2r import R2RClient
-        client = R2RClient(base_url=R2R_BASE_URL)
+        client = R2RClient(base_url=R2R_BASE_URL, timeout=httpx.Timeout(0.5))
         client.system.health()
         return True
     except Exception:
@@ -61,8 +63,11 @@ def test_prechunked_ingest_citation_round_trip():
         # Ingest the chunk
         ingest_response = ingest_prechunked_document([test_chunk], report)
         # Extract the R2R document ID for cleanup
-        if isinstance(ingest_response, dict) and "results" in ingest_response:
-            r2r_document_id = ingest_response.get("results", {}).get("id")
+        # The R2R SDK returns a Pydantic model with .results property, not a dict
+        try:
+            r2r_document_id = str(ingest_response.results.document_id)
+        except AttributeError:
+            pass
 
         # Wait for R2R to index (R2R's background ingestion pipeline takes a moment)
         time.sleep(3)
