@@ -77,3 +77,56 @@ class TestPostMessage:
 
             assert response.status_code == 503
             assert "R2R unavailable" in response.json()["detail"]
+
+
+class TestPostMessageStream:
+    """Test POST /conversations/{conversation_id}/messages/stream endpoint."""
+
+    def test_post_message_stream_returns_event_stream_content_type(self, client):
+        """POST /conversations/{id}/messages/stream returns text/event-stream."""
+        with mock.patch("apps.api.routes.conversations.r2r_agent.agent_stream") as mock_stream:
+            mock_stream.return_value = iter([f'data: {{"type":"status"}}\n\n'])
+
+            response = client.post(
+                "/conversations/conv-1/messages/stream",
+                json={"message": "hi"},
+            )
+
+            assert response.status_code == 200
+            assert response.headers["content-type"].startswith("text/event-stream")
+
+    def test_post_message_stream_yields_frames_in_order(self, client):
+        """POST /conversations/{id}/messages/stream yields SSE frames in order."""
+        with mock.patch("apps.api.routes.conversations.r2r_agent.agent_stream") as mock_stream:
+            mock_stream.return_value = iter([
+                'data: {"type":"status","phase":"searching"}\n\n',
+                'data: {"type":"token","text":"Hello"}\n\n',
+                'data: {"type":"token","text":" world"}\n\n',
+            ])
+
+            response = client.post(
+                "/conversations/conv-1/messages/stream",
+                json={"message": "hi"},
+            )
+
+            assert response.status_code == 200
+            content = response.text
+            # Verify all frames are present and in order
+            assert "searching" in content
+            assert content.index("searching") < content.index("Hello")
+            assert content.index("Hello") < content.index("world")
+
+    def test_post_message_stream_passes_through_error_frames(self, client):
+        """POST /conversations/{id}/messages/stream passes through error frames."""
+        with mock.patch("apps.api.routes.conversations.r2r_agent.agent_stream") as mock_stream:
+            mock_stream.return_value = iter([
+                'data: {"type":"error","detail":"R2R unavailable"}\n\n'
+            ])
+
+            response = client.post(
+                "/conversations/conv-1/messages/stream",
+                json={"message": "hi"},
+            )
+
+            assert response.status_code == 200
+            assert "R2R unavailable" in response.text

@@ -1,6 +1,7 @@
 # pattern: Imperative Shell
 """Conversation endpoints for multi-turn RAG queries."""
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from apps.api.services import r2r_agent
@@ -43,3 +44,26 @@ def post_message(conversation_id: str, body: MessageRequest) -> dict:
         return r2r_agent.agent_query(message=body.message, conversation_id=conversation_id)
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@router.post("/{conversation_id}/messages/stream")
+def post_message_stream(conversation_id: str, body: MessageRequest) -> StreamingResponse:
+    """Stream agent response events as Server-Sent Events.
+
+    Returns text/event-stream with frames containing status, token, final, or error events.
+    """
+    generator = r2r_agent.agent_stream(
+        message=body.message,
+        conversation_id=conversation_id,
+    )
+    return StreamingResponse(
+        generator,
+        media_type="text/event-stream",
+        headers={
+            # Prevent proxy buffering (matters for nginx, also affects Next.js dev proxy in some setups)
+            "Cache-Control": "no-cache, no-transform",
+            "X-Accel-Buffering": "no",
+            # CORS already handled at app level, but be explicit for streaming responses:
+            "Connection": "keep-alive",
+        },
+    )
