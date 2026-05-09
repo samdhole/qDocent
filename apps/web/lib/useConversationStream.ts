@@ -35,7 +35,7 @@ export function useConversationStream() {
   }
 
   const sendMessage = useCallback(
-    async (text: string) => {
+    async (text: string, opts?: { docOnly?: boolean; documentId?: string }) => {
       const trimmed = text.trim();
       if (!trimmed || pending) return;
       setPending(true);
@@ -72,7 +72,11 @@ export function useConversationStream() {
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ message: trimmed }),
+            body: JSON.stringify({
+              message: trimmed,
+              ...(opts?.docOnly && { doc_only: true }),
+              ...(opts?.documentId && { document_id: opts.documentId }),
+            }),
           },
         );
         if (!res.ok || !res.body) {
