@@ -14,14 +14,13 @@ R2R_BASE_URL = os.getenv("R2R_BASE_URL", "http://localhost:7272")
 
 
 def _r2r_reachable() -> bool:
-    # Use the R2R SDK rather than a raw HTTP probe so the check works regardless
-    # of which API version the installed R2R server exposes.
-    # Cap timeout to 0.5 seconds to avoid slowing pytest collection when R2R is unreachable.
+    # Probe R2R health endpoint directly with a short timeout to avoid slowing pytest
+    # collection when R2R is unreachable. Use httpx.get rather than R2RClient SDK
+    # constructor to ensure timeout applies and avoid SDK version issues.
     try:
         import httpx
-        from r2r import R2RClient
-        client = R2RClient(base_url=R2R_BASE_URL, timeout=httpx.Timeout(0.5))
-        client.system.health()
+        health_url = f"{R2R_BASE_URL}/health"
+        httpx.get(health_url, timeout=0.5)
         return True
     except Exception:
         return False

@@ -64,7 +64,7 @@ def main() -> None:
         try:
             r2r_document_id = str(ingest_response.results.document_id)
         except AttributeError:
-            pass
+            print("Warning: could not extract R2R document ID for cleanup — document may persist in R2R")
         print("Pre-chunked ingest: OK")
     except Exception as exc:
         sys.exit(f"Pre-chunked ingest failed: {exc}")

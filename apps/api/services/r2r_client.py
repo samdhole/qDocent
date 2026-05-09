@@ -18,7 +18,7 @@ from apps.api.services.r2r_chunk_adapter import (
     chunks_for_r2r,
     citation_from_retrieved_text,
 )
-from apps.api.services.r2r_client_helpers import _label_from_score
+from apps.api.services.r2r_client_helpers import _label_from_score, _valid_chunks
 from packages.ingestion.pipeline import run_pipeline
 
 load_dotenv()
@@ -127,7 +127,7 @@ def delete_r2r_documents(document_ids: list[str]) -> dict[str, list[str]]:
     failed: list[str] = []
     try:
         client = _client()
-    except (httpx.HTTPError, R2RException):
+    except Exception:
         return {"deleted": [], "failed": list(document_ids)}
     for document_id in document_ids:
         try:
@@ -154,20 +154,6 @@ def ingest_prechunked_document(chunks: list[dict[str, Any]], report: dict[str, A
         )
     except (httpx.HTTPError, R2RException) as exc:
         raise RuntimeError(f"R2R unavailable: {exc}") from exc
-
-
-def _valid_chunks(chunks: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Filter out chunks with missing or empty required fields for citation header embedding."""
-    required = {"text", "document_id", "source_file"}
-    valid = [c for c in chunks if all(c.get(k) for k in required)]
-    if len(valid) < len(chunks):
-        log = logging.getLogger(__name__)
-        log.warning(
-            "Dropped %d of %d chunks missing required fields",
-            len(chunks) - len(valid),
-            len(chunks),
-        )
-    return valid
 
 
 def ingest_file_with_pipeline(
