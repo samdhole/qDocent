@@ -4,6 +4,7 @@
 import * as React from "react"
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card"
 import { useCitationContext } from "@/components/CitationContext"
+import { canOpenSource } from "@/lib/citationClickable"
 import { cn } from "@/lib/utils"
 
 type Props = {
@@ -19,12 +20,10 @@ export function CitationBadge({ index, variant = "inline" }: Props) {
 
   // Match the existing AnswerCard guard: only invoke onSelectCitation when
   // document_id is present AND page is present. Otherwise click is a no-op.
-  const canOpenSource = Boolean(
-    citation && citation.document_id && citation.page != null && onSelectCitation
-  )
+  const isClickable = canOpenSource(citation, onSelectCitation)
 
   const handleSelect = () => {
-    if (!citation || !canOpenSource || !onSelectCitation) return
+    if (!citation || !isClickable || !onSelectCitation) return
     onSelectCitation({
       documentId: citation.document_id!,
       documentName: citation.document,
@@ -53,10 +52,10 @@ export function CitationBadge({ index, variant = "inline" }: Props) {
     <button
       type="button"
       onClick={handleSelect}
-      disabled={!canOpenSource}
+      disabled={!isClickable}
       className={cn(
         "inline-flex items-center rounded px-1 text-xs font-medium",
-        canOpenSource
+        isClickable
           ? "bg-blue-50 text-blue-700 hover:bg-blue-100 cursor-pointer"
           : "bg-muted text-muted-foreground cursor-default",
         variant === "panel" && "px-2 py-0.5 text-sm"
@@ -80,7 +79,7 @@ export function CitationBadge({ index, variant = "inline" }: Props) {
           .filter(Boolean)
           .join(" · ")}
       </p>
-      {canOpenSource && (
+      {isClickable && (
         <button
           type="button"
           onClick={handleSelect}
