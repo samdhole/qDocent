@@ -243,6 +243,16 @@ class FinalAnswerEvent:
         }
 
 
+class CitationEvent:
+    """Fake CitationEvent for testing agent_stream."""
+
+    def __init__(self):
+        pass
+
+    def model_dump(self):
+        return {"data": {}}
+
+
 class TestAgentStream:
     """Test agent_stream generator for SSE-formatted event streaming."""
 
@@ -359,3 +369,54 @@ class TestAgentStream:
             assert token_frames[1]["text"] == "answer"
             assert len(error_frames) == 1
             assert "stream interrupted" in error_frames[0]["detail"]
+
+    def test_agent_stream_citation_event_between_tokens_does_not_regress_phase(self):
+        """CitationEvent does not emit a status frame that regresses phase order.
+
+        R2R may emit CitationEvent during/after the MessageEvent token stream.
+        Previously, CitationEvent yielded a status frame with phase=found_results,
+        causing UI regression: "Generating answer…" → "Reading citations…" (backwards).
+
+        This test verifies that CitationEvent does NOT yield any status frame,
+        preserving monotonic forward-only phase progression:
+        "Searching…" → "Reading citations…" → "Generating…"
+        """
+        with mock.patch("apps.api.services.r2r_agent.get_client") as mock_client_factory:
+            with mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures:
+                events = [
+                    SearchResultsEvent([]),  # Announces "found_results"
+                    MessageEvent("hello"),   # Start generation
+                    CitationEvent(),         # Should NOT emit a status frame
+                    MessageEvent(" world"),  # Continue generation
+                    FinalAnswerEvent("hello world", "conv-1"),
+                ]
+                mock_client_factory.return_value.retrieval.agent.return_value = iter(events)
+                mock_figures.return_value = []
+
+                from apps.api.services.r2r_agent import agent_stream
+
+                frames = list(agent_stream("test?", "conv-1"))
+                frame_list = [json.loads(f.split("data: ")[1]) for f in frames if "data: " in f]
+
+                # Extract status frames to verify phase order
+                status_frames = [f for f in frame_list if f.get("type") == "status"]
+                token_frames = [f for f in frame_list if f.get("type") == "token"]
+
+                # Verify status frames are in forward-only order: searching → found_results → generating
+                status_phases = [s.get("phase") for s in status_frames]
+                assert status_phases == ["searching", "found_results", "generating"], (
+                    f"Phase order must be monotonically forward. Got: {status_phases}"
+                )
+
+                # Verify tokens are streamed in order with no regressive status frames between them
+                assert len(token_frames) == 2
+                assert token_frames[0]["text"] == "hello"
+                assert token_frames[1]["text"] == " world"
+
+                # Verify no duplicate "found_results" phase (which would come from CitationEvent)
+                found_results_count = status_phases.count("found_results")
+                assert found_results_count == 1, (
+                    f"'found_results' phase should appear exactly once (from SearchResultsEvent). "
+                    f"Got {found_results_count} occurrences. This indicates CitationEvent is "
+                    f"emitting a regressive status frame."
+                )

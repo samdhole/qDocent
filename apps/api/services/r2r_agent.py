@@ -215,8 +215,6 @@ def agent_stream(message: str, conversation_id: str) -> Generator[str, None, Non
                             yield _sse({"type": "status", "phase": "generating"})
                         full_text_parts.append(text)
                         yield _sse({"type": "token", "text": text})
-            elif event_type == "CitationEvent":
-                yield _sse({"type": "status", "phase": "found_results"})
             elif event_type == "FinalAnswerEvent":
                 # The final event contains the assembled answer + citations.
                 payload = _event_payload(event)
