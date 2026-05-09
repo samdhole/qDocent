@@ -34,6 +34,15 @@ def _client() -> R2RClient:
     return R2RClient(base_url=_BASE_URL)
 
 
+def get_client() -> R2RClient:
+    """Public factory for the R2R SDK client. Use from other service modules."""
+    return _client()
+
+
+# Public alias for search settings (used by other service modules)
+DEFAULT_SEARCH_SETTINGS = _SEARCH_SETTINGS
+
+
 def rag_query(query: str) -> dict[str, Any]:
     """Ask a RAG question. Returns structured dict for the /ask route."""
     try:
