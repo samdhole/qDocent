@@ -90,3 +90,35 @@ questions:
     reference: >
       The system should refuse or state that the uploaded documents do not
       contain this private employee information. It must not guess a salary.
+
+  - id: support_ticket_1001
+    category: support_history
+    user_input: "What happened with support ticket 1001?"
+    reference: >
+      Ticket #1001 was a customer refund request submitted on 2024-01-15.
+      It was approved within policy. The answer should not invent additional
+      details or approvers beyond what appears in the uploaded support history.
+
+  - id: support_ticket_1002
+    category: support_history
+    user_input: "Was the enterprise discount in ticket 1002 escalated, and to whom?"
+    reference: >
+      Ticket #1002 involved an enterprise discount request for 25% that was
+      escalated to VP Sales. The answer should cite the ticket and the
+      escalation; it must not say the discount was approved by an account
+      executive or that it was denied.
+
+  - id: support_data_export
+    category: support_history
+    user_input: "How was the data export request handled?"
+    reference: >
+      Ticket #1003 was a data export request that was processed per the
+      retention policy. The answer should reference the ticket; it must not
+      invent a specific date or approver.
+
+  - id: support_billing_dispute
+    category: support_history
+    user_input: "Who resolved the billing dispute in the support history?"
+    reference: >
+      Ticket #1004 was a billing dispute resolved by an account executive.
+      The answer should not invent a ticket date or escalation to VP Sales.
