@@ -58,11 +58,16 @@ def _adapt_agent_response(question: str, response: Any) -> dict[str, Any]:
 
     Expected shape (verified by Task 1 spike):
         results.messages[-1].content                                          → answer text
-        results.messages[-1].metadata.aggregated_search_results (singular,
-            may be JSON string or dict).chunk_search_results                  → list of retrieved chunks
+        results.messages[-1].metadata.aggregated_search_result (singular,
+            JSON string or dict).chunk_search_results                         → list of retrieved chunks
         results.conversation_id                                               → conversation_id
     """
-    inner = getattr(response, "results", response)
+    # Extract inner dict/object from response.results or use response directly
+    inner = (
+        getattr(response, "results", None)
+        or (response.get("results") if isinstance(response, dict) else None)
+        or response
+    )
 
     messages = getattr(inner, "messages", None) or (
         inner.get("messages") if isinstance(inner, dict) else []
@@ -89,9 +94,13 @@ def _adapt_agent_response(question: str, response: Any) -> dict[str, Any]:
     # If aggregated is a JSON string (as found in spike), parse it
     if isinstance(aggregated, str):
         try:
-            aggregated = json.loads(aggregated)
+            parsed = json.loads(aggregated)
         except (json.JSONDecodeError, TypeError):
-            aggregated = {}
+            parsed = {}
+        aggregated = parsed if isinstance(parsed, dict) else {}
+    elif not isinstance(aggregated, dict):
+        # Defensive: if it's neither string nor dict (e.g., list from json.loads("[]")), reset
+        aggregated = {}
 
     chunk_results = aggregated.get("chunk_search_results") or []
 
