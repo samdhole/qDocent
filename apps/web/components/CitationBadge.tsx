@@ -53,7 +53,6 @@ export function CitationBadge({ index, variant = "inline" }: Props) {
     <button
       type="button"
       onClick={handleSelect}
-      onKeyDown={(e) => { if (e.key === "Enter") handleSelect() }}
       disabled={!canOpenSource}
       className={cn(
         "inline-flex items-center rounded px-1 text-xs font-medium",

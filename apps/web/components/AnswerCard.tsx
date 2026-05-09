@@ -22,12 +22,6 @@ type Props = {
   onSelectCitation?: (citation: SelectedCitation) => void;
 };
 
-function sourceHref(documentId: string, page?: number) {
-  return `${API}/documents/${encodeURIComponent(documentId)}/source${
-    page != null ? `#page=${page}` : ""
-  }`;
-}
-
 export default function AnswerCard({ result, onSelectCitation }: Props) {
   const isLowConfidenceNoContext =
     result.confidence_label === "low" && result.retrieved_contexts.length === 0;
