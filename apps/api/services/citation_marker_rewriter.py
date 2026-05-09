@@ -70,9 +70,11 @@ def rewrite_brackets(
         for ctx in retrieved_contexts
         if ctx.get("chunk_id")
     }
-    _empty_ctx: dict[str, Any] = {"chunk_id": None, "text": "", "score": 0.0}
     reordered_contexts = [
-        ctx_by_chunk_id.get(citations[i].get("chunk_id") or "", _empty_ctx)
+        ctx_by_chunk_id.get(
+            citations[i].get("chunk_id") or "",
+            {"chunk_id": None, "text": "", "score": 0.0},
+        )
         for i in new_order
     ]
 

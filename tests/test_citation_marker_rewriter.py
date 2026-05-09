@@ -85,7 +85,7 @@ class TestCitationMarkerRewriter(unittest.TestCase):
 
     def test_ac2_3_unknown_shortid_passthrough(self):
         """AC2.3: Unknown shortid not in citations → passes through unchanged."""
-        answer = "Unknown citation [zzzzzzz]."
+        answer = "Unknown citation [deadbef]."
         citations = [_cit("93033bdf-0000-0000-0000-000000000000")]
         retrieved_contexts = [_ctx("93033bdf-0000-0000-0000-000000000000")]
 
@@ -94,7 +94,7 @@ class TestCitationMarkerRewriter(unittest.TestCase):
         )
 
         # Unknown shortid stays unchanged
-        self.assertEqual(rewritten, "Unknown citation [zzzzzzz].")
+        self.assertEqual(rewritten, "Unknown citation [deadbef].")
         # Citations unchanged (no prose reference)
         self.assertEqual(len(reordered_cits), 1)
         self.assertEqual(
