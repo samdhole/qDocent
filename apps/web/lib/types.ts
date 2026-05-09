@@ -91,3 +91,13 @@ export type SelectedCitation = {
   pageEnd: number | null;
   chunkIndex: number | null;
 };
+
+// Document types (added in Phase 5)
+
+export type SourceDocument = {
+  document_id: string;
+  source_file: string;
+  source_url: string;
+  size_bytes: number;
+  updated_at: string;
+};
