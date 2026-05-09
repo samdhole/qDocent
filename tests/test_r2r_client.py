@@ -416,9 +416,9 @@ class TestIngestPrechunkedDocument:
         assert metadata["ingestion_mode"] == "docquery_pre_chunked"
 
     @mock.patch("apps.api.services.r2r_client._client")
-    def test_passes_chunks_as_strings_with_citation_headers(self, mock_client_factory):
+    def test_passes_chunks_as_strings_with_citation_headers(self, mock_client_fn):
         """chunks_for_r2r output is passed verbatim to client.documents.create (arfix.AC15.1)."""
-        mock_client = mock_client_factory.return_value
+        mock_client = mock_client_fn.return_value
         mock_client.documents.create.return_value = {"results": {"id": "r2r-abc123"}}
 
         from apps.api.services.r2r_client import ingest_prechunked_document
@@ -447,9 +447,9 @@ class TestIngestPrechunkedDocument:
         )
 
     @mock.patch("apps.api.services.r2r_client._client")
-    def test_metadata_contains_required_fields(self, mock_client_factory):
+    def test_metadata_contains_required_fields(self, mock_client_fn):
         """metadata dict passed to R2R contains ingestion_mode, docquery_document_id, source_file (arfix.AC15.2)."""
-        mock_client = mock_client_factory.return_value
+        mock_client = mock_client_fn.return_value
         mock_client.documents.create.return_value = {}
 
         from apps.api.services.r2r_client import ingest_prechunked_document
@@ -463,14 +463,16 @@ class TestIngestPrechunkedDocument:
         metadata = call_kwargs.get("metadata", {})
         assert metadata.get("ingestion_mode") == "docquery_pre_chunked"
         assert "docquery_document_id" in metadata
+        assert metadata["docquery_document_id"] == "doc1"
         assert "source_file" in metadata
+        assert metadata["source_file"] == "test.pdf"
 
     @mock.patch("apps.api.services.r2r_client._client")
-    def test_raises_runtime_error_when_client_construction_fails(self, mock_client_factory):
+    def test_raises_runtime_error_when_client_construction_fails(self, mock_client_fn):
         """RuntimeError is raised when R2R client cannot be constructed (arfix.AC15.3)."""
         import httpx
 
-        mock_client_factory.side_effect = httpx.HTTPError("connection refused")
+        mock_client_fn.side_effect = httpx.HTTPError("connection refused")
 
         from apps.api.services.r2r_client import ingest_prechunked_document
 

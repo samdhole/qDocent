@@ -44,8 +44,11 @@ def main() -> None:
     print("\nTesting pre-chunked ingest (DocQuery Citation header round-trip) ...")
     from apps.api.services.r2r_client import ingest_prechunked_document, rag_query
 
+    # Use unique document ID per run to avoid polluting the shared R2R vector store
+    unique_doc_id = f"smoke_prechunked_{int(time.time())}"
+
     smoke_chunk = {
-        "document_id": "smoke_prechunked_doc",
+        "document_id": unique_doc_id,
         "source_file": "smoke_prechunked.pdf",
         "page_start": 1,
         "page_end": 1,
@@ -53,7 +56,7 @@ def main() -> None:
         "text": "The pre-chunked ingest smoke test policy: all items covered.",
     }
     try:
-        ingest_prechunked_document([smoke_chunk], {"document_id": "smoke_prechunked_doc", "source_file": "smoke_prechunked.pdf"})
+        ingest_prechunked_document([smoke_chunk], {"document_id": unique_doc_id, "source_file": "smoke_prechunked.pdf"})
         print("Pre-chunked ingest: OK")
     except Exception as exc:
         sys.exit(f"Pre-chunked ingest failed: {exc}")
