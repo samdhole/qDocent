@@ -54,3 +54,14 @@ export type IngestJob = {
   } | null;
   error?: string | null;
 };
+
+// Conversation types (added in Phase 3)
+
+export type ChatMessage =
+  | { role: "user"; content: string; id: string }
+  | { role: "assistant"; id: string; result: AskResponse };
+// `result` is the existing AskResponse shape, returned by POST /conversations/{id}/messages.
+
+export type ConversationStartResponse = {
+  conversation_id: string;
+};
