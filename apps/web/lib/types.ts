@@ -66,3 +66,27 @@ export type ChatMessage =
 export type ConversationStartResponse = {
   conversation_id: string;
 };
+
+// Source panel types (added in Phase 7)
+
+export type ChunkManifestEntry = {
+  chunk_index: number;
+  page_start: number | null;
+  page_end: number | null;
+  bbox: [number, number, number, number] | null; // [x0, top, x1, bottom] in points
+  section_path: string | null;
+  text_preview: string;
+};
+
+export type ChunksResponse = {
+  document_id: string;
+  chunks: ChunkManifestEntry[];
+};
+
+export type SelectedCitation = {
+  documentId: string;
+  documentName: string;
+  pageStart: number;
+  pageEnd: number | null;
+  chunkIndex: number | null;
+};
