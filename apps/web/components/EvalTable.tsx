@@ -1,3 +1,4 @@
+// pattern: Imperative Shell
 "use client";
 import { useEffect, useState } from "react";
 
@@ -22,26 +23,39 @@ const TARGETS: Record<string, number> = {
 
 export default function EvalTable() {
   const [rows, setRows] = useState<Row[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<{ message: string; isNotFound: boolean } | null>(null);
 
   useEffect(() => {
     fetch(`${API}/eval/results`)
       .then((r) => {
-        if (!r.ok) throw new Error("No eval results yet. Run: make eval");
+        if (!r.ok) {
+          throw { message: r.status === 404 ? "No eval results yet. Run: make eval" : `HTTP ${r.status}: ${r.statusText}`, status: r.status };
+        }
         return r.json();
       })
       .then(setRows)
-      .catch((e: Error) => setError(e.message));
+      .catch((e: unknown) => {
+        const isNetworkError = e instanceof TypeError;
+        const status = typeof e === "object" && e !== null && "status" in e ? (e as { status: number }).status : null;
+        const isNotFound = status === 404 || isNetworkError;
+        const message = typeof e === "object" && e !== null && "message" in e
+          ? (e as { message: string }).message
+          : isNetworkError ? "Network error. Is the API running?" : "Unknown error";
+        setError({ message, isNotFound });
+      });
   }, []);
 
   if (error) {
-    return (
-      <EmptyState
-        icon={BarChart3}
-        title="No evaluation reports yet"
-        body="Run `make eval` from the project root to generate a RAGAS report. Reports appear here automatically."
-      />
-    );
+    if (error.isNotFound) {
+      return (
+        <EmptyState
+          icon={BarChart3}
+          title="No evaluation reports yet"
+          body="Run `make eval` from the project root to generate a RAGAS report. Reports appear here automatically."
+        />
+      );
+    }
+    return <p className="text-sm text-red-600">Error: {error.message}</p>;
   }
   if (!rows.length) return <p className="text-sm text-gray-500">Loading...</p>;
 

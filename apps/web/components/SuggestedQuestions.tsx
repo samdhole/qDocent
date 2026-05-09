@@ -38,7 +38,7 @@ export function SuggestedQuestions({ onSelect, disabled }: Props) {
   }, []);
 
   const docSuggestions = docTitles.map((t) => `Summarize ${t}`);
-  const all = [...docSuggestions, ...STATIC_SEEDS].slice(0, 6);
+  const all = Array.from(new Set([...docSuggestions, ...STATIC_SEEDS])).slice(0, 6);
 
   return (
     <div className="flex flex-wrap gap-2">
