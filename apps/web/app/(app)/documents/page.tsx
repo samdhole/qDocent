@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { EmptyState } from "@/components/EmptyState";
 
 import type { IngestJob } from "@/lib/types";
 
@@ -260,7 +261,11 @@ export default function DocumentsPage() {
           {loadingDocuments ? (
             <p className="text-sm text-muted-foreground">Loading documents…</p>
           ) : documents.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No stored source PDFs yet.</p>
+            <EmptyState
+              icon={Upload}
+              title="No documents yet"
+              body="Drop a PDF onto this page or use the upload form above to get started."
+            />
           ) : (
             <Table>
               <TableHeader>
