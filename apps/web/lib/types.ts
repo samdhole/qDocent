@@ -5,6 +5,7 @@ export type Citation = {
   page_end?: number;
   section?: string;
   chunk_id?: string;
+  chunk_index?: number | null;
 };
 
 export type RetrievedContext = {

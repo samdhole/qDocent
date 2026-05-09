@@ -716,3 +716,64 @@ class TestRagQueryFigures:
         assert result["citations"][0]["page"] == 4
         assert result["citations"][0]["page_end"] == 5
         assert result["citations"][0]["section"] == "Intro"
+
+    @mock.patch("apps.api.services.r2r_client.figures_for_response")
+    @mock.patch("apps.api.services.r2r_client._client")
+    def test_rag_query_includes_chunk_index_from_header(
+        self, mock_client_fn, mock_figures
+    ):
+        """Task 1: chunk_index from DocQuery citation header is included in citations."""
+        mock_figures.return_value = []
+
+        hit = mock.MagicMock()
+        hit.id = "r2r-hit"
+        hit.score = 0.85
+        hit.metadata = {"source_file": "policy.pdf", "page_start": 1}
+        hit.text = (
+            "DocQuery Citation: document_id=doc1; source_file=policy.pdf; "
+            "page_start=1; page_end=1; section_path=Refunds; chunk_index=7\n\n"
+            "Refund policy details."
+        )
+        mock_inner = mock.MagicMock()
+        mock_inner.generated_answer = "The refund policy is 30 days."
+        mock_inner.search_results = mock.MagicMock()
+        mock_inner.search_results.chunk_search_results = [hit]
+        mock_response = mock.MagicMock()
+        mock_response.results = mock_inner
+        mock_client_fn.return_value.retrieval.rag.return_value = mock_response
+
+        from apps.api.services.r2r_client import rag_query
+
+        result = rag_query("refund policy?")
+
+        assert len(result["citations"]) == 1
+        assert result["citations"][0]["chunk_index"] == 7
+
+    @mock.patch("apps.api.services.r2r_client.figures_for_response")
+    @mock.patch("apps.api.services.r2r_client._client")
+    def test_rag_query_chunk_index_is_none_when_header_missing(
+        self, mock_client_fn, mock_figures
+    ):
+        """Task 1: chunk_index is None when no DocQuery header."""
+        mock_figures.return_value = []
+
+        hit = mock.MagicMock()
+        hit.id = "r2r-hit"
+        hit.score = 0.85
+        hit.metadata = {"source_file": "policy.pdf", "page_start": 1}
+        hit.text = "Plain text with no DocQuery header."
+
+        mock_inner = mock.MagicMock()
+        mock_inner.generated_answer = "The answer."
+        mock_inner.search_results = mock.MagicMock()
+        mock_inner.search_results.chunk_search_results = [hit]
+        mock_response = mock.MagicMock()
+        mock_response.results = mock_inner
+        mock_client_fn.return_value.retrieval.rag.return_value = mock_response
+
+        from apps.api.services.r2r_client import rag_query
+
+        result = rag_query("question?")
+
+        assert len(result["citations"]) == 1
+        assert result["citations"][0]["chunk_index"] is None

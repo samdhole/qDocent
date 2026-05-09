@@ -128,6 +128,7 @@ def _adapt_agent_response(question: str, response: Any) -> dict[str, Any]:
                 "section": header_citation.get("section") or meta.get("section_path"),
                 "document_id": header_citation.get("document_id"),
                 "chunk_id": chunk_id,
+                "chunk_index": header_citation.get("chunk_index"),
             }
         )
         retrieved_contexts.append(

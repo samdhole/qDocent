@@ -206,6 +206,45 @@ class TestAgentQuery:
                 assert result["citations"][0]["document"] == "guide.pdf"
                 assert result["conversation_id"] == "conv-dict"
 
+    def test_agent_query_includes_chunk_index_from_header(self):
+        """Task 1: chunk_index from DocQuery citation header is included in citations."""
+        with mock.patch("apps.api.services.r2r_agent.get_client") as mock_client_factory:
+            with mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures:
+                mock_message = mock.MagicMock()
+                mock_message.content = "The policy is 30 days."
+                mock_message.metadata = {
+                    "citations": [],
+                    "aggregated_search_result": json.dumps({
+                        "chunk_search_results": [
+                            {
+                                "text": "DocQuery Citation: document_id=doc1; source_file=policy.pdf; page_start=1; page_end=1; section_path=Refunds; chunk_index=5\n\nRefund policy details",
+                                "metadata": {
+                                    "chunk_id": "chunk-1",
+                                    "source_file": "policy.pdf",
+                                    "page_start": 1,
+                                },
+                                "score": 0.85,
+                                "id": "chunk-1",
+                            }
+                        ]
+                    })
+                }
+
+                mock_response = mock.MagicMock()
+                mock_response.results.messages = [mock_message]
+                mock_response.results.conversation_id = "conv-1"
+
+                mock_client_factory.return_value.retrieval.agent.return_value = mock_response
+                mock_figures.return_value = []
+
+                from apps.api.services.r2r_agent import agent_query
+
+                result = agent_query("What is the refund policy?", "conv-1")
+
+                assert result["answer"] == "The policy is 30 days."
+                assert len(result["citations"]) == 1
+                assert result["citations"][0]["chunk_index"] == 5
+
 
 class MessageEvent:
     """Fake MessageEvent for testing agent_stream."""
