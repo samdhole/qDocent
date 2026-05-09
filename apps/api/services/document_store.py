@@ -45,7 +45,11 @@ def write_document_manifest(
 
 def load_document_manifest(document_id: str) -> dict[str, Any] | None:
     """Load persisted document metadata, if available."""
-    manifest_path = DOCUMENTS_DIR / _safe_segment(document_id) / "manifest.json"
+    try:
+        target_dir = DOCUMENTS_DIR / _safe_segment(document_id)
+    except ValueError:
+        return None
+    manifest_path = target_dir / "manifest.json"
     if not manifest_path.exists():
         return None
     try:
@@ -92,7 +96,11 @@ def write_chunks_manifest(document_id: str, chunks: list[dict[str, Any]]) -> Pat
 
 def load_chunks_manifest(document_id: str) -> list[dict[str, Any]] | None:
     """Load persisted chunk metadata. Returns None if missing or corrupt."""
-    path = DOCUMENTS_DIR / _safe_segment(document_id) / "chunks.json"
+    try:
+        target_dir = DOCUMENTS_DIR / _safe_segment(document_id)
+    except ValueError:
+        return None
+    path = target_dir / "chunks.json"
     if not path.exists():
         return None
     try:
@@ -108,7 +116,10 @@ def load_chunks_manifest(document_id: str) -> list[dict[str, Any]] | None:
 
 def source_pdf_path(document_id: str) -> Path | None:
     """Return the stored source PDF for a document ID, if present."""
-    target_dir = DOCUMENTS_DIR / _safe_segment(document_id)
+    try:
+        target_dir = DOCUMENTS_DIR / _safe_segment(document_id)
+    except ValueError:
+        return None
     if not target_dir.exists():
         return None
     matches = sorted(target_dir.glob("*.pdf"))
@@ -146,7 +157,10 @@ def list_source_documents() -> list[dict[str, Any]]:
 
 def delete_source_document(document_id: str) -> bool:
     """Delete the local stored source PDF directory for a document ID."""
-    target_dir = DOCUMENTS_DIR / _safe_segment(document_id)
+    try:
+        target_dir = DOCUMENTS_DIR / _safe_segment(document_id)
+    except ValueError:
+        return False
     if not target_dir.exists() or not target_dir.is_dir():
         return False
     shutil.rmtree(target_dir)

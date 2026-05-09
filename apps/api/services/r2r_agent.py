@@ -234,6 +234,10 @@ def agent_stream(message: str, conversation_id: str) -> Generator[str, None, Non
     except (httpx.HTTPError, R2RException) as exc:
         yield _sse({"type": "error", "detail": f"R2R stream interrupted: {exc}"})
         return
+    except Exception as exc:
+        log.exception("Unexpected error in agent_stream: %s", exc)
+        yield _sse({"type": "error", "detail": f"Stream error: {exc}"})
+        return
 
     # If we exited the loop without a FinalAnswerEvent, synthesize one from
     # what we collected (defensive — the SDK is documented to always emit one).

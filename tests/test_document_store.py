@@ -200,6 +200,53 @@ def test_safe_segment_strips_leading_trailing_underscores():
     assert _safe_segment("_abc_") == "abc"
 
 
+# Tests for defensive ValueError handling in document_store functions (I1 fix)
+
+
+def test_source_pdf_path_returns_none_on_degenerate_id(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    """source_pdf_path() returns None when document_id sanitizes to empty string."""
+    monkeypatch.setattr(document_store_mod, "DOCUMENTS_DIR", tmp_path / "documents")
+
+    result = source_pdf_path("...")
+
+    assert result is None
+
+
+def test_load_chunks_manifest_returns_none_on_degenerate_id(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    """load_chunks_manifest() returns None when document_id sanitizes to empty string."""
+    monkeypatch.setattr(document_store_mod, "DOCUMENTS_DIR", tmp_path / "documents")
+
+    result = load_chunks_manifest("...")
+
+    assert result is None
+
+
+def test_load_document_manifest_returns_none_on_degenerate_id(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    """load_document_manifest() returns None when document_id sanitizes to empty string."""
+    monkeypatch.setattr(document_store_mod, "DOCUMENTS_DIR", tmp_path / "documents")
+
+    result = load_document_manifest("...")
+
+    assert result is None
+
+
+def test_delete_source_document_returns_false_on_degenerate_id(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    """delete_source_document() returns False when document_id sanitizes to empty string."""
+    monkeypatch.setattr(document_store_mod, "DOCUMENTS_DIR", tmp_path / "documents")
+
+    result = delete_source_document("!@#$%")
+
+    assert result is False
+
+
 # Tests for _safe_pdf_name() degenerate filename handling
 
 

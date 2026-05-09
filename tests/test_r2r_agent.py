@@ -459,3 +459,44 @@ class TestAgentStream:
                     f"Got {found_results_count} occurrences. This indicates CitationEvent is "
                     f"emitting a regressive status frame."
                 )
+
+    def test_agent_stream_synthesizes_final_frame_when_no_final_event(self):
+        """Defensive branch: loop exits without FinalAnswerEvent; synthesizes final frame from accumulated text."""
+        with mock.patch("apps.api.services.r2r_agent.get_client") as mock_client_factory:
+            with mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures:
+                # Events: search result and message delta, but no FinalAnswerEvent
+                events = [
+                    SearchResultsEvent([
+                        {
+                            "text": "DocQuery Citation: document_id=doc1; source_file=policy.pdf; page_start=1; page_end=1; section_path=Refunds; chunk_index=0\n\nRefund policy details",
+                            "metadata": {
+                                "chunk_id": "chunk-1",
+                                "source_file": "policy.pdf",
+                                "page_start": 1,
+                            },
+                            "score": 0.85,
+                            "id": "chunk-1",
+                        }
+                    ]),
+                    MessageEvent("The refund policy is 30 days."),
+                    # No FinalAnswerEvent - loop exits without it
+                ]
+                mock_client_factory.return_value.retrieval.agent.return_value = iter(events)
+                mock_figures.return_value = []
+
+                from apps.api.services.r2r_agent import agent_stream
+
+                frames = list(agent_stream("What is the refund policy?", "conv-1"))
+
+                # Parse all frames
+                frame_list = [json.loads(f.split("data: ")[1]) for f in frames if "data: " in f]
+
+                # Find the final frame
+                final_frames = [f for f in frame_list if f.get("type") == "final"]
+
+                assert len(final_frames) == 1, "Should emit exactly one final frame (synthesized)"
+                result = final_frames[0]["result"]
+                assert result["answer"] == "The refund policy is 30 days."
+                assert result["question"] == "What is the refund policy?"
+                assert "citations" in result
+                assert "retrieved_contexts" in result

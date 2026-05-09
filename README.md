@@ -197,7 +197,7 @@ docquery/
 │   │   └── services/         r2r_client, r2r_client_helpers, document_store, figure_store, ragas_runner, report_writer
 │   └── web/                  Next.js 16 UI
 │       ├── app/              App Router pages
-│       ├── components/       AskForm, AnswerCard, EvalTable
+│       ├── components/       AnswerCard, AppSidebar, ConversationView, Dropzone, EmptyState, EvalTable, SourcePanel, SuggestedQuestions, UploadQueueList
 │       └── lib/types.ts      Shared TypeScript types
 ├── packages/
 │   ├── evals/                RAGAS evaluation harness
