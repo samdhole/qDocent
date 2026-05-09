@@ -1,6 +1,12 @@
 "use client";
+
 import { useState } from "react";
+import { Loader2, ArrowUp } from "lucide-react";
+
 import AnswerCard from "./AnswerCard";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import type { AskResponse } from "@/lib/types";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -38,27 +44,30 @@ export default function AskForm() {
   }
 
   return (
-    <div>
-      <form onSubmit={submit} className="flex gap-2 mb-6">
-        <input
+    <div className="space-y-6">
+      <form onSubmit={submit} className="flex gap-2">
+        <Input
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
           placeholder="What is the refund policy?"
-          className="flex-1 border rounded px-3 py-2 text-sm"
-        />
-        <button
-          type="submit"
           disabled={loading}
-          className="bg-blue-600 text-white px-4 py-2 rounded text-sm disabled:opacity-50"
-        >
-          {loading ? "..." : "Ask"}
-        </button>
+        />
+        <Button type="submit" disabled={loading || !question.trim()}>
+          {loading ? <Loader2 className="size-4 animate-spin" /> : <ArrowUp className="size-4" />}
+          <span className="sr-only">Ask</span>
+        </Button>
       </form>
-      {error && <p className="text-red-600 text-sm mb-4">{error}</p>}
+
+      {error && (
+        <Card className="border-destructive/50 bg-destructive/5">
+          <CardContent className="pt-4 text-sm text-destructive">{error}</CardContent>
+        </Card>
+      )}
+
       <div className="space-y-6">
         {results.map((result, i) => (
           <section key={`${result.question}-${i}`} className="space-y-2">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
               Question
             </p>
             <p className="text-sm">{result.question}</p>
