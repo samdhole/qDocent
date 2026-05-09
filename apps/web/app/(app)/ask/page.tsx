@@ -2,9 +2,14 @@ import AskForm from "@/components/AskForm";
 
 export default function AskPage() {
   return (
-    <main className="max-w-3xl mx-auto p-8">
-      <h1 className="text-2xl font-bold mb-6">Ask a Question</h1>
+    <div className="max-w-3xl mx-auto p-6 md:p-8">
+      <header className="mb-6">
+        <h1 className="text-2xl font-semibold">Ask</h1>
+        <p className="text-sm text-muted-foreground mt-1">
+          Query ingested documents with RAG.
+        </p>
+      </header>
       <AskForm />
-    </main>
+    </div>
   );
 }
