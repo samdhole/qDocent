@@ -1,5 +1,15 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+
+import { Loader2, Trash2, Upload } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+
 import type { IngestJob } from "@/lib/types";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -168,83 +178,103 @@ export default function DocumentsPage() {
   }
 
   return (
-    <main className="max-w-3xl mx-auto p-8">
-      <h1 className="text-2xl font-bold mb-6">Documents</h1>
-      <p className="text-sm text-gray-500 mb-4">Upload a PDF to ingest it into R2R.</p>
-      <form onSubmit={upload} className="flex gap-2 mb-4">
-        <input
+    <div className="max-w-3xl mx-auto p-6 md:p-8">
+      <header className="mb-6">
+        <h1 className="text-2xl font-semibold">Documents</h1>
+        <p className="text-sm text-muted-foreground mt-1">
+          Upload a PDF to ingest it into R2R.
+        </p>
+      </header>
+
+      <form onSubmit={upload} className="flex gap-2 mb-6">
+        <Input
           type="file"
           accept=".pdf"
           onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-          className="flex-1 text-sm"
         />
-        <button
-          type="submit"
-          disabled={uploading || !file}
-          className="bg-blue-600 text-white px-4 py-2 rounded text-sm disabled:opacity-50"
-        >
-          {uploading ? "Uploading..." : "Ingest PDF"}
-        </button>
+        <Button type="submit" disabled={uploading || !file}>
+          {uploading ? (
+            <>
+              <Loader2 className="size-4 animate-spin mr-2" />
+              Uploading...
+            </>
+          ) : (
+            <>
+              <Upload className="size-4 mr-2" />
+              Ingest PDF
+            </>
+          )}
+        </Button>
       </form>
+
       {status && (
-        <p className={`text-sm mt-2 ${status.startsWith("Error") ? "text-red-600" : "text-green-700"}`}>
-          {status}
-        </p>
+        <Card className={status.startsWith("Error") ? "border-destructive/50 bg-destructive/5 mb-6" : "mb-6"}>
+          <CardContent className="pt-4 text-sm">
+            <p className={status.startsWith("Error") ? "text-destructive" : "text-green-700"}>
+              {status}
+            </p>
+          </CardContent>
+        </Card>
       )}
+
       {job && (
-        <div className="mt-3 border rounded p-3 text-sm">
-          <div className="flex items-center justify-between gap-3">
-            <span className="font-medium">{job.filename}</span>
-            <span className="text-xs uppercase tracking-wide text-gray-500">{job.status}</span>
-          </div>
-          <div className="mt-2 h-2 rounded bg-gray-100 overflow-hidden">
-            <div
-              className={`h-full ${
-                job.status === "failed" ? "bg-red-500" : "bg-blue-600"
-              }`}
-              style={{
-                width:
-                  job.status === "queued"
-                    ? "20%"
-                    : job.status === "running"
-                      ? "60%"
-                      : "100%",
-              }}
+        <Card className="mb-6">
+          <CardContent className="pt-4">
+            <div className="flex items-center justify-between gap-3 mb-3">
+              <span className="font-medium text-sm">{job.filename}</span>
+              <Badge variant="secondary">{job.status}</Badge>
+            </div>
+            <Progress
+              value={
+                job.status === "queued"
+                  ? 20
+                  : job.status === "running"
+                    ? 60
+                    : job.status === "failed"
+                      ? 0
+                      : 100
+              }
             />
-          </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {sourceUrl && (
+        <div className="mb-6">
+          <a
+            href={sourceUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="text-sm text-blue-700 hover:underline"
+          >
+            Open stored source PDF
+          </a>
         </div>
       )}
-      {sourceUrl && (
-        <a
-          href={sourceUrl}
-          target="_blank"
-          rel="noreferrer"
-          className="text-sm text-blue-700 hover:underline"
-        >
-          Open stored source PDF
-        </a>
-      )}
-      <section className="mt-8">
-        <h2 className="text-sm font-semibold text-gray-500 mb-3">Stored Sources</h2>
-        {loadingDocuments ? (
-          <p className="text-sm text-gray-500">Loading documents...</p>
-        ) : documents.length === 0 ? (
-          <p className="text-sm text-gray-500">No stored source PDFs yet.</p>
-        ) : (
-          <div className="border rounded overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 text-xs text-gray-500">
-                <tr>
-                  <th className="text-left font-medium p-2">Source</th>
-                  <th className="text-left font-medium p-2">Document ID</th>
-                  <th className="text-right font-medium p-2">Size</th>
-                  <th className="text-right font-medium p-2">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm font-semibold text-muted-foreground">Stored Sources</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {loadingDocuments ? (
+            <p className="text-sm text-muted-foreground">Loading documents…</p>
+          ) : documents.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No stored source PDFs yet.</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Source</TableHead>
+                  <TableHead>Document ID</TableHead>
+                  <TableHead className="text-right">Size</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {documents.map((doc) => (
-                  <tr key={doc.document_id} className="border-t">
-                    <td className="p-2">
+                  <TableRow key={doc.document_id}>
+                    <TableCell>
                       <a
                         href={`${API}${doc.source_url}`}
                         target="_blank"
@@ -253,48 +283,59 @@ export default function DocumentsPage() {
                       >
                         {doc.source_file}
                       </a>
-                    </td>
-                    <td className="p-2 text-xs text-gray-500">{doc.document_id}</td>
-                    <td className="p-2 text-right text-xs text-gray-500">
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{doc.document_id}</TableCell>
+                    <TableCell className="text-right text-xs text-muted-foreground">
                       {Math.ceil(doc.size_bytes / 1024)} KB
-                    </td>
-                    <td className="p-2 text-right">
+                    </TableCell>
+                    <TableCell className="text-right">
                       {confirmingId === doc.document_id ? (
-                        <span className="flex justify-end gap-1">
-                          <button
+                        <div className="flex justify-end gap-2">
+                          <Button
                             type="button"
+                            size="sm"
+                            variant="destructive"
                             onClick={() => void deleteDocument(doc.document_id)}
                             disabled={deletingId === doc.document_id}
-                            className="border rounded px-2 py-1 text-xs text-red-700 bg-red-50 hover:bg-red-100 disabled:opacity-50"
                           >
-                            {deletingId === doc.document_id ? "Deleting..." : "Confirm?"}
-                          </button>
-                          <button
+                            {deletingId === doc.document_id ? (
+                              <>
+                                <Loader2 className="size-3 animate-spin mr-1" />
+                                Deleting...
+                              </>
+                            ) : (
+                              "Confirm?"
+                            )}
+                          </Button>
+                          <Button
                             type="button"
+                            size="sm"
+                            variant="ghost"
                             onClick={() => setConfirmingId(null)}
-                            className="border rounded px-2 py-1 text-xs text-gray-500 hover:bg-gray-50"
                           >
                             Cancel
-                          </button>
-                        </span>
+                          </Button>
+                        </div>
                       ) : (
-                        <button
+                        <Button
                           type="button"
+                          size="sm"
+                          variant="destructive"
                           onClick={() => setConfirmingId(doc.document_id)}
                           disabled={deletingId !== null}
-                          className="border rounded px-2 py-1 text-xs text-red-700 hover:bg-red-50 disabled:opacity-50"
                         >
+                          <Trash2 className="size-3 mr-1" />
                           Delete
-                        </button>
+                        </Button>
                       )}
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
-    </main>
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 }
