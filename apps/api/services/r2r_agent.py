@@ -194,7 +194,6 @@ def agent_stream(message: str, conversation_id: str) -> Generator[str, None, Non
 
     full_text_parts: list[str] = []
     last_search_results: dict[str, Any] = {}
-    citations_seen = False
     generation_started = False
 
     try:
@@ -217,7 +216,7 @@ def agent_stream(message: str, conversation_id: str) -> Generator[str, None, Non
                         full_text_parts.append(text)
                         yield _sse({"type": "token", "text": text})
             elif event_type == "CitationEvent":
-                citations_seen = True
+                yield _sse({"type": "status", "phase": "found_results"})
             elif event_type == "FinalAnswerEvent":
                 # The final event contains the assembled answer + citations.
                 payload = _event_payload(event)
