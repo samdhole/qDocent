@@ -166,9 +166,13 @@ export function useUploadQueue(onCompleted: () => void) {
 
 
   // On unmount, abort in-flight fetch and stop queue processing
-  useEffect(() => () => {
-    unmountedRef.current = true;
-    abortRef.current?.abort();
+  useEffect(() => {
+    unmountedRef.current = false;
+    const abort = abortRef;
+    return () => {
+      unmountedRef.current = true;
+      abort.current?.abort();
+    };
   }, []);
 
   return { items, enqueue, removeItem };
