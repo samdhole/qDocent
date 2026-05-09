@@ -298,6 +298,148 @@ class CitationEvent:
         return {"data": {}}
 
 
+class TestDocOnly:
+    """Test doc_only post-hoc check for strict document-only mode."""
+
+    def test_ac3_2_doc_only_empty_retrieval(self):
+        """AC3.2: doc_only=True with empty retrieval → "I couldn't find this in your documents." + low confidence."""
+        with mock.patch("apps.api.services.r2r_agent.get_client") as mock_client_factory, \
+             mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures, \
+             mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
+                # Empty chunk results — LLM still tries to answer from knowledge
+                mock_message = mock.MagicMock()
+                mock_message.content = "Based on my knowledge, the refund period is 30 days."
+                mock_message.metadata = {
+                    "aggregated_search_result": json.dumps({"chunk_search_results": []})
+                }
+
+                mock_response = mock.MagicMock()
+                mock_response.results.messages = [mock_message]
+                mock_response.results.conversation_id = "conv-1"
+
+                mock_client_factory.return_value.retrieval.agent.return_value = mock_response
+                mock_figures.return_value = []
+
+                from apps.api.services.r2r_agent import agent_query
+
+                result = agent_query("What is the refund policy?", "conv-1", doc_only=True)
+
+                # Post-hoc check should replace LLM answer with strict not-found string
+                assert result["answer"] == "I couldn't find this in your documents."
+                assert result["confidence_label"] == "low"
+                assert result["needs_human_review"] is True
+
+    def test_ac3_3_doc_only_low_score_chunk(self):
+        """AC3.3: doc_only=True with low-score chunk (score < 0.50) → strict not-found string."""
+        with mock.patch("apps.api.services.r2r_agent.get_client") as mock_client_factory, \
+             mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures, \
+             mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
+                # Single low-score chunk (score 0.3 < 0.50 threshold)
+                mock_message = mock.MagicMock()
+                mock_message.content = "The policy might be related to refunds."
+                mock_message.metadata = {
+                    "aggregated_search_result": json.dumps({
+                        "chunk_search_results": [
+                            {
+                                "text": "DocQuery Citation: document_id=doc1; source_file=policy.pdf; page_start=1; page_end=1; section_path=Overview; chunk_index=0\n\nGeneric text about policies",
+                                "metadata": {
+                                    "chunk_id": "chunk-1",
+                                    "source_file": "policy.pdf",
+                                    "page_start": 1,
+                                },
+                                "score": 0.3,  # Below 0.50 threshold → confidence_label="low"
+                                "id": "chunk-1",
+                            }
+                        ]
+                    })
+                }
+
+                mock_response = mock.MagicMock()
+                mock_response.results.messages = [mock_message]
+                mock_response.results.conversation_id = "conv-1"
+
+                mock_client_factory.return_value.retrieval.agent.return_value = mock_response
+                mock_figures.return_value = []
+
+                from apps.api.services.r2r_agent import agent_query
+
+                result = agent_query("What is the refund policy?", "conv-1", doc_only=True)
+
+                # Even though we have a chunk, confidence is low, so post-hoc check triggers
+                assert result["answer"] == "I couldn't find this in your documents."
+                assert result["confidence_label"] == "low"
+                assert result["needs_human_review"] is True
+
+    def test_ac3_4_doc_only_high_score_chunk(self):
+        """AC3.4: doc_only=True with high-score chunk (score >= 0.80) → original LLM answer unchanged."""
+        with mock.patch("apps.api.services.r2r_agent.get_client") as mock_client_factory, \
+             mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures, \
+             mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
+                # High-score chunk (score 0.85 >= 0.80) → confidence_label="high"
+                mock_message = mock.MagicMock()
+                mock_message.content = "The refund policy is 30 days."
+                mock_message.metadata = {
+                    "aggregated_search_result": json.dumps({
+                        "chunk_search_results": [
+                            {
+                                "text": "DocQuery Citation: document_id=doc1; source_file=policy.pdf; page_start=1; page_end=1; section_path=Refunds; chunk_index=0\n\nRefund policy details: 30 days",
+                                "metadata": {
+                                    "chunk_id": "chunk-1",
+                                    "source_file": "policy.pdf",
+                                    "page_start": 1,
+                                },
+                                "score": 0.85,  # Above 0.80 threshold → confidence_label="high"
+                                "id": "chunk-1",
+                            }
+                        ]
+                    })
+                }
+
+                mock_response = mock.MagicMock()
+                mock_response.results.messages = [mock_message]
+                mock_response.results.conversation_id = "conv-1"
+
+                mock_client_factory.return_value.retrieval.agent.return_value = mock_response
+                mock_figures.return_value = []
+
+                from apps.api.services.r2r_agent import agent_query
+
+                result = agent_query("What is the refund policy?", "conv-1", doc_only=True)
+
+                # High confidence + doc_only=True → post-hoc check does NOT trigger, original answer preserved
+                assert result["answer"] == "The refund policy is 30 days."
+                assert result["confidence_label"] == "high"
+                assert result["needs_human_review"] is False
+
+    def test_ac3_5_doc_only_false_empty_retrieval(self):
+        """AC3.5: doc_only=False (general mode) with empty retrieval → original LLM answer (no substitution)."""
+        with mock.patch("apps.api.services.r2r_agent.get_client") as mock_client_factory, \
+             mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures, \
+             mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
+                # Empty retrieval, but doc_only=False → LLM can answer from knowledge
+                mock_message = mock.MagicMock()
+                mock_message.content = "Based on general knowledge, refund periods vary by industry."
+                mock_message.metadata = {
+                    "aggregated_search_result": json.dumps({"chunk_search_results": []})
+                }
+
+                mock_response = mock.MagicMock()
+                mock_response.results.messages = [mock_message]
+                mock_response.results.conversation_id = "conv-1"
+
+                mock_client_factory.return_value.retrieval.agent.return_value = mock_response
+                mock_figures.return_value = []
+
+                from apps.api.services.r2r_agent import agent_query
+
+                result = agent_query("What is the refund policy?", "conv-1", doc_only=False)
+
+                # No post-hoc substitution — doc_only=False means general mode
+                assert result["answer"] == "Based on general knowledge, refund periods vary by industry."
+                assert result["confidence_label"] == "low"  # Still low because no retrieval
+                assert result["needs_human_review"] is True  # Still needs review due to low confidence
+
+
 class TestAgentStream:
     """Test agent_stream generator for SSE-formatted event streaming."""
 
