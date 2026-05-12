@@ -218,3 +218,47 @@ class TestListNotebookDocuments:
         resp = client.get("/notebooks/ghost/documents")
         assert resp.status_code == 404
         assert "not found" in resp.json()["detail"].lower()
+
+
+class TestIngestNotebookDocument:
+    """Test POST /notebooks/{notebook_id}/documents endpoint."""
+
+    def test_201_with_pdf(self, client, mock_store):
+        """POST /notebooks/{id}/documents with PDF returns 201 and records membership."""
+        mock_store.get_notebook.return_value = {"id": "nb-1", "r2r_collection_id": "col-abc"}
+        mock_store.add_document.return_value = None
+        fake_pdf = io.BytesIO(b"%PDF-1.4 fake content")
+
+        with mock.patch("apps.api.routes.notebooks.r2r_client.ingest_file_with_pipeline") as mock_ingest:
+            mock_ingest.return_value = {"document_id": "doc-new", "status": "ok"}
+            resp = client.post(
+                "/notebooks/nb-1/documents",
+                files={"file": ("report.pdf", fake_pdf, "application/pdf")},
+            )
+
+        assert resp.status_code == 201
+        assert resp.json()["document_id"] == "doc-new"
+        mock_ingest.assert_called_once()
+        call_kwargs = mock_ingest.call_args[1]
+        assert call_kwargs.get("collection_id") == "col-abc"
+        mock_store.add_document.assert_called_once_with("nb-1", "doc-new")
+
+    def test_422_for_non_pdf(self, client, mock_store):
+        """POST /notebooks/{id}/documents with non-PDF returns 422 (Unprocessable Entity)."""
+        mock_store.get_notebook.return_value = {"id": "nb-1", "r2r_collection_id": "col-abc"}
+        resp = client.post(
+            "/notebooks/nb-1/documents",
+            files={"file": ("evil.exe", io.BytesIO(b"MZ"), "application/octet-stream")},
+        )
+        assert resp.status_code == 422
+        assert "pdf" in resp.json()["detail"].lower()
+
+    def test_404_when_notebook_not_found(self, client, mock_store):
+        """POST /notebooks/{id}/documents returns 404 when notebook doesn't exist."""
+        mock_store.get_notebook.return_value = None
+        resp = client.post(
+            "/notebooks/ghost/documents",
+            files={"file": ("f.pdf", io.BytesIO(b"%PDF"), "application/pdf")},
+        )
+        assert resp.status_code == 404
+        assert "not found" in resp.json()["detail"].lower()
