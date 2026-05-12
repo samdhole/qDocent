@@ -3,13 +3,12 @@ from __future__ import annotations
 
 import json
 import logging
-import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 from langchain_google_genai import ChatGoogleGenerativeAI
 
-from apps.api.services import notebook_store, r2r_client, wiki_store
+from apps.api.services import notebook_store, r2r_client, wiki_store, document_store
 from apps.api.services.wiki_prompts import build_page_prompt, build_structure_prompt
 from apps.api.services.wiki_xml_parser import WikiPageSpec, WikiStructure, parse_wiki_structure_xml
 
@@ -25,20 +24,15 @@ def _make_llm() -> ChatGoogleGenerativeAI:
 
 
 def _build_doc_manifest(notebook_id: str) -> list[dict]:
-    """Build a list of {document_id, source_file, page_count} for all docs in the notebook."""
+    """Build a list of {document_id, source_file} for all docs in the notebook."""
     docs = notebook_store.list_documents(notebook_id)
     manifest = []
     for doc in docs:
         doc_id = doc["document_id"]
-        entry: dict = {"document_id": doc_id, "source_file": doc_id, "page_count": None}
-        # Try to enrich with manifest.json data
-        manifest_path = _DOCS_BASE_PATH / doc_id / "manifest.json"
-        if manifest_path.exists():
-            try:
-                data = json.loads(manifest_path.read_text())
-                entry["source_file"] = data.get("source_file", doc_id)
-            except Exception:
-                pass
+        # Load persisted metadata or fall back to doc_id as source_file
+        persisted = document_store.load_document_manifest(doc_id)
+        source_file = (persisted or {}).get("source_file", doc_id) if persisted else doc_id
+        entry = {"document_id": doc_id, "source_file": source_file}
         manifest.append(entry)
     return manifest
 
@@ -76,7 +70,7 @@ def _generate_page_content(
         log.info("Generated page '%s' for notebook %s", page.slug, notebook_id)
 
     except Exception as exc:
-        log.error("Failed to generate page '%s': %s", page.slug, exc)
+        log.exception("Failed to generate page '%s'", page.slug)
         wiki_store.update_page_content(
             notebook_id, page.slug,
             f"# {page.title}\n\n*Error generating this page: {exc}*"
@@ -144,11 +138,11 @@ def generate_wiki(notebook_id: str, r2r_collection_id: str, job_id: str) -> None
                 slug = futures[future]
                 exc = future.exception()
                 if exc:
-                    log.error("Page generation thread failed for '%s': %s", slug, exc)
+                    log.error("Page generation thread failed for '%s'", slug, exc_info=exc)
 
         wiki_store.update_job(job_id, status="completed")
         log.info("Wiki generation complete for notebook %s", notebook_id)
 
     except Exception as exc:
-        log.error("Wiki generation failed for notebook %s: %s", notebook_id, exc)
+        log.exception("Wiki generation failed for notebook %s", notebook_id)
         wiki_store.update_job(job_id, status="failed", error=str(exc))

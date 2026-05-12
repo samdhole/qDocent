@@ -74,8 +74,13 @@ def parse_wiki_structure_xml(xml: str) -> WikiStructure:
 
     # Parse pages
     pages: list[WikiPageSpec] = []
+    seen_slugs: set[str] = set()
     for page_el in root.findall(".//page"):
         page_id = page_el.get("id", f"page-{len(pages) + 1}")
+        # Skip duplicate slugs, preserving order of first occurrence
+        if page_id in seen_slugs:
+            continue
+        seen_slugs.add(page_id)
         page_title = (page_el.findtext("title") or "Untitled").strip()
         page_desc = (page_el.findtext("description") or "").strip()
         importance = (page_el.findtext("importance") or "medium").strip()

@@ -54,11 +54,10 @@ IMPORTANT:
 def build_structure_prompt(doc_manifest: list[dict]) -> str:
     """Build the LLM prompt to generate wiki XML structure from a document manifest.
 
-    doc_manifest entries: {document_id: str, source_file: str, page_count: int | None}
+    doc_manifest entries: {document_id: str, source_file: str}
     """
     doc_lines = "\n".join(
-        f"- ID: {doc['document_id']}  |  File: {doc.get('source_file', 'unknown')}  "
-        f"|  Pages: {doc.get('page_count', 'unknown')}"
+        f"- ID: {doc['document_id']}  |  File: {doc.get('source_file', 'unknown')}"
         for doc in doc_manifest
     )
     return (
