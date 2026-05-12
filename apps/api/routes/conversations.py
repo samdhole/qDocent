@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from apps.api.services import r2r_agent
+from apps.api.services import conversation_store, r2r_agent
 from apps.api.routes.notebooks import resolve_collection_id
 
 router = APIRouter(prefix="/conversations")
@@ -14,6 +14,8 @@ class CreateConversationRequest(BaseModel):
     """Request body for POST /conversations."""
 
     name: str | None = None
+    notebook_id: str | None = None
+    first_message: str | None = None
 
 
 class CreateConversationResponse(BaseModel):
@@ -36,9 +38,20 @@ def create_conversation(body: CreateConversationRequest) -> CreateConversationRe
     """Create a new conversation and return its ID."""
     try:
         conversation_id = r2r_agent.create_conversation(name=body.name)
+        conversation_store.create_conversation(
+            r2r_conv_id=conversation_id,
+            notebook_id=body.notebook_id,
+            first_message=body.first_message,
+        )
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     return CreateConversationResponse(conversation_id=conversation_id)
+
+
+@router.get("")
+def list_conversations(notebook_id: str | None = None) -> list[dict]:
+    """List conversations, optionally filtered by notebook_id."""
+    return conversation_store.list_conversations(notebook_id=notebook_id)
 
 
 @router.post("/{conversation_id}/messages")
