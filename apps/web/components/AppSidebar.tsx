@@ -3,7 +3,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, BookOpen, FileText, LogOut, MessageSquareText, Moon, Sun, Workflow } from "lucide-react";
+import { BarChart3, BookOpen, FileText, LogOut, MessageSquare, MessageSquareText, Moon, Sun, Workflow } from "lucide-react";
 import { useTheme } from "next-themes";
 
 import { cn } from "@/lib/utils";
@@ -13,6 +13,7 @@ import { Separator } from "@/components/ui/separator";
 const NAV_ITEMS = [
   { href: "/notebooks", label: "Notebooks", icon: BookOpen },
   { href: "/ask", label: "Ask", icon: MessageSquareText },
+  { href: "/conversations", label: "Conversations", icon: MessageSquare },
   { href: "/documents", label: "Documents", icon: FileText },
   { href: "/workflows", label: "Workflows", icon: Workflow },
   { href: "/evals", label: "Evaluations", icon: BarChart3 },

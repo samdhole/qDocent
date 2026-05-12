@@ -85,7 +85,10 @@ export function useConversationStream() {
           const res = await fetch(`${API}/conversations`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({}),
+            body: JSON.stringify({
+              notebook_id: opts?.notebookId,
+              first_message: trimmed,
+            }),
           });
           if (!res.ok) {
             const err = await res.json().catch(() => ({}));
