@@ -31,7 +31,7 @@ export default function ConversationsPage() {
         ]);
         if (convResp.ok) setConversations(await convResp.json());
         if (nbResp.ok) setNotebooks(await nbResp.json());
-      } catch (error) {
+      } catch {
         toast.error('Failed to load conversations — is the API running?');
       } finally {
         setLoading(false);
