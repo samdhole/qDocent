@@ -55,6 +55,7 @@ logs/
 # Vibecoding artifacts
 HANDOFF.md
 docs/
+!docs/licensing.md
 **/CONTEXT.md
 
 # Local config

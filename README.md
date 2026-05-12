@@ -246,3 +246,11 @@ docquery/
 **Approval gate is in-node**: the LangGraph `send_response` node enforces the approval gate by returning `"[Awaiting human approval]"` — no `interrupt_before` or LangGraph checkpointer is required.
 
 **RAGFlow patterns, not RAGFlow**: layout-aware parsing, table normalization, template chunking, and visual citation inspection are borrowed from RAGFlow's design; RAGFlow is not self-hosted.
+
+## Licensing
+
+Most dependencies are MIT or Apache 2.0. The exception is **PyMuPDF** (`pymupdf`),
+which is AGPL-3.0. Closed-source or proprietary deployments require a commercial license
+from [Artifex](https://artifex.com/licensing/).
+
+See [`docs/licensing.md`](docs/licensing.md) for the full dependency license table.
