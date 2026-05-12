@@ -1,0 +1,119 @@
+# pattern: Imperative Shell
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
+
+from apps.api.services import notebook_store
+
+router = APIRouter(prefix="/notebooks", tags=["notebooks"])
+
+
+class NotebookCreate(BaseModel):
+    """Request body for creating a notebook."""
+
+    name: str
+    description: str | None = None
+
+
+class NotebookUpdate(BaseModel):
+    """Request body for updating a notebook."""
+
+    name: str | None = None
+    description: str | None = None
+
+
+@router.get("")
+def list_notebooks() -> list[dict]:
+    """List all notebooks.
+
+    Returns:
+        List of notebook dictionaries, ordered by creation date.
+    """
+    return notebook_store.list_notebooks()
+
+
+@router.post("", status_code=201)
+def create_notebook(body: NotebookCreate) -> dict:
+    """Create a new notebook.
+
+    Args:
+        body: NotebookCreate with name and optional description.
+
+    Returns:
+        Created notebook dictionary with id and r2r_collection_id.
+    """
+    return notebook_store.create_notebook(name=body.name, description=body.description)
+
+
+@router.get("/{notebook_id}")
+def get_notebook(notebook_id: str) -> dict:
+    """Get a notebook by ID.
+
+    Args:
+        notebook_id: ID of the notebook to retrieve.
+
+    Returns:
+        Notebook dictionary.
+
+    Raises:
+        HTTPException: 404 if notebook not found.
+    """
+    nb = notebook_store.get_notebook(notebook_id)
+    if not nb:
+        raise HTTPException(status_code=404, detail="Notebook not found")
+    return nb
+
+
+@router.patch("/{notebook_id}")
+def update_notebook(notebook_id: str, body: NotebookUpdate) -> dict:
+    """Update a notebook.
+
+    Args:
+        notebook_id: ID of the notebook to update.
+        body: NotebookUpdate with fields to change (name, description).
+
+    Returns:
+        Updated notebook dictionary.
+
+    Raises:
+        HTTPException: 404 if notebook not found.
+    """
+    nb = notebook_store.update_notebook(
+        notebook_id,
+        **{k: v for k, v in body.model_dump().items() if v is not None},
+    )
+    if not nb:
+        raise HTTPException(status_code=404, detail="Notebook not found")
+    return nb
+
+
+@router.delete("/{notebook_id}", status_code=204)
+def delete_notebook(notebook_id: str) -> None:
+    """Delete a notebook.
+
+    Args:
+        notebook_id: ID of the notebook to delete.
+
+    Raises:
+        HTTPException: 404 if notebook not found.
+    """
+    deleted = notebook_store.delete_notebook(notebook_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Notebook not found")
+
+
+@router.get("/{notebook_id}/documents")
+def list_notebook_documents(notebook_id: str) -> list[dict]:
+    """List all documents in a notebook.
+
+    Args:
+        notebook_id: ID of the notebook.
+
+    Returns:
+        List of document membership records, ordered by addition date.
+
+    Raises:
+        HTTPException: 404 if notebook not found.
+    """
+    if not notebook_store.get_notebook(notebook_id):
+        raise HTTPException(status_code=404, detail="Notebook not found")
+    return notebook_store.list_documents(notebook_id)
