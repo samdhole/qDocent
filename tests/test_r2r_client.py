@@ -92,7 +92,7 @@ class TestIngestFileWithPipeline:
 
         result = ingest_file_with_pipeline("/tmp/tmpXXXX.pdf", original_filename="report.pdf")
 
-        mock_ingest_chunks.assert_called_once_with(chunks, report)
+        mock_ingest_chunks.assert_called_once_with(chunks, report, collection_id=None)
         mock_save_source.assert_called_once_with(
             "/tmp/tmpXXXX.pdf", document_id="doc", source_file="report.pdf"
         )

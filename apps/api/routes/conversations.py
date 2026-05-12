@@ -5,6 +5,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from apps.api.services import notebook_store, r2r_agent
+from apps.api.routes.notebooks import resolve_collection_id
 
 router = APIRouter(prefix="/conversations")
 
@@ -43,12 +44,7 @@ def create_conversation(body: CreateConversationRequest) -> CreateConversationRe
 @router.post("/{conversation_id}/messages")
 def post_message(conversation_id: str, body: MessageRequest) -> dict:
     """Send a message in a conversation and return the agent response."""
-    collection_id: str | None = None
-    if body.notebook_id:
-        nb = notebook_store.get_notebook(body.notebook_id)
-        if not nb:
-            raise HTTPException(status_code=404, detail="Notebook not found")
-        collection_id = nb.get("r2r_collection_id") or None
+    collection_id = resolve_collection_id(body.notebook_id)
 
     try:
         return r2r_agent.agent_query(
@@ -68,12 +64,7 @@ def post_message_stream(conversation_id: str, body: MessageRequest) -> Streaming
 
     Returns text/event-stream with frames containing status, token, final, or error events.
     """
-    collection_id: str | None = None
-    if body.notebook_id:
-        nb = notebook_store.get_notebook(body.notebook_id)
-        if not nb:
-            raise HTTPException(status_code=404, detail="Notebook not found")
-        collection_id = nb.get("r2r_collection_id") or None
+    collection_id = resolve_collection_id(body.notebook_id)
 
     generator = r2r_agent.agent_stream(
         message=body.message,

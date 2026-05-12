@@ -1,5 +1,6 @@
 # pattern: Imperative Shell
 import os
+import shutil
 import tempfile
 from fastapi import APIRouter, HTTPException, UploadFile, File
 from pydantic import BaseModel
@@ -7,6 +8,19 @@ from pydantic import BaseModel
 from apps.api.services import notebook_store, r2r_client
 
 router = APIRouter(prefix="/notebooks", tags=["notebooks"])
+
+
+def resolve_collection_id(notebook_id: str | None) -> str | None:
+    """Look up r2r_collection_id for notebook_id, raise 404 if not found.
+
+    Returns None if notebook_id is None.
+    """
+    if not notebook_id:
+        return None
+    nb = notebook_store.get_notebook(notebook_id)
+    if not nb:
+        raise HTTPException(status_code=404, detail="Notebook not found")
+    return nb.get("r2r_collection_id") or None
 
 
 class NotebookCreate(BaseModel):
@@ -148,11 +162,17 @@ def ingest_notebook_document(notebook_id: str, file: UploadFile = File(...)) -> 
     if not filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=422, detail="Only PDF files are accepted")
 
-    collection_id = nb.get("r2r_collection_id") or None
+    # Validate PDF magic header to prevent non-PDF files with fake extensions
+    header = file.file.read(5)
+    if header != b"%PDF-":
+        raise HTTPException(status_code=422, detail="File is not a valid PDF (invalid magic header)")
+    file.file.seek(0)  # Rewind to start for the actual ingest
+
+    collection_id = resolve_collection_id(notebook_id)
 
     with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
         tmp_path = tmp.name
-        tmp.write(file.file.read())
+        shutil.copyfileobj(file.file, tmp)
 
     try:
         result = r2r_client.ingest_file_with_pipeline(
