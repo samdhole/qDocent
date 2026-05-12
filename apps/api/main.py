@@ -8,12 +8,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from apps.api.routes import ask, conversations, documents, evals, ingest, reports, workflows
-from apps.api.services import ingest_job_store
+from apps.api.services import ingest_job_store, notebook_store
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     ingest_job_store.mark_stale_running_jobs()
+    notebook_store.migrate_default_notebook()
     yield
 
 
