@@ -3,7 +3,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, FileText, Home, LogOut, MessageSquareText, Moon, Sun, Workflow } from "lucide-react";
+import { BarChart3, BookOpen, FileText, Home, LogOut, MessageSquareText, Moon, Sun, Workflow } from "lucide-react";
 import { useTheme } from "next-themes";
 
 import { cn } from "@/lib/utils";
@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 
 const NAV_ITEMS = [
-  { href: "/", label: "Home", icon: Home },
+  { href: "/notebooks", label: "Notebooks", icon: BookOpen },
   { href: "/ask", label: "Ask", icon: MessageSquareText },
   { href: "/documents", label: "Documents", icon: FileText },
   { href: "/workflows", label: "Workflows", icon: Workflow },
@@ -32,7 +32,7 @@ export function AppSidebar({ onLogout }: Props) {
       <Separator />
       <nav className="flex flex-col gap-1 p-2">
         {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
-          const active = pathname === href || (href !== "/" && pathname.startsWith(href));
+          const active = pathname === href || pathname.startsWith(href);
           return (
             <Button
               key={href}
