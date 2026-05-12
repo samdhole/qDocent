@@ -1,4 +1,4 @@
-// pattern: Functional Core
+// pattern: Imperative Shell
 'use client';
 
 import ReactMarkdown from 'react-markdown';

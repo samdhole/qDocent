@@ -164,11 +164,17 @@ def rag_query(
     }
 
 
-def ingest_file(file_path: str) -> Any:
-    """Ingest a single file into R2R. Returns raw SDK response."""
+def ingest_file(file_path: str, collection_id: str | None = None) -> Any:
+    """Ingest a single file into R2R. Returns raw SDK response.
+
+    When collection_id is provided, adds the document to that collection.
+    """
     try:
         client = get_client()
-        return client.documents.create(file_path=file_path)
+        create_kwargs: dict[str, Any] = {"file_path": file_path}
+        if collection_id:
+            create_kwargs["collection_ids"] = [collection_id]
+        return client.documents.create(**create_kwargs)
     except (httpx.HTTPError, R2RException) as exc:
         raise RuntimeError(f"R2R unavailable: {exc}") from exc
 
@@ -271,7 +277,7 @@ def ingest_file_with_pipeline(
             save_source_pdf(file_path, document_id=document_id, source_file=source_file)
             source_url = f"/documents/{document_id}/source"
     else:  # fallback path: no chunks, pipeline failed, or all chunks filtered invalid
-        r2r_result = ingest_file(file_path)
+        r2r_result = ingest_file(file_path, collection_id=collection_id)
         ingestion_mode = "raw_file_fallback"
         # save source PDF in fallback path when pipeline provided a document_id
         _fallback_doc_id = report.get("document_id")
@@ -289,7 +295,7 @@ def ingest_file_with_pipeline(
     figure_manifest = pipeline_result.get("figure_manifest")
     if figure_manifest:
         try:
-            figure_r2r_result = ingest_file(figure_manifest)
+            figure_r2r_result = ingest_file(figure_manifest, collection_id=collection_id)
             figure_r2r_id = _r2r_document_id_from_response(figure_r2r_result)
             if figure_r2r_id:
                 r2r_document_ids.append(figure_r2r_id)

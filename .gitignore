@@ -19,6 +19,9 @@ data/figures/
 data/documents/
 data/ingest_jobs.db
 data/test_*.db
+data/notebooks.db
+data/wiki.db
+data/conversations.db
 
 # Reports with sensitive content
 reports/private/

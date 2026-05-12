@@ -341,5 +341,5 @@ def migrate_default_notebook() -> None:
                     _r2r_client.add_document_to_r2r_collection(r2r_collection_id, r2r_doc_id)
                 except Exception:
                     logger.warning("Failed to add R2R doc %s to collection", r2r_doc_id)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Failed to migrate manifest %s: %s", manifest_path, e)

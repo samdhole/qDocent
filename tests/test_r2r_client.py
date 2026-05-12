@@ -151,7 +151,7 @@ class TestIngestFileWithPipeline:
         result = ingest_file_with_pipeline("/tmp/tmpXXXX.pdf")
 
         mock_ingest_chunks.assert_called_once()
-        mock_ingest.assert_called_once_with("/data/figures/doc/figures.md")
+        mock_ingest.assert_called_once_with("/data/figures/doc/figures.md", collection_id=None)
         assert result["figures_r2r"] is not None
 
     @mock.patch("apps.api.services.r2r_client.write_document_manifest")
@@ -217,7 +217,7 @@ class TestIngestFileWithPipeline:
 
         result = ingest_file_with_pipeline("/tmp/tmpXXXX.pdf")
 
-        mock_ingest.assert_called_once_with("/tmp/tmpXXXX.pdf")
+        mock_ingest.assert_called_once_with("/tmp/tmpXXXX.pdf", collection_id=None)
         assert result["ingestion_mode"] == "raw_file_fallback"
 
     @mock.patch("apps.api.services.r2r_client.save_source_pdf")
@@ -313,7 +313,7 @@ class TestIngestFileWithPipeline:
 
         result = ingest_file_with_pipeline("/tmp/tmpXXXX.pdf")
 
-        mock_ingest.assert_called_once_with("/tmp/tmpXXXX.pdf")
+        mock_ingest.assert_called_once_with("/tmp/tmpXXXX.pdf", collection_id=None)
         mock_save_source.assert_called_once_with(
             "/tmp/tmpXXXX.pdf", document_id="doc", source_file="test.pdf"
         )
@@ -856,6 +856,80 @@ class TestAddDocumentToR2RCollection:
             mock_get.return_value.collections.add_document.assert_called_once_with(
                 id="col-abc", document_id="r2r-doc-xyz"
             )
+
+
+class TestIngestFileCollectionId:
+    def test_passes_collection_ids_when_provided(self):
+        """IMP-1 regression: ingest_file forwards collection_id to R2R."""
+        with mock.patch("apps.api.services.r2r_client.get_client") as mock_get:
+            mock_get.return_value.documents.create.return_value = mock.Mock()
+            from apps.api.services import r2r_client
+            r2r_client.ingest_file("/tmp/test.pdf", collection_id="col-xyz")
+            call_kwargs = mock_get.return_value.documents.create.call_args[1]
+            assert call_kwargs.get("collection_ids") == ["col-xyz"]
+
+    def test_omits_collection_ids_when_none(self):
+        """IMP-1 regression: ingest_file omits collection_ids when None."""
+        with mock.patch("apps.api.services.r2r_client.get_client") as mock_get:
+            mock_get.return_value.documents.create.return_value = mock.Mock()
+            from apps.api.services import r2r_client
+            r2r_client.ingest_file("/tmp/test.pdf")  # no collection_id
+            call_kwargs = mock_get.return_value.documents.create.call_args[1]
+            assert "collection_ids" not in call_kwargs
+
+
+class TestIngestFileWithPipelineFallbackCollectionId:
+    @mock.patch("apps.api.services.r2r_client.save_source_pdf")
+    @mock.patch("apps.api.services.r2r_client.ingest_file")
+    @mock.patch("apps.api.services.r2r_client.run_pipeline")
+    def test_fallback_path_forwards_collection_id(self, mock_pipeline, mock_ingest, mock_save_source):
+        """IMP-1 regression: fallback ingest_file call includes collection_id."""
+        mock_pipeline.return_value = {
+            "report": {"document_id": "doc1", "source_file": "test.pdf"},
+            "chunks": [],  # Empty chunks trigger fallback
+            "classifier": {},
+            "figures": [],
+            "figure_manifest": None,
+        }
+        mock_ingest.return_value = "ok"
+
+        from apps.api.services.r2r_client import ingest_file_with_pipeline
+
+        result = ingest_file_with_pipeline("/tmp/tmpXXXX.pdf", collection_id="col-xyz")
+
+        # Verify ingest_file was called with collection_id
+        mock_ingest.assert_called_once_with("/tmp/tmpXXXX.pdf", collection_id="col-xyz")
+        assert result["ingestion_mode"] == "raw_file_fallback"
+
+    @mock.patch("apps.api.services.r2r_client.write_document_manifest")
+    @mock.patch("apps.api.services.r2r_client.ingest_file")
+    @mock.patch("apps.api.services.r2r_client.ingest_prechunked_document")
+    @mock.patch("apps.api.services.r2r_client.save_source_pdf")
+    @mock.patch("apps.api.services.r2r_client.run_pipeline")
+    def test_figure_manifest_forwards_collection_id(
+        self, mock_pipeline, mock_save_source, mock_ingest_chunks, mock_ingest, mock_manifest
+    ):
+        """IMP-2 regression: figure manifest ingest includes collection_id."""
+        mock_pipeline.return_value = {
+            "report": {"document_id": "doc", "tables_detected": 0},
+            "chunks": [{"text": "body", "document_id": "doc", "source_file": "test.pdf"}],
+            "classifier": {},
+            "figures": [{"figure_id": "fig1"}],
+            "figure_manifest": "/data/figures/doc/figures.md",
+        }
+        mock_ingest_chunks.return_value = mock.Mock(results=mock.Mock(id="r2r-primary"))
+        mock_ingest.return_value = mock.Mock(results=mock.Mock(id="r2r-figures"))
+
+        from apps.api.services.r2r_client import ingest_file_with_pipeline
+
+        result = ingest_file_with_pipeline("/tmp/tmpXXXX.pdf", collection_id="col-xyz")
+
+        # Verify ingest_file was called with collection_id for figure manifest
+        calls = mock_ingest.call_args_list
+        assert len(calls) == 1
+        assert calls[0][0] == ("/data/figures/doc/figures.md",)
+        assert calls[0][1].get("collection_id") == "col-xyz"
+        assert result["figures_r2r"] is not None
 
 
 class TestIngestPrechunkedDocumentCollectionId:
