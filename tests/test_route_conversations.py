@@ -13,6 +13,15 @@ def client():
     return TestClient(app)
 
 
+@pytest.fixture(autouse=True)
+def mock_conv_store():
+    """Mock conversation_store for all tests to avoid SQLite I/O."""
+    with mock.patch("apps.api.routes.conversations.conversation_store") as m:
+        m.create_conversation.return_value = None
+        m.list_conversations.return_value = []
+        yield m
+
+
 class TestCreateConversation:
     """Test POST /conversations endpoint."""
 
@@ -197,3 +206,47 @@ class TestPostMessageWithNotebook:
                 json={"message": "hello", "notebook_id": "ghost"},
             )
         assert response.status_code == 404
+
+
+class TestListConversations:
+    """Test GET /conversations endpoint."""
+
+    def test_returns_all_conversations(self, client):
+        """GET /conversations returns 200 with conversation list."""
+        with mock.patch(
+            "apps.api.routes.conversations.conversation_store"
+        ) as mock_store:
+            mock_store.list_conversations.return_value = [
+                {
+                    "r2r_conv_id": "conv-1",
+                    "notebook_id": "nb-1",
+                    "title": "Hello there",
+                    "created_at": "2026-05-12T12:00:00+00:00",
+                },
+            ]
+            resp = client.get("/conversations")
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data) == 1
+        assert data[0]["r2r_conv_id"] == "conv-1"
+
+    def test_passes_notebook_id_filter(self, client):
+        """GET /conversations?notebook_id=nb-1 passes filter to store."""
+        with mock.patch(
+            "apps.api.routes.conversations.conversation_store"
+        ) as mock_store:
+            mock_store.list_conversations.return_value = []
+            client.get("/conversations?notebook_id=nb-1")
+            mock_store.list_conversations.assert_called_once_with(notebook_id="nb-1")
+
+    def test_returns_empty_list_when_no_conversations(self, client):
+        """GET /conversations returns 200 with empty list when no conversations."""
+        with mock.patch(
+            "apps.api.routes.conversations.conversation_store"
+        ) as mock_store:
+            mock_store.list_conversations.return_value = []
+            resp = client.get("/conversations")
+
+        assert resp.status_code == 200
+        assert resp.json() == []
