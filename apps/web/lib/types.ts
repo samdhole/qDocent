@@ -117,4 +117,4 @@ export type NotebookDocument = {
   notebook_id: string;
   document_id: string;
   added_at: string;
-};;
+};

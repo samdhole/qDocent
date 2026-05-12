@@ -74,7 +74,11 @@ export default function ConversationView({ notebookId }: { notebookId?: string }
   return (
     <div className="flex flex-col h-full min-h-0">
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-2xl font-semibold">Ask</h1>
+        {notebookId ? (
+          <h2 className="text-2xl font-semibold">Ask</h2>
+        ) : (
+          <h1 className="text-2xl font-semibold">Ask</h1>
+        )}
         <Button
           variant="outline"
           size="sm"

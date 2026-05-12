@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import { toast } from "sonner";
 import ConversationView from "@/components/ConversationView";
 import NotebookHeader from "@/components/NotebookHeader";
 import { Dropzone } from "@/components/Dropzone";
@@ -17,13 +18,15 @@ export default function NotebookPage() {
 
   useEffect(() => {
     if (!notebookId) return;
-    fetch(`${API}/notebooks/${notebookId}`)
+    const ctrl = new AbortController();
+    fetch(`${API}/notebooks/${notebookId}`, { signal: ctrl.signal })
       .then((r) => {
         if (r.status === 404) { setNotFound(true); return null; }
         return r.json();
       })
       .then((data) => { if (data) setNotebook(data as Notebook); })
       .catch(console.error);
+    return () => ctrl.abort();
   }, [notebookId]);
 
   if (notFound) {
@@ -55,12 +58,19 @@ export default function NotebookPage() {
             <Dropzone
               onFiles={async (files) => {
                 for (const file of files) {
-                  const form = new FormData();
-                  form.append("file", file);
-                  await fetch(`${API}/notebooks/${notebookId}/documents`, {
-                    method: "POST",
-                    body: form,
-                  });
+                  try {
+                    const form = new FormData();
+                    form.append("file", file);
+                    const resp = await fetch(`${API}/notebooks/${notebookId}/documents`, {
+                      method: "POST",
+                      body: form,
+                    });
+                    if (!resp.ok) {
+                      toast.error(`Failed to upload ${file.name}: ${resp.status}`);
+                    }
+                  } catch {
+                    toast.error(`Failed to upload ${file.name}`);
+                  }
                 }
               }}
             />

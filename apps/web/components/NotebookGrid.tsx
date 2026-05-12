@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -18,16 +19,15 @@ export default function NotebookGrid() {
   const [newDesc, setNewDesc] = useState("");
   const [creating, setCreating] = useState(false);
 
-  const loadNotebooks = () => {
-    setLoading(true);
-    fetch(`${API}/notebooks`)
+  useEffect(() => {
+    const ctrl = new AbortController();
+    fetch(`${API}/notebooks`, { signal: ctrl.signal })
       .then((r) => r.json())
       .then((data: Notebook[]) => setNotebooks(data))
       .catch(console.error)
       .finally(() => setLoading(false));
-  };
-
-  useEffect(() => { loadNotebooks(); }, []);
+    return () => ctrl.abort();
+  }, []);
 
   const handleCreate = async () => {
     if (!newName.trim()) return;
@@ -42,16 +42,38 @@ export default function NotebookGrid() {
         setShowCreate(false);
         setNewName("");
         setNewDesc("");
-        loadNotebooks();
+        // Reload notebooks
+        const reloadCtrl = new AbortController();
+        fetch(`${API}/notebooks`, { signal: reloadCtrl.signal })
+          .then((r) => r.json())
+          .then((data: Notebook[]) => setNotebooks(data))
+          .catch(console.error);
+      } else {
+        toast.error(`Failed to create notebook: ${resp.status}`);
       }
+    } catch {
+      toast.error("Failed to create notebook");
     } finally {
       setCreating(false);
     }
   };
 
   const handleDelete = async (id: string) => {
-    await fetch(`${API}/notebooks/${id}`, { method: "DELETE" });
-    loadNotebooks();
+    try {
+      const resp = await fetch(`${API}/notebooks/${id}`, { method: "DELETE" });
+      if (!resp.ok) {
+        toast.error(`Failed to delete notebook: ${resp.status}`);
+        return;
+      }
+      // Reload notebooks
+      const reloadCtrl = new AbortController();
+      fetch(`${API}/notebooks`, { signal: reloadCtrl.signal })
+        .then((r) => r.json())
+        .then((data: Notebook[]) => setNotebooks(data))
+        .catch(console.error);
+    } catch {
+      toast.error("Failed to delete notebook");
+    }
   };
 
   if (loading) {

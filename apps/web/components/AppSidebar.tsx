@@ -3,7 +3,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, BookOpen, FileText, Home, LogOut, MessageSquareText, Moon, Sun, Workflow } from "lucide-react";
+import { BarChart3, BookOpen, FileText, LogOut, MessageSquareText, Moon, Sun, Workflow } from "lucide-react";
 import { useTheme } from "next-themes";
 
 import { cn } from "@/lib/utils";
