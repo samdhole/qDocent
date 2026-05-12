@@ -11,6 +11,7 @@ from apps.api.services import ingest_job_ttl
 _DB_PATH: Path = Path("data/ingest_jobs.db")
 _LOCK = Lock()
 _JOB_TTL = timedelta(minutes=60)
+_ALLOWED_UPDATE_COLUMNS: frozenset[str] = frozenset({"status", "result", "error", "updated_at"})
 
 
 def _connect() -> sqlite3.Connection:
@@ -69,6 +70,11 @@ def update_job(job_id: str, **changes: Any) -> None:
     Update a job with the given changes.
     If 'updated_at' is not in changes, auto-stamp it to current time.
     """
+    # Validate that only allowed columns are being updated
+    unknown = set(changes) - _ALLOWED_UPDATE_COLUMNS
+    if unknown:
+        raise ValueError(f"Unknown column(s) for update_job: {unknown}")
+
     if "updated_at" not in changes:
         changes["updated_at"] = _now_iso()
 
