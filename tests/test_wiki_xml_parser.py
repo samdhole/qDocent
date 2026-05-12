@@ -74,6 +74,20 @@ def test_xml_with_no_pages_returns_fallback():
     assert structure.pages[0].title == "Overview"
 
 
+def test_dedup_drops_subsequent_pages_with_same_id():
+    xml = """<wiki_structure>
+      <title>T</title><description>D</description>
+      <pages>
+        <page id="page-1"><title>First</title><description/><importance>high</importance><relevant_files/><related_pages/></page>
+        <page id="page-1"><title>Duplicate</title><description/><importance>low</importance><relevant_files/><related_pages/></page>
+        <page id="page-2"><title>Other</title><description/><importance>medium</importance><relevant_files/><related_pages/></page>
+      </pages>
+    </wiki_structure>"""
+    s = parse_wiki_structure_xml(xml)
+    assert [p.slug for p in s.pages] == ["page-1", "page-2"]
+    assert s.pages[0].title == "First"  # first occurrence wins
+
+
 def test_does_not_raise_on_any_input():
     # Fuzz: should never raise
     for bad_input in ["", "null", "<broken>", "<?xml?>", "<wiki_structure/>"]:

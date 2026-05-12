@@ -1,10 +1,8 @@
 # pattern: Imperative Shell
 from __future__ import annotations
 
-import json
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from pathlib import Path
 
 from langchain_google_genai import ChatGoogleGenerativeAI
 
@@ -15,7 +13,6 @@ from apps.api.services.wiki_xml_parser import WikiPageSpec, WikiStructure, parse
 log = logging.getLogger(__name__)
 
 _GEMINI_MODEL = "gemini-3-flash-preview"
-_DOCS_BASE_PATH = Path("data/documents")
 _MAX_WORKERS = 4
 
 
@@ -31,7 +28,7 @@ def _build_doc_manifest(notebook_id: str) -> list[dict]:
         doc_id = doc["document_id"]
         # Load persisted metadata or fall back to doc_id as source_file
         persisted = document_store.load_document_manifest(doc_id)
-        source_file = (persisted or {}).get("source_file", doc_id) if persisted else doc_id
+        source_file = persisted.get("source_file", doc_id) if persisted else doc_id
         entry = {"document_id": doc_id, "source_file": source_file}
         manifest.append(entry)
     return manifest

@@ -20,7 +20,7 @@ VALID_XML = """<wiki_structure>
 def isolated_stores(tmp_path, monkeypatch):
     monkeypatch.setattr(wiki_store, "_DB_PATH", tmp_path / "wiki.db")
     monkeypatch.setattr(notebook_store, "_DB_PATH", tmp_path / "notebooks.db")
-    monkeypatch.setattr(wiki_generator, "_DOCS_BASE_PATH", tmp_path / "documents")
+    monkeypatch.setattr("apps.api.services.document_store.DOCUMENTS_DIR", tmp_path / "documents")
     # Mock R2R calls on notebook_store (create_notebook calls R2R)
     with mock.patch("apps.api.services.notebook_store._r2r_client") as m:
         m.create_r2r_collection.return_value = "fake-col"
