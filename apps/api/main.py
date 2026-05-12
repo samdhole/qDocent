@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from apps.api.routes import ask, conversations, documents, evals, ingest, notebooks, reports, workflows
+from apps.api.routes import ask, conversations, documents, evals, ingest, notebooks, reports, workflows, wiki
 from apps.api.services import ingest_job_store, notebook_store
 
 
@@ -40,6 +40,7 @@ app.include_router(evals.router)
 app.include_router(notebooks.router)
 app.include_router(reports.router)
 app.include_router(workflows.router)
+app.include_router(wiki.router)
 
 Path("data/figures").mkdir(parents=True, exist_ok=True)
 app.mount("/figures", StaticFiles(directory="data/figures"), name="figures")
