@@ -18,7 +18,7 @@ FastAPI wrapper between the frontend and R2R. Translates HTTP requests into serv
 
 ## Dependencies
 
-- **Uses**: `apps/api/services/` (`r2r_client`, `r2r_agent`, `r2r_client_helpers`, `r2r_chunk_adapter`, `figure_store`, `document_store`, `ragas_runner`, `report_writer`, `ingest_jobs`, `ingest_job_store`, `ingest_job_ttl`); `packages/workflows/` (triage + email-draft graphs); `packages/ingestion/` (run_pipeline)
+- **Uses**: `apps/api/services/` (`r2r_client`, `r2r_agent`, `r2r_client_helpers`, `r2r_chunk_adapter`, `figure_store`, `document_store`, `ragas_runner`, `report_writer`, `ingest_jobs`, `ingest_job_store`, `ingest_job_ttl`, `notebook_store`, `notebook_helpers`); `packages/workflows/` (triage + email-draft graphs); `packages/ingestion/` (run_pipeline)
 - **Used by**: `apps/web/` frontend only — never called directly from ingestion or eval packages
 - **Boundary**: routes import from `services/` only; services import from packages; routes never import `r2r` SDK or package internals directly
 

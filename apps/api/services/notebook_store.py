@@ -1,11 +1,14 @@
 # pattern: Imperative Shell
 import json
+import logging
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 from threading import Lock
 
 from apps.api.services.notebook_helpers import generate_notebook_id
+
+logger = logging.getLogger(__name__)
 
 _DB_PATH: Path = Path("data/notebooks.db")
 _DOCS_BASE_PATH: Path = Path("data/documents")
@@ -35,7 +38,7 @@ def _ensure_tables(conn: sqlite3.Connection) -> None:
         """
         CREATE TABLE IF NOT EXISTS notebooks (
             id               TEXT PRIMARY KEY,
-            name             TEXT NOT NULL,
+            name             TEXT NOT NULL UNIQUE,
             description      TEXT,
             r2r_collection_id TEXT NOT NULL DEFAULT '',
             created_at       TEXT NOT NULL,
@@ -273,19 +276,41 @@ def list_documents(notebook_id: str) -> list[dict]:
 def migrate_default_notebook() -> None:
     """Idempotent startup hook: assign all pre-existing documents to Default Notebook.
 
-    Creates "Default Notebook" in SQLite if not already present, then walks
-    _DOCS_BASE_PATH/*/manifest.json and inserts each document_id into
+    Creates "Default Notebook" in SQLite if not already present (INSERT OR IGNORE
+    prevents race conditions where two processes try to create it simultaneously),
+    then walks _DOCS_BASE_PATH/*/manifest.json and inserts each document_id into
     notebook_documents (INSERT OR IGNORE guarantees idempotency).
 
     r2r_collection_id is set to '' here; Phase 2 extends this to create the
     real R2R collection and populate the field.
     """
-    existing = list_notebooks()
-    if any(n["name"] == "Default Notebook" for n in existing):
-        notebook_id = next(n["id"] for n in existing if n["name"] == "Default Notebook")
-    else:
-        nb = create_notebook(name="Default Notebook", description="Auto-created on upgrade")
-        notebook_id = nb["id"]
+    # Use INSERT OR IGNORE to handle race condition where two processes
+    # try to create the Default Notebook simultaneously.
+    default_nb_id = generate_notebook_id()
+    now = _now_iso()
+    with _LOCK:
+        conn = _connect()
+        try:
+            _ensure_tables(conn)
+            conn.execute(
+                """
+                INSERT OR IGNORE INTO notebooks (id, name, description, r2r_collection_id, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (default_nb_id, "Default Notebook", "Auto-created on upgrade", "", now, now),
+            )
+            conn.commit()
+            # Always look up by name to get the actual ID (whether we just created it or it already existed)
+            row = conn.execute(
+                "SELECT id FROM notebooks WHERE name = ?", ("Default Notebook",)
+            ).fetchone()
+            notebook_id = row["id"] if row else None
+        finally:
+            conn.close()
+
+    if not notebook_id:
+        logger.warning("Failed to create or retrieve Default Notebook")
+        return
 
     manifests = sorted(_DOCS_BASE_PATH.glob("*/manifest.json"))
     for manifest_path in manifests:
@@ -294,5 +319,5 @@ def migrate_default_notebook() -> None:
             doc_id = data.get("document_id")
             if doc_id:
                 add_document(notebook_id, doc_id)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Failed to migrate manifest %s: %s", manifest_path, e)
