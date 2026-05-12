@@ -13,12 +13,17 @@ _LOCK = Lock()
 _JOB_TTL = timedelta(minutes=60)
 
 
-def _ensure_table(conn: sqlite3.Connection) -> None:
-    """Create the jobs table if it doesn't exist.
+def _connect() -> sqlite3.Connection:
+    """Open a connection to the ingest jobs database.
 
-    Ensures parent directory exists before creating the database file.
+    Ensures the parent directory exists before opening the connection.
     """
     _DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    return sqlite3.connect(str(_DB_PATH))
+
+
+def _ensure_table(conn: sqlite3.Connection) -> None:
+    """Create the jobs table if it doesn't exist."""
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS jobs (
@@ -44,7 +49,7 @@ def create_job(job_id: str, filename: str) -> None:
     """Create a new ingest job with status=queued."""
     now = _now_iso()
     with _LOCK:
-        conn = sqlite3.connect(str(_DB_PATH))
+        conn = _connect()
         try:
             _ensure_table(conn)
             conn.execute(
@@ -80,7 +85,7 @@ def update_job(job_id: str, **changes: Any) -> None:
     values.append(job_id)
 
     with _LOCK:
-        conn = sqlite3.connect(str(_DB_PATH))
+        conn = _connect()
         try:
             _ensure_table(conn)
             query = f"UPDATE jobs SET {', '.join(set_clauses)} WHERE job_id = ?"
@@ -96,7 +101,7 @@ def get_job(job_id: str) -> dict[str, Any] | None:
     Returns None if job doesn't exist or if it's an expired terminal job (evicted).
     """
     with _LOCK:
-        conn = sqlite3.connect(str(_DB_PATH))
+        conn = _connect()
         conn.row_factory = sqlite3.Row
         try:
             _ensure_table(conn)
@@ -134,7 +139,7 @@ def mark_stale_running_jobs() -> None:
     """
     now = _now_iso()
     with _LOCK:
-        conn = sqlite3.connect(str(_DB_PATH))
+        conn = _connect()
         try:
             _ensure_table(conn)
             conn.execute(
