@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from apps.api.services import r2r_agent
+from apps.api.services import notebook_store, r2r_agent
 
 router = APIRouter(prefix="/conversations")
 
@@ -27,6 +27,7 @@ class MessageRequest(BaseModel):
     message: str
     doc_only: bool = False
     document_ids: list[str] | None = None
+    notebook_id: str | None = None
 
 
 @router.post("", response_model=CreateConversationResponse)
@@ -42,12 +43,20 @@ def create_conversation(body: CreateConversationRequest) -> CreateConversationRe
 @router.post("/{conversation_id}/messages")
 def post_message(conversation_id: str, body: MessageRequest) -> dict:
     """Send a message in a conversation and return the agent response."""
+    collection_id: str | None = None
+    if body.notebook_id:
+        nb = notebook_store.get_notebook(body.notebook_id)
+        if not nb:
+            raise HTTPException(status_code=404, detail="Notebook not found")
+        collection_id = nb.get("r2r_collection_id") or None
+
     try:
         return r2r_agent.agent_query(
             message=body.message,
             conversation_id=conversation_id,
             doc_only=body.doc_only,
             document_ids=body.document_ids,
+            collection_id=collection_id,
         )
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
@@ -59,11 +68,19 @@ def post_message_stream(conversation_id: str, body: MessageRequest) -> Streaming
 
     Returns text/event-stream with frames containing status, token, final, or error events.
     """
+    collection_id: str | None = None
+    if body.notebook_id:
+        nb = notebook_store.get_notebook(body.notebook_id)
+        if not nb:
+            raise HTTPException(status_code=404, detail="Notebook not found")
+        collection_id = nb.get("r2r_collection_id") or None
+
     generator = r2r_agent.agent_stream(
         message=body.message,
         conversation_id=conversation_id,
         doc_only=body.doc_only,
         document_ids=body.document_ids,
+        collection_id=collection_id,
     )
     return StreamingResponse(
         generator,
