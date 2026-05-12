@@ -130,3 +130,70 @@ class TestPostMessageStream:
 
             assert response.status_code == 200
             assert "R2R unavailable" in response.text
+
+
+class TestPostMessageWithNotebook:
+    """Test POST /conversations/{conversation_id}/messages with notebook_id."""
+
+    def test_scoped_message_passes_collection_id(self, client):
+        """POST /conversations/{id}/messages with notebook_id passes collection_id to agent_query."""
+        fake_nb = {"id": "nb-1", "r2r_collection_id": "col-xyz"}
+        fake_result = {"answer": "scoped", "citations": []}
+
+        with mock.patch("apps.api.routes.conversations.notebook_store.get_notebook", return_value=fake_nb), \
+             mock.patch("apps.api.routes.conversations.r2r_agent.agent_query", return_value=fake_result) as mock_agent:
+            response = client.post(
+                "/conversations/conv-abc/messages",
+                json={"message": "hello", "notebook_id": "nb-1"},
+            )
+
+        assert response.status_code == 200
+        call_kwargs = mock_agent.call_args[1]
+        assert call_kwargs.get("collection_id") == "col-xyz"
+
+    def test_unscoped_message_no_collection_id(self, client):
+        """POST /conversations/{id}/messages without notebook_id passes collection_id=None."""
+        fake_result = {"answer": "unscoped", "citations": []}
+        with mock.patch("apps.api.routes.conversations.r2r_agent.agent_query", return_value=fake_result) as mock_agent:
+            response = client.post(
+                "/conversations/conv-abc/messages",
+                json={"message": "hello"},
+            )
+        assert response.status_code == 200
+        call_kwargs = mock_agent.call_args[1]
+        assert call_kwargs.get("collection_id") is None
+
+    def test_message_with_unknown_notebook_returns_404(self, client):
+        """POST /conversations/{id}/messages with non-existent notebook_id returns 404."""
+        with mock.patch("apps.api.routes.conversations.notebook_store.get_notebook", return_value=None):
+            response = client.post(
+                "/conversations/conv-abc/messages",
+                json={"message": "hello", "notebook_id": "ghost"},
+            )
+        assert response.status_code == 404
+
+    def test_scoped_message_stream_passes_collection_id(self, client):
+        """POST /conversations/{id}/messages/stream with notebook_id passes collection_id to agent_stream."""
+        fake_nb = {"id": "nb-2", "r2r_collection_id": "col-stream"}
+
+        with mock.patch("apps.api.routes.conversations.notebook_store.get_notebook", return_value=fake_nb), \
+             mock.patch("apps.api.routes.conversations.r2r_agent.agent_stream") as mock_stream:
+            mock_stream.return_value = iter([f'data: {{"type":"status"}}\n\n'])
+
+            response = client.post(
+                "/conversations/conv-stream/messages/stream",
+                json={"message": "hello", "notebook_id": "nb-2"},
+            )
+
+        assert response.status_code == 200
+        call_kwargs = mock_stream.call_args[1]
+        assert call_kwargs.get("collection_id") == "col-stream"
+
+    def test_message_stream_with_unknown_notebook_returns_404(self, client):
+        """POST /conversations/{id}/messages/stream with non-existent notebook_id returns 404."""
+        with mock.patch("apps.api.routes.conversations.notebook_store.get_notebook", return_value=None):
+            response = client.post(
+                "/conversations/conv-abc/messages/stream",
+                json={"message": "hello", "notebook_id": "ghost"},
+            )
+        assert response.status_code == 404
