@@ -1,18 +1,8 @@
 # pattern: Test suite for ingest_job_store imperative shell
-import pytest
 import json
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
 
 from apps.api.services import ingest_job_store
-
-
-@pytest.fixture(autouse=True)
-def temp_db(tmp_path, monkeypatch):
-    """Redirect _DB_PATH to a temp SQLite file for all tests."""
-    db_file = tmp_path / "test_jobs.db"
-    monkeypatch.setattr("apps.api.services.ingest_job_store._DB_PATH", db_file)
-    yield db_file
 
 
 class TestCreateAndGet:

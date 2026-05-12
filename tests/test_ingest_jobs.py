@@ -2,17 +2,7 @@
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-import pytest
-
 from apps.api.services import ingest_jobs, ingest_job_store
-
-
-@pytest.fixture(autouse=True)
-def temp_db(tmp_path, monkeypatch):
-    """Redirect ingest_job_store._DB_PATH to a temporary test database."""
-    db_file = tmp_path / "test_jobs.db"
-    monkeypatch.setattr("apps.api.services.ingest_job_store._DB_PATH", db_file)
-    yield db_file
 
 
 def test_ingest_job_completes_with_result(tmp_path):

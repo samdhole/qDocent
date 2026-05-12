@@ -14,7 +14,11 @@ _JOB_TTL = timedelta(minutes=60)
 
 
 def _ensure_table(conn: sqlite3.Connection) -> None:
-    """Create the jobs table if it doesn't exist."""
+    """Create the jobs table if it doesn't exist.
+
+    Ensures parent directory exists before creating the database file.
+    """
+    _DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS jobs (
