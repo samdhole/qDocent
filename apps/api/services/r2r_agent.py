@@ -41,9 +41,20 @@ def _apply_doc_only_check(result: dict[str, Any], doc_only: bool) -> dict[str, A
     return result
 
 
-def _build_search_settings(document_ids: list[str] | None) -> dict[str, Any]:
-    """Return search settings with an optional combined multi-document filter."""
+def _build_search_settings(
+    document_ids: list[str] | None,
+    collection_id: str | None = None,
+) -> dict[str, Any]:
+    """Return search settings with optional collection or document-level filter.
+
+    collection_id takes priority: when set, filters by R2R collection using
+    $overlap (R2R 3.6.x array operator). document_ids filter is only applied
+    when no collection_id is given.
+    """
     settings = dict(DEFAULT_SEARCH_SETTINGS)
+    if collection_id:
+        settings["filters"] = {"collection_ids": {"$overlap": [collection_id]}}
+        return settings
     if not document_ids:
         return settings
     combined_r2r_ids: list[str] = []
@@ -81,6 +92,7 @@ def agent_query(
     conversation_id: str,
     doc_only: bool = False,
     document_ids: list[str] | None = None,
+    collection_id: str | None = None,
 ) -> dict[str, Any]:
     """Send one user message in a conversation. Returns the same response
     shape as r2r_client.rag_query() so the frontend can render it identically.
@@ -88,7 +100,7 @@ def agent_query(
     When doc_only=True, applies post-hoc check: if retrieval is empty or low-confidence,
     replaces answer with strict "I couldn't find this in your documents." string.
     """
-    search_settings = _build_search_settings(document_ids)
+    search_settings = _build_search_settings(document_ids, collection_id)
     try:
         response = get_client().retrieval.agent(
             message={"role": "user", "content": message},
@@ -226,6 +238,7 @@ def agent_stream(
     conversation_id: str,
     doc_only: bool = False,
     document_ids: list[str] | None = None,
+    collection_id: str | None = None,
 ) -> Generator[str, None, None]:
     """Stream agent events as SSE-formatted strings.
 
@@ -240,7 +253,7 @@ def agent_stream(
 
     When doc_only=True, applies post-hoc check to final frame (same as agent_query).
     """
-    search_settings = _build_search_settings(document_ids)
+    search_settings = _build_search_settings(document_ids, collection_id)
     try:
         stream = get_client().retrieval.agent(
             message={"role": "user", "content": message},
