@@ -57,6 +57,7 @@ docs/
 **/CONTEXT.md
 
 # Local config
+r2r_gemini.toml
 .gitignore
 .claude/
 **/CLAUDE.md

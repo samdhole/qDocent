@@ -114,6 +114,9 @@ LOG_LEVEL=INFO
 
 ## R2R startup modes
 
+> **First-time setup:** Copy `r2r_gemini.toml.example` → `r2r_gemini.toml` and set a real
+> `default_admin_password` before starting R2R. Never commit `r2r_gemini.toml` — it is gitignored.
+
 **Light mode** (fastest, no Docker):
 
 ```bash

@@ -1,0 +1,45 @@
+[app]
+fast_llm = "gemini/gemini-3-flash-preview"
+quality_llm = "gemini/gemini-3-flash-preview"
+vlm = "gemini/gemini-3-flash-preview"
+reasoning_llm = "gemini/gemini-3-flash-preview"
+planning_llm = "gemini/gemini-3-flash-preview"
+
+[auth]
+provider = "r2r"
+access_token_lifetime_in_minutes = 60
+refresh_token_lifetime_in_days = 7
+require_authentication = true
+require_email_verification = true
+default_admin_email = "admin@example.com"
+default_admin_password = "CHANGE_ME"
+
+[completion]
+provider = "r2r"
+concurrent_request_limit = 32
+
+  [completion.generation_config]
+  temperature = 0.1
+  top_p = 1
+  max_tokens_to_sample = 4096
+  stream = false
+
+[embedding]
+provider = "litellm"
+base_model = "gemini/gemini-embedding-001"
+base_dimension = 3072
+batch_size = 32
+concurrent_request_limit = 32
+
+[completion_embedding]
+provider = "litellm"
+base_model = "gemini/gemini-embedding-001"
+base_dimension = 3072
+batch_size = 32
+concurrent_request_limit = 32
+
+[agent]
+rag_agent_static_prompt = "static_rag_agent"
+rag_agent_dynamic_prompt = "dynamic_rag_agent"
+rag_tools = ["search_file_descriptions", "search_file_knowledge", "get_file_content"]
+research_tools = ["rag", "reasoning", "critique", "python_executor"]
