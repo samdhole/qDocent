@@ -1,4 +1,4 @@
-.PHONY: setup r2r api web smoke ingest eval demo-check clean
+.PHONY: setup r2r api web smoke ingest eval demo-check clean test
 
 setup:
 	uv venv .venv
@@ -31,3 +31,6 @@ clean:
 	rm -rf reports/evals/*.csv
 	rm -rf reports/evals/*.json
 	rm -rf reports/evals/*.md
+test:
+	uv run python -m pytest tests/ -v
+	cd apps/web && npm test
