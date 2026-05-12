@@ -1,5 +1,6 @@
 import json
 import pytest
+from unittest import mock
 from apps.api.services import notebook_store
 
 
@@ -9,12 +10,23 @@ def isolated_notebook_db(tmp_path, monkeypatch):
     monkeypatch.setattr(notebook_store, "_DOCS_BASE_PATH", tmp_path / "documents")
 
 
+@pytest.fixture(autouse=True)
+def mock_r2r(monkeypatch):
+    """Prevent notebook_store from calling real R2R in any test."""
+    with mock.patch("apps.api.services.notebook_store._r2r_client") as m:
+        m.create_r2r_collection.return_value = "fake-collection-id"
+        m.delete_r2r_collection.return_value = None
+        m.add_document_to_r2r_collection.return_value = None
+        yield m
+
+
 class TestNotebookCRUD:
     def test_create_and_get(self):
         nb = notebook_store.create_notebook("My NB", "A description")
         assert nb["id"]
         assert nb["name"] == "My NB"
         assert nb["description"] == "A description"
+        assert nb["r2r_collection_id"] == "fake-collection-id"
         fetched = notebook_store.get_notebook(nb["id"])
         assert fetched == nb
 
@@ -134,3 +146,30 @@ class TestMigration:
         assert len(notebooks) == 1
         assert notebooks[0]["name"] == "Default Notebook"
         assert notebook_store.list_documents(notebooks[0]["id"]) == []
+
+    def test_migration_creates_r2r_collection(self, mock_r2r):
+        notebook_store.migrate_default_notebook()
+        mock_r2r.create_r2r_collection.assert_called_once_with("Default Notebook")
+
+    def test_migration_calls_add_document_for_each_r2r_id(self, tmp_path, monkeypatch, mock_r2r):
+        docs_base = tmp_path / "documents"
+        monkeypatch.setattr(notebook_store, "_DOCS_BASE_PATH", docs_base)
+        self._write_manifest(docs_base, "doc-001", ["r2r-uuid-1", "r2r-uuid-2"])
+
+        notebook_store.migrate_default_notebook()
+
+        calls = mock_r2r.add_document_to_r2r_collection.call_args_list
+        r2r_ids_added = [c[0][1] for c in calls]  # second positional arg
+        assert "r2r-uuid-1" in r2r_ids_added
+        assert "r2r-uuid-2" in r2r_ids_added
+
+    def test_migration_idempotent_creates_collection_once(self, mock_r2r):
+        notebook_store.migrate_default_notebook()
+        notebook_store.migrate_default_notebook()
+        # On second call, collection already has a real id — should NOT create again
+        assert mock_r2r.create_r2r_collection.call_count == 1
+
+    def test_delete_notebook_deletes_r2r_collection_not_documents(self, mock_r2r):
+        nb = notebook_store.create_notebook("To Delete")
+        notebook_store.delete_notebook(nb["id"])
+        mock_r2r.delete_r2r_collection.assert_called_once_with("fake-collection-id")
