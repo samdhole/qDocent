@@ -12,7 +12,12 @@ from dotenv import load_dotenv
 from r2r import R2RClient
 from shared.abstractions.exception import R2RException
 
-from apps.api.services.document_store import save_source_pdf, write_chunks_manifest, write_document_manifest
+from apps.api.services.document_store import (
+    load_document_manifest,
+    save_source_pdf,
+    write_chunks_manifest,
+    write_document_manifest,
+)
 from apps.api.services.figure_store import figures_for_response
 from apps.api.services.r2r_chunk_adapter import (
     chunks_for_r2r,
@@ -36,13 +41,53 @@ def get_client() -> R2RClient:
     return R2RClient(base_url=_BASE_URL)
 
 
-def rag_query(query: str) -> dict[str, Any]:
-    """Ask a RAG question. Returns structured dict for the /ask route."""
+def create_r2r_collection(name: str) -> str:
+    """Create a new R2R collection and return its collection ID string."""
+    client = get_client()
+    response = client.collections.create(name=name)
+    return str(response.results.id)
+
+
+def delete_r2r_collection(collection_id: str) -> None:
+    """Delete an R2R collection. Does NOT delete documents from R2R storage."""
+    client = get_client()
+    client.collections.delete(id=collection_id)
+
+
+def add_document_to_r2r_collection(collection_id: str, r2r_document_id: str) -> None:
+    """Associate an already-ingested R2R document with a collection."""
+    client = get_client()
+    client.collections.add_document(id=collection_id, document_id=r2r_document_id)
+
+
+def rag_query(
+    query: str,
+    document_ids: list[str] | None = None,
+    collection_id: str | None = None,
+) -> dict[str, Any]:
+    """Ask a RAG question. Returns structured dict for the /ask route.
+
+    When collection_id is provided, filters retrieval to that collection using $overlap.
+    When document_ids is provided and collection_id is None, filters by document IDs.
+    collection_id takes precedence over document_ids when both are set.
+    """
+    search_settings = dict(DEFAULT_SEARCH_SETTINGS)
+    if collection_id:
+        search_settings["filters"] = {"collection_ids": {"$overlap": [collection_id]}}
+    elif document_ids:
+        combined_r2r_ids: list[str] = []
+        for doc_id in document_ids:
+            manifest = load_document_manifest(doc_id)
+            r2r_ids = (manifest or {}).get("r2r_document_ids") or []
+            combined_r2r_ids.extend(r2r_ids)
+        if combined_r2r_ids:
+            search_settings["filters"] = {"document_id": {"$in": combined_r2r_ids}}
+
     try:
         client = get_client()
         response = client.retrieval.rag(
             query=query,
-            search_settings=DEFAULT_SEARCH_SETTINGS,
+            search_settings=search_settings,
         )
     except (httpx.HTTPError, R2RException) as exc:
         raise RuntimeError(f"R2R unavailable: {exc}") from exc
@@ -146,8 +191,15 @@ def delete_r2r_documents(document_ids: list[str]) -> dict[str, list[str]]:
     return {"deleted": deleted, "failed": failed}
 
 
-def ingest_prechunked_document(chunks: list[dict[str, Any]], report: dict[str, Any]) -> Any:
-    """Ingest DocQuery-produced chunks into R2R so retrieval keeps citation headers."""
+def ingest_prechunked_document(
+    chunks: list[dict[str, Any]],
+    report: dict[str, Any],
+    collection_id: str | None = None,
+) -> Any:
+    """Ingest DocQuery-produced chunks into R2R so retrieval keeps citation headers.
+
+    When collection_id is provided, adds the document to that collection.
+    """
     try:
         client = get_client()
         metadata = {
@@ -155,10 +207,13 @@ def ingest_prechunked_document(chunks: list[dict[str, Any]], report: dict[str, A
             "source_file": report.get("source_file"),
             "ingestion_mode": "docquery_pre_chunked",
         }
-        return client.documents.create(
-            chunks=chunks_for_r2r(chunks),
-            metadata=metadata,  # pass None values — R2R accepts them; preserves key presence for introspection
-        )
+        create_kwargs: dict[str, Any] = {
+            "chunks": chunks_for_r2r(chunks),
+            "metadata": metadata,  # pass None values — R2R accepts them; preserves key presence for introspection
+        }
+        if collection_id:
+            create_kwargs["collection_ids"] = [collection_id]
+        return client.documents.create(**create_kwargs)
     except (httpx.HTTPError, R2RException) as exc:
         raise RuntimeError(f"R2R unavailable: {exc}") from exc
 

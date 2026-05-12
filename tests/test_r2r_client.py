@@ -829,6 +829,125 @@ class TestRagQueryFigures:
         assert result["citations"][0]["chunk_index"] is None
 
 
+class TestCreateR2RCollection:
+    def test_returns_collection_id_string(self):
+        with mock.patch("apps.api.services.r2r_client.get_client") as mock_get:
+            fake_id = "abc-123-uuid"
+            mock_get.return_value.collections.create.return_value.results.id = fake_id
+            from apps.api.services import r2r_client
+            result = r2r_client.create_r2r_collection("My Notebook")
+            assert result == fake_id
+            mock_get.return_value.collections.create.assert_called_once_with(name="My Notebook")
+
+
+class TestDeleteR2RCollection:
+    def test_calls_delete_with_id_keyword(self):
+        with mock.patch("apps.api.services.r2r_client.get_client") as mock_get:
+            from apps.api.services import r2r_client
+            r2r_client.delete_r2r_collection("col-999")
+            mock_get.return_value.collections.delete.assert_called_once_with(id="col-999")
+
+
+class TestAddDocumentToR2RCollection:
+    def test_calls_add_document(self):
+        with mock.patch("apps.api.services.r2r_client.get_client") as mock_get:
+            from apps.api.services import r2r_client
+            r2r_client.add_document_to_r2r_collection("col-abc", "r2r-doc-xyz")
+            mock_get.return_value.collections.add_document.assert_called_once_with(
+                id="col-abc", document_id="r2r-doc-xyz"
+            )
+
+
+class TestIngestPrechunkedDocumentCollectionId:
+    def test_passes_collection_ids_when_provided(self, tmp_path):
+        # Minimal valid chunks/report to satisfy function internals
+        with mock.patch("apps.api.services.r2r_client.get_client") as mock_get, \
+             mock.patch("apps.api.services.r2r_client.write_document_manifest"), \
+             mock.patch("apps.api.services.r2r_client.write_chunks_manifest"), \
+             mock.patch("apps.api.services.r2r_client.save_source_pdf"):
+            mock_get.return_value.documents.create.return_value = mock.Mock()
+            chunks = [{"chunk_index": 0, "text": "hello", "document_id": "d1",
+                       "source_file": "f.pdf", "page_start": 1, "page_end": 1,
+                       "section_path": "", "bbox": None}]
+            report = {"document_id": "d1", "source_file": "f.pdf", "source_pdf_path": str(tmp_path / "f.pdf")}
+            (tmp_path / "f.pdf").write_bytes(b"%PDF")
+            from apps.api.services import r2r_client
+            r2r_client.ingest_prechunked_document(chunks, report, collection_id="col-abc")
+            call_kwargs = mock_get.return_value.documents.create.call_args[1]
+            assert call_kwargs.get("collection_ids") == ["col-abc"]
+
+    def test_omits_collection_ids_when_none(self, tmp_path):
+        with mock.patch("apps.api.services.r2r_client.get_client") as mock_get, \
+             mock.patch("apps.api.services.r2r_client.write_document_manifest"), \
+             mock.patch("apps.api.services.r2r_client.write_chunks_manifest"), \
+             mock.patch("apps.api.services.r2r_client.save_source_pdf"):
+            mock_get.return_value.documents.create.return_value = mock.Mock()
+            chunks = [{"chunk_index": 0, "text": "hello", "document_id": "d1",
+                       "source_file": "f.pdf", "page_start": 1, "page_end": 1,
+                       "section_path": "", "bbox": None}]
+            report = {"document_id": "d1", "source_file": "f.pdf", "source_pdf_path": str(tmp_path / "f.pdf")}
+            (tmp_path / "f.pdf").write_bytes(b"%PDF")
+            from apps.api.services import r2r_client
+            r2r_client.ingest_prechunked_document(chunks, report)  # no collection_id
+            call_kwargs = mock_get.return_value.documents.create.call_args[1]
+            assert "collection_ids" not in call_kwargs
+
+
+class TestRagQueryCollectionId:
+    def test_applies_overlap_filter_when_collection_id_provided(self):
+        with mock.patch("apps.api.services.r2r_client.get_client") as mock_get:
+            fake = mock.Mock()
+            fake.results.generated_answer = "answer"
+            fake.results.search_results.chunk_search_results = []
+            mock_get.return_value.retrieval.rag.return_value = fake
+            from apps.api.services import r2r_client
+            r2r_client.rag_query("test question", collection_id="col-xyz")
+            call_kwargs = mock_get.return_value.retrieval.rag.call_args[1]
+            filters = call_kwargs["search_settings"]["filters"]
+            assert filters == {"collection_ids": {"$overlap": ["col-xyz"]}}
+
+    def test_no_filter_when_collection_id_none(self):
+        with mock.patch("apps.api.services.r2r_client.get_client") as mock_get:
+            fake = mock.Mock()
+            fake.results.generated_answer = "answer"
+            fake.results.search_results.chunk_search_results = []
+            mock_get.return_value.retrieval.rag.return_value = fake
+            from apps.api.services import r2r_client
+            r2r_client.rag_query("test question")  # no collection_id, no document_ids
+            call_kwargs = mock_get.return_value.retrieval.rag.call_args[1]
+            assert "filters" not in call_kwargs.get("search_settings", {})
+
+    def test_document_ids_applies_document_filter(self):
+        with mock.patch("apps.api.services.r2r_client.get_client") as mock_get, \
+             mock.patch("apps.api.services.r2r_client.load_document_manifest") as mock_manifest:
+            mock_manifest.return_value = {"r2r_document_ids": ["r2r-001", "r2r-002"]}
+            fake = mock.Mock()
+            fake.results.generated_answer = "answer"
+            fake.results.search_results.chunk_search_results = []
+            mock_get.return_value.retrieval.rag.return_value = fake
+            from apps.api.services import r2r_client
+            r2r_client.rag_query("q", document_ids=["doc-1"])
+            call_kwargs = mock_get.return_value.retrieval.rag.call_args[1]
+            assert call_kwargs["search_settings"]["filters"] == {
+                "document_id": {"$in": ["r2r-001", "r2r-002"]}
+            }
+
+    def test_collection_id_takes_precedence_over_document_ids(self):
+        with mock.patch("apps.api.services.r2r_client.get_client") as mock_get, \
+             mock.patch("apps.api.services.r2r_client.load_document_manifest") as mock_manifest:
+            mock_manifest.return_value = {"r2r_document_ids": ["r2r-001"]}
+            fake = mock.Mock()
+            fake.results.generated_answer = "answer"
+            fake.results.search_results.chunk_search_results = []
+            mock_get.return_value.retrieval.rag.return_value = fake
+            from apps.api.services import r2r_client
+            r2r_client.rag_query("q", document_ids=["doc-1"], collection_id="col-xyz")
+            call_kwargs = mock_get.return_value.retrieval.rag.call_args[1]
+            assert call_kwargs["search_settings"]["filters"] == {
+                "collection_ids": {"$overlap": ["col-xyz"]}
+            }
+
+
 class TestRagQueryBracketRewrite:
     @mock.patch("apps.api.services.r2r_client.figures_for_response", return_value=[])
     @mock.patch("apps.api.services.r2r_client.get_client")

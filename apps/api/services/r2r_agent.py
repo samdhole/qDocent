@@ -280,11 +280,13 @@ def agent_stream(
             elif event_type == "FinalAnswerEvent":
                 # The final event contains the assembled answer + citations.
                 payload = _event_payload(event)
+                final_data = payload.get("data") or {}
                 adapted = _adapt_final_event(
                     question=message,
                     payload=payload,
                     fallback_text="".join(full_text_parts),
                     search_results=last_search_results,
+                    final_answer_citations=final_data.get("citations") or [],
                 )
                 adapted = _apply_doc_only_check(adapted, doc_only)
                 yield _sse({"type": "final", "result": adapted})
@@ -328,12 +330,18 @@ def _adapt_final_event(
     payload: dict[str, Any],
     fallback_text: str,
     search_results: dict[str, Any],
+    final_answer_citations: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Build the same dict shape `agent_query` returns, from streaming events.
 
     Re-uses the citation/header/figure logic from _adapt_agent_response by
     constructing a synthetic 'response' object — keeps the adapter logic in
     one place (DRY).
+
+    R2R no longer emits SearchResultsEvent in the streaming path; citation data
+    arrives via CitationEvent / FinalAnswerEvent.data.citations instead.
+    When search_results is empty, we fall back to final_answer_citations to
+    reconstruct the chunk_search_results structure expected by _adapt_agent_response.
     """
     final_answer = (
         (payload.get("data") or {}).get("generated_answer")
@@ -341,9 +349,21 @@ def _adapt_final_event(
         or fallback_text
     )
 
-    # Build a fake "messages[-1].metadata.aggregated_search_results" so we can
-    # call the same adapter the non-streaming path uses. SearchResultsEvent
-    # already has the same structure under .data.
+    # R2R no longer emits SearchResultsEvent — fall back to FinalAnswerEvent citations.
+    if final_answer_citations and not search_results.get("chunk_search_results"):
+        search_results = {
+            "chunk_search_results": [
+                {
+                    "id": c.get("payload", {}).get("id"),
+                    "text": c.get("payload", {}).get("text", ""),
+                    "score": c.get("payload", {}).get("score", 0.0),
+                    "metadata": c.get("payload", {}).get("metadata", {}),
+                }
+                for c in final_answer_citations
+                if c.get("payload")
+            ]
+        }
+
     fake_response = {
         "results": {
             "messages": [
