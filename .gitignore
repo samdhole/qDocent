@@ -17,6 +17,7 @@ data/sample_docs/*.pdf
 data/sample_docs/*.docx
 data/figures/
 data/documents/
+data/ingest_jobs.db
 
 # Reports with sensitive content
 reports/private/
