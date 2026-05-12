@@ -935,3 +935,135 @@ class TestDocumentFilter:
             "document_id": {"$in": ["r2r-uuid-a1", "r2r-uuid-a2", "r2r-uuid-b1"]}
         }
 
+
+class TestBuildSearchSettingsCollectionId:
+    """Test _build_search_settings with collection_id parameter."""
+
+    def test_collection_id_applies_overlap_filter(self):
+        """collection_id applies $overlap filter (R2R collection-level scope)."""
+        with mock.patch("apps.api.services.r2r_agent.get_client") as mock_get, \
+             mock.patch("apps.api.services.r2r_agent.figures_for_response", return_value=[]), \
+             mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
+            mock_response = mock.Mock()
+            mock_response.results.messages = [mock.Mock(role="assistant", content="answer")]
+            mock_response.results.search_results.chunk_search_results = []
+            mock_get.return_value.retrieval.agent.return_value = mock_response
+
+            from apps.api.services.r2r_agent import agent_query
+
+            agent_query(
+                message="q",
+                conversation_id=None,
+                doc_only=False,
+                document_ids=None,
+                collection_id="col-abc",
+            )
+
+            call_kwargs = mock_get.return_value.retrieval.agent.call_args[1]
+            filters = call_kwargs["search_settings"]["filters"]
+            assert filters == {"collection_ids": {"$overlap": ["col-abc"]}}
+
+    def test_no_collection_id_uses_document_filter(self):
+        """When collection_id=None, document_ids filter is applied."""
+        with mock.patch("apps.api.services.r2r_agent.get_client") as mock_get, \
+             mock.patch("apps.api.services.r2r_agent.load_document_manifest") as mock_manifest, \
+             mock.patch("apps.api.services.r2r_agent.figures_for_response", return_value=[]), \
+             mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
+            mock_manifest.return_value = {"r2r_document_ids": ["r2r-001"]}
+            mock_response = mock.Mock()
+            mock_response.results.messages = [mock.Mock(role="assistant", content="answer")]
+            mock_response.results.search_results.chunk_search_results = []
+            mock_get.return_value.retrieval.agent.return_value = mock_response
+
+            from apps.api.services.r2r_agent import agent_query
+
+            agent_query(
+                message="q",
+                conversation_id=None,
+                doc_only=False,
+                document_ids=["local-doc-1"],
+                collection_id=None,
+            )
+
+            call_kwargs = mock_get.return_value.retrieval.agent.call_args[1]
+            filters = call_kwargs["search_settings"]["filters"]
+            assert filters == {"document_id": {"$in": ["r2r-001"]}}
+
+    def test_no_filter_when_both_none(self):
+        """When collection_id=None and document_ids=None, no filters applied."""
+        with mock.patch("apps.api.services.r2r_agent.get_client") as mock_get, \
+             mock.patch("apps.api.services.r2r_agent.figures_for_response", return_value=[]), \
+             mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
+            mock_response = mock.Mock()
+            mock_response.results.messages = [mock.Mock(role="assistant", content="answer")]
+            mock_response.results.search_results.chunk_search_results = []
+            mock_get.return_value.retrieval.agent.return_value = mock_response
+
+            from apps.api.services.r2r_agent import agent_query
+
+            agent_query(
+                message="q",
+                conversation_id=None,
+                doc_only=False,
+                document_ids=None,
+                collection_id=None,
+            )
+
+            call_kwargs = mock_get.return_value.retrieval.agent.call_args[1]
+            assert "filters" not in call_kwargs.get("search_settings", {})
+
+    def test_collection_id_takes_precedence_over_document_ids(self):
+        """When both collection_id and document_ids are set, collection_id wins."""
+        with mock.patch("apps.api.services.r2r_agent.get_client") as mock_get, \
+             mock.patch("apps.api.services.r2r_agent.load_document_manifest") as mock_manifest, \
+             mock.patch("apps.api.services.r2r_agent.figures_for_response", return_value=[]), \
+             mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
+            mock_manifest.return_value = {"r2r_document_ids": ["r2r-001"]}
+            mock_response = mock.Mock()
+            mock_response.results.messages = [mock.Mock(role="assistant", content="answer")]
+            mock_response.results.search_results.chunk_search_results = []
+            mock_get.return_value.retrieval.agent.return_value = mock_response
+
+            from apps.api.services.r2r_agent import agent_query
+
+            agent_query(
+                message="q",
+                conversation_id=None,
+                doc_only=False,
+                document_ids=["doc-1"],
+                collection_id="col-xyz",
+            )
+
+            call_kwargs = mock_get.return_value.retrieval.agent.call_args[1]
+            filters = call_kwargs["search_settings"]["filters"]
+            assert filters == {"collection_ids": {"$overlap": ["col-xyz"]}}
+            # Verify document_ids manifest was NOT called (collection_id took priority)
+            mock_manifest.assert_not_called()
+
+    def test_agent_stream_with_collection_id(self):
+        """agent_stream() also accepts collection_id and applies $overlap filter."""
+        with mock.patch("apps.api.services.r2r_agent.get_client") as mock_get, \
+             mock.patch("apps.api.services.r2r_agent.figures_for_response", return_value=[]), \
+             mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
+            # Simple streaming events
+            events = [
+                MessageEvent("answer"),
+                FinalAnswerEvent("answer", "conv-1"),
+            ]
+            mock_get.return_value.retrieval.agent.return_value = iter(events)
+
+            from apps.api.services.r2r_agent import agent_stream
+
+            # Consume the generator to trigger the call
+            list(agent_stream(
+                message="q",
+                conversation_id="conv-1",
+                doc_only=False,
+                document_ids=None,
+                collection_id="col-abc",
+            ))
+
+            call_kwargs = mock_get.return_value.retrieval.agent.call_args[1]
+            filters = call_kwargs["search_settings"]["filters"]
+            assert filters == {"collection_ids": {"$overlap": ["col-abc"]}}
+
