@@ -71,7 +71,7 @@ export default function AnswerCard({ result, onSelectCitation, onSwitchToGeneral
             <CardTitle className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
               <span>Answer</span>
               <Badge variant={LABEL_VARIANT[result.confidence_label] ?? "outline"} className="capitalize">
-                {result.confidence_label.replace("_", " ")}
+                {(result.confidence_label ?? "unknown").replace("_", " ")}
               </Badge>
               {result.needs_human_review && (
                 <span className="text-xs text-orange-700">Human review recommended</span>

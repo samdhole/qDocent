@@ -5,6 +5,6 @@ export function canOpenSource(
   onSelectCitation: ((sel: SelectedCitation) => void) | undefined
 ): boolean {
   return Boolean(
-    citation && citation.document_id && citation.page != null && onSelectCitation
+    citation && citation.document_id && citation.page && onSelectCitation
   );
 }
