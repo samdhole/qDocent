@@ -33,6 +33,15 @@ class MessageRequest(BaseModel):
     notebook_id: str | None = None
 
 
+class ConversationListItem(BaseModel):
+    """Response item for GET /conversations."""
+
+    r2r_conv_id: str
+    notebook_id: str | None
+    title: str
+    created_at: str
+
+
 @router.post("", response_model=CreateConversationResponse)
 def create_conversation(body: CreateConversationRequest) -> CreateConversationResponse:
     """Create a new conversation and return its ID."""
@@ -48,8 +57,8 @@ def create_conversation(body: CreateConversationRequest) -> CreateConversationRe
     return CreateConversationResponse(conversation_id=conversation_id)
 
 
-@router.get("")
-def list_conversations(notebook_id: str | None = None) -> list[dict]:
+@router.get("", response_model=list[ConversationListItem])
+def list_conversations(notebook_id: str | None = None) -> list[ConversationListItem]:
     """List conversations, optionally filtered by notebook_id."""
     return conversation_store.list_conversations(notebook_id=notebook_id)
 

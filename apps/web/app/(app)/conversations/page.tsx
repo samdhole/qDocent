@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import ConversationList from '@/components/ConversationList';
 import type { ConversationRecord } from '@/components/ConversationItem';
 
@@ -30,6 +31,8 @@ export default function ConversationsPage() {
         ]);
         if (convResp.ok) setConversations(await convResp.json());
         if (nbResp.ok) setNotebooks(await nbResp.json());
+      } catch (error) {
+        toast.error('Failed to load conversations — is the API running?');
       } finally {
         setLoading(false);
       }
