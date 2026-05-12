@@ -5,7 +5,7 @@ import { useState, useEffect } from "react"
 
 export type QueryMode = "documents" | "general"
 
-const STORAGE_KEY = "docquery.queryMode"
+const STORAGE_KEY = "qdocent.queryMode"
 const DEFAULT_MODE: QueryMode = "documents"
 
 export function useQueryMode(): [QueryMode, (m: QueryMode) => void] {

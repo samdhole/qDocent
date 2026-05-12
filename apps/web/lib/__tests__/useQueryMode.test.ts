@@ -13,11 +13,11 @@ describe("useQueryMode", () => {
   it("persists general mode to localStorage", () => {
     const { result } = renderHook(() => useQueryMode())
     act(() => result.current[1]("general"))
-    expect(localStorage.getItem("docquery.queryMode")).toBe("general")
+    expect(localStorage.getItem("qdocent.queryMode")).toBe("general")
   })
 
   it("hydrates from localStorage on mount", async () => {
-    localStorage.setItem("docquery.queryMode", "general")
+    localStorage.setItem("qdocent.queryMode", "general")
     const { result } = renderHook(() => useQueryMode())
     // useEffect fires after render; wait for hydration
     await waitFor(() => {

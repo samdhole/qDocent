@@ -3,7 +3,7 @@
 
 import { useCallback, useState } from "react";
 
-const AUTH_KEY = "docquery.auth";
+const AUTH_KEY = "qdocent.auth";
 
 type AuthState = {
   isLoggedIn: boolean;

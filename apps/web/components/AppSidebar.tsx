@@ -28,7 +28,7 @@ export function AppSidebar({ onLogout }: Props) {
 
   return (
     <aside className="hidden md:flex w-56 shrink-0 border-r flex-col bg-background">
-      <div className="px-4 h-14 flex items-center font-semibold">DocQuery</div>
+      <div className="px-4 h-14 flex items-center font-semibold">qDocent</div>
       <Separator />
       <nav className="flex flex-col gap-1 p-2">
         {NAV_ITEMS.map(({ href, label, icon: Icon }) => {

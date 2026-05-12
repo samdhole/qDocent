@@ -1,4 +1,4 @@
-# DocQuery
+# qDocent
 
 **Evaluated AI Knowledge & Workflow Assistant** — a local-first RAG portfolio project and reusable client starter kit.
 
@@ -161,7 +161,7 @@ source .venv/bin/activate && pytest tests/ -v  # Unix
 Test coverage:
 - `tests/test_api_routes.py` — FastAPI routes (health, ask, eval, reports)
 - `tests/test_r2r_client.py` — confidence label helper, pre-chunked ingest wiring, retrieval citation parsing
-- `tests/test_r2r_chunk_adapter.py` — DocQuery citation headers for R2R chunks
+- `tests/test_r2r_chunk_adapter.py` — qDocent citation headers for R2R chunks
 - `tests/test_report_writer.py` — report reader service
 - `tests/test_document_store.py` — persisted source PDF storage, manifest metadata, and delete
 - `tests/test_classify_document.py` — PDF type classification rules
@@ -238,7 +238,7 @@ docquery/
 
 **FCIS pattern**: every production module is marked `# pattern: Functional Core` or `# pattern: Imperative Shell` to enforce testability at module boundaries.
 
-**DocQuery chunks are the R2R ingest path**: the ingestion pipeline produces citation-rich chunks, and the API sends them to R2R with `documents.create(chunks=[...])`. Each chunk starts with a compact `DocQuery Citation:` header so retrieved chunks can be mapped back to `source_file`, page, and section. If the pipeline fails or emits no chunks, ingest falls back to raw PDF upload.
+**qDocent chunks are the R2R ingest path**: the ingestion pipeline produces citation-rich chunks, and the API sends them to R2R with `documents.create(chunks=[...])`. Each chunk starts with a compact `qDocent Citation:` header so retrieved chunks can be mapped back to `source_file`, page, and section. If the pipeline fails or emits no chunks, ingest falls back to raw PDF upload.
 
 **Approval gate is in-node**: the LangGraph `send_response` node enforces the approval gate by returning `"[Awaiting human approval]"` — no `interrupt_before` or LangGraph checkpointer is required.
 

@@ -17,7 +17,7 @@ router = APIRouter(prefix="/documents")
 
 @router.get("")
 def list_documents() -> dict:
-    """List source PDFs stored by DocQuery."""
+    """List source PDFs stored by qDocent."""
     return {"documents": list_source_documents()}
 
 
@@ -39,7 +39,7 @@ def get_document_chunks(document_id: str) -> dict:
 
 @router.delete("/{document_id}")
 def delete_document(document_id: str) -> dict:
-    """Delete DocQuery's locally stored source PDF for a document."""
+    """Delete qDocent's locally stored source PDF for a document."""
     manifest = load_document_manifest(document_id)
     r2r_ids = (manifest or {}).get("r2r_document_ids", [])
     r2r_delete: dict = {"deleted": [], "failed": []}

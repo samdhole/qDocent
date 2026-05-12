@@ -15,7 +15,7 @@ export default function HomePage() {
   return (
     <main className="max-w-4xl mx-auto px-6 py-16 md:py-24">
       <header className="mb-12">
-        <h1 className="text-4xl md:text-5xl font-semibold tracking-tight">DocQuery</h1>
+        <h1 className="text-4xl md:text-5xl font-semibold tracking-tight">qDocent</h1>
         <p className="text-muted-foreground mt-3 text-base md:text-lg max-w-2xl">
           Local-first RAG. Ingest your business documents, ask questions, and get cited answers
           with the original source pages right next to them.

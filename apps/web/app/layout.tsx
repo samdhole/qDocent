@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "DocQuery",
+  title: "qDocent",
   description: "Local-first RAG demo — ask questions over your business documents",
 };
 

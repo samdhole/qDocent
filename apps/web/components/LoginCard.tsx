@@ -25,7 +25,7 @@ export function LoginCard({ onLogin }: Props) {
     <div className="flex items-center justify-center min-h-full p-4">
       <Card className="w-full max-w-sm">
         <CardHeader>
-          <CardTitle className="text-xl">DocQuery</CardTitle>
+          <CardTitle className="text-xl">qDocent</CardTitle>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">

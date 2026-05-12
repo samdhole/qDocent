@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import type { AskResponse, ChatMessage, ConversationStartResponse } from "@/lib/types";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
-const MESSAGES_KEY = "docquery.messages";
+const MESSAGES_KEY = "qdocent.messages";
 
 export type StreamPhase = "idle" | "searching" | "found_results" | "generating";
 

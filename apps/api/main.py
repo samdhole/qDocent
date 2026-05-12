@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from apps.api.routes import ask, conversations, documents, evals, ingest, reports, workflows
 
 app = FastAPI(
-    title="DocQuery API",
+    title="qDocent API",
     description="RAG portfolio demo — wraps R2R and RAGAS.",
     version="0.1.0",
 )
