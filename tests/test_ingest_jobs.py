@@ -4,16 +4,15 @@ from pathlib import Path
 
 import pytest
 
-from apps.api.services import ingest_jobs
-from apps.api.services.ingest_jobs import _JOBS
+from apps.api.services import ingest_jobs, ingest_job_store
 
 
 @pytest.fixture(autouse=True)
-def clear_jobs():
-    """Clear the _JOBS dict before and after each test to prevent state bleed."""
-    _JOBS.clear()
-    yield
-    _JOBS.clear()
+def temp_db(tmp_path, monkeypatch):
+    """Redirect ingest_job_store._DB_PATH to a temporary test database."""
+    db_file = tmp_path / "test_jobs.db"
+    monkeypatch.setattr("apps.api.services.ingest_job_store._DB_PATH", db_file)
+    yield db_file
 
 
 def test_ingest_job_completes_with_result(tmp_path):
@@ -67,15 +66,10 @@ def test_expired_completed_job_is_pruned():
     job = ingest_jobs.create_ingest_job("sample.pdf")
     job_id = job["job_id"]
 
-    # Simulate a completed job 2 hours in the past
     two_hours_ago = datetime.now(timezone.utc) - timedelta(hours=2)
-    _JOBS[job_id]["status"] = "completed"
-    _JOBS[job_id]["updated_at"] = two_hours_ago.isoformat()
+    ingest_job_store.update_job(job_id, status="completed", updated_at=two_hours_ago.isoformat())
 
-    result = ingest_jobs.get_ingest_job(job_id)
-
-    assert result is None
-    assert job_id not in _JOBS
+    assert ingest_jobs.get_ingest_job(job_id) is None
 
 
 def test_expired_failed_job_is_pruned():
@@ -83,15 +77,10 @@ def test_expired_failed_job_is_pruned():
     job = ingest_jobs.create_ingest_job("sample.pdf")
     job_id = job["job_id"]
 
-    # Simulate a failed job 2 hours in the past
     two_hours_ago = datetime.now(timezone.utc) - timedelta(hours=2)
-    _JOBS[job_id]["status"] = "failed"
-    _JOBS[job_id]["updated_at"] = two_hours_ago.isoformat()
+    ingest_job_store.update_job(job_id, status="failed", updated_at=two_hours_ago.isoformat())
 
-    result = ingest_jobs.get_ingest_job(job_id)
-
-    assert result is None
-    assert job_id not in _JOBS
+    assert ingest_jobs.get_ingest_job(job_id) is None
 
 
 def test_non_terminal_job_is_never_pruned():
@@ -99,16 +88,12 @@ def test_non_terminal_job_is_never_pruned():
     job = ingest_jobs.create_ingest_job("sample.pdf")
     job_id = job["job_id"]
 
-    # Simulate a running job 2 hours in the past
     two_hours_ago = datetime.now(timezone.utc) - timedelta(hours=2)
-    _JOBS[job_id]["status"] = "running"
-    _JOBS[job_id]["updated_at"] = two_hours_ago.isoformat()
+    ingest_job_store.update_job(job_id, status="running", updated_at=two_hours_ago.isoformat())
 
     result = ingest_jobs.get_ingest_job(job_id)
-
     assert result is not None
     assert result["status"] == "running"
-    assert job_id in _JOBS
 
 
 def test_recent_completed_job_is_not_pruned():
@@ -116,26 +101,20 @@ def test_recent_completed_job_is_not_pruned():
     job = ingest_jobs.create_ingest_job("sample.pdf")
     job_id = job["job_id"]
 
-    # Simulate a completed job 30 minutes ago
     thirty_minutes_ago = datetime.now(timezone.utc) - timedelta(minutes=30)
-    _JOBS[job_id]["status"] = "completed"
-    _JOBS[job_id]["updated_at"] = thirty_minutes_ago.isoformat()
+    ingest_job_store.update_job(job_id, status="completed", updated_at=thirty_minutes_ago.isoformat())
 
     result = ingest_jobs.get_ingest_job(job_id)
-
     assert result is not None
     assert result["status"] == "completed"
-    assert job_id in _JOBS
 
 
 def test_is_expired_handles_none_updated_at():
-    """_is_expired returns False (not pruned) when updated_at is None (TypeError guard)."""
+    """get_job returns the job (not pruned) when updated_at is None."""
     job = ingest_jobs.create_ingest_job("sample.pdf")
     job_id = job["job_id"]
 
-    _JOBS[job_id]["status"] = "completed"
-    _JOBS[job_id]["updated_at"] = None  # triggers TypeError in fromisoformat
+    ingest_job_store.update_job(job_id, status="completed", updated_at=None)
 
     result = ingest_jobs.get_ingest_job(job_id)
-
-    assert result is not None  # not pruned — safe fallback
+    assert result is not None  # safe fallback — None updated_at is not expired
