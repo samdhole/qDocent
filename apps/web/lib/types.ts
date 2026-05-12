@@ -101,3 +101,20 @@ export type SourceDocument = {
   size_bytes: number;
   updated_at: string;
 };
+
+// Notebook types (added in Phase 4)
+
+export type Notebook = {
+  id: string;
+  name: string;
+  description: string | null;
+  r2r_collection_id: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type NotebookDocument = {
+  notebook_id: string;
+  document_id: string;
+  added_at: string;
+};;
