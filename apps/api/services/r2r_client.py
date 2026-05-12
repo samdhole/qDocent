@@ -219,13 +219,16 @@ def ingest_prechunked_document(
 
 
 def ingest_file_with_pipeline(
-    file_path: str, original_filename: str | None = None
+    file_path: str, original_filename: str | None = None, collection_id: str | None = None
 ) -> dict:
     """Run ingestion pipeline, then ingest the original file and figure manifest into R2R.
 
     original_filename: the original uploaded filename. When provided, threads through
     to run_pipeline so figure records and quality reports show the real filename
     instead of the temp path.
+
+    collection_id: optional R2R collection ID to associate the document with.
+    When provided, the document is added to this collection during ingestion.
 
     Figure manifest ingest runs only after the raw PDF ingest succeeds. Failure
     of the manifest ingest is non-fatal — logged as warning, not raised.
@@ -253,7 +256,7 @@ def ingest_file_with_pipeline(
     if chunks:  # filter invalid chunks before deciding ingest path
         chunks = _valid_chunks(chunks)
     if chunks:  # pre-chunked path — may be empty after validation → falls to else
-        r2r_result = ingest_prechunked_document(chunks, report)
+        r2r_result = ingest_prechunked_document(chunks, report, collection_id=collection_id)
         primary_r2r_id = _r2r_document_id_from_response(r2r_result)
         if primary_r2r_id:
             r2r_document_ids.append(primary_r2r_id)

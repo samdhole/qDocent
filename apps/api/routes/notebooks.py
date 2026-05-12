@@ -1,8 +1,10 @@
 # pattern: Imperative Shell
-from fastapi import APIRouter, HTTPException
+import os
+import tempfile
+from fastapi import APIRouter, HTTPException, UploadFile, File
 from pydantic import BaseModel
 
-from apps.api.services import notebook_store
+from apps.api.services import notebook_store, r2r_client
 
 router = APIRouter(prefix="/notebooks", tags=["notebooks"])
 
@@ -117,3 +119,54 @@ def list_notebook_documents(notebook_id: str) -> list[dict]:
     if not notebook_store.get_notebook(notebook_id):
         raise HTTPException(status_code=404, detail="Notebook not found")
     return notebook_store.list_documents(notebook_id)
+
+
+@router.post("/{notebook_id}/documents", status_code=201)
+def ingest_notebook_document(notebook_id: str, file: UploadFile = File(...)) -> dict:
+    """Ingest a PDF document into a notebook.
+
+    The document is scoped to the notebook's R2R collection during ingestion.
+    Membership is recorded in SQLite.
+
+    Args:
+        notebook_id: ID of the notebook to ingest into.
+        file: PDF file to ingest.
+
+    Returns:
+        Result dict with status, ingestion result, and document_id.
+
+    Raises:
+        HTTPException: 404 if notebook not found.
+        HTTPException: 422 if file is not a PDF.
+    """
+    nb = notebook_store.get_notebook(notebook_id)
+    if not nb:
+        raise HTTPException(status_code=404, detail="Notebook not found")
+
+    # Validate file type — 422 for non-PDF
+    filename = file.filename or ""
+    if not filename.lower().endswith(".pdf"):
+        raise HTTPException(status_code=422, detail="Only PDF files are accepted")
+
+    collection_id = nb.get("r2r_collection_id") or None
+
+    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+        tmp_path = tmp.name
+        tmp.write(file.file.read())
+
+    try:
+        result = r2r_client.ingest_file_with_pipeline(
+            tmp_path,
+            original_filename=filename,
+            collection_id=collection_id,
+        )
+    finally:
+        if os.path.exists(tmp_path):
+            os.unlink(tmp_path)
+
+    # Record membership in SQLite
+    document_id = (result or {}).get("document_id") or ""
+    if document_id:
+        notebook_store.add_document(notebook_id, document_id)
+
+    return {"status": "ok", "result": result, "document_id": document_id}
