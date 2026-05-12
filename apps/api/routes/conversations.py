@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from apps.api.services import notebook_store, r2r_agent
+from apps.api.services import r2r_agent
 from apps.api.routes.notebooks import resolve_collection_id
 
 router = APIRouter(prefix="/conversations")

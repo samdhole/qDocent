@@ -140,7 +140,7 @@ class TestPostMessageWithNotebook:
         fake_nb = {"id": "nb-1", "r2r_collection_id": "col-xyz"}
         fake_result = {"answer": "scoped", "citations": []}
 
-        with mock.patch("apps.api.routes.conversations.notebook_store.get_notebook", return_value=fake_nb), \
+        with mock.patch("apps.api.routes.notebooks.notebook_store.get_notebook", return_value=fake_nb), \
              mock.patch("apps.api.routes.conversations.r2r_agent.agent_query", return_value=fake_result) as mock_agent:
             response = client.post(
                 "/conversations/conv-abc/messages",
@@ -165,7 +165,7 @@ class TestPostMessageWithNotebook:
 
     def test_message_with_unknown_notebook_returns_404(self, client):
         """POST /conversations/{id}/messages with non-existent notebook_id returns 404."""
-        with mock.patch("apps.api.routes.conversations.notebook_store.get_notebook", return_value=None):
+        with mock.patch("apps.api.routes.notebooks.notebook_store.get_notebook", return_value=None):
             response = client.post(
                 "/conversations/conv-abc/messages",
                 json={"message": "hello", "notebook_id": "ghost"},
@@ -176,7 +176,7 @@ class TestPostMessageWithNotebook:
         """POST /conversations/{id}/messages/stream with notebook_id passes collection_id to agent_stream."""
         fake_nb = {"id": "nb-2", "r2r_collection_id": "col-stream"}
 
-        with mock.patch("apps.api.routes.conversations.notebook_store.get_notebook", return_value=fake_nb), \
+        with mock.patch("apps.api.routes.notebooks.notebook_store.get_notebook", return_value=fake_nb), \
              mock.patch("apps.api.routes.conversations.r2r_agent.agent_stream") as mock_stream:
             mock_stream.return_value = iter([f'data: {{"type":"status"}}\n\n'])
 
@@ -191,7 +191,7 @@ class TestPostMessageWithNotebook:
 
     def test_message_stream_with_unknown_notebook_returns_404(self, client):
         """POST /conversations/{id}/messages/stream with non-existent notebook_id returns 404."""
-        with mock.patch("apps.api.routes.conversations.notebook_store.get_notebook", return_value=None):
+        with mock.patch("apps.api.routes.notebooks.notebook_store.get_notebook", return_value=None):
             response = client.post(
                 "/conversations/conv-abc/messages/stream",
                 json={"message": "hello", "notebook_id": "ghost"},

@@ -168,7 +168,7 @@ def ingest_notebook_document(notebook_id: str, file: UploadFile = File(...)) -> 
         raise HTTPException(status_code=422, detail="File is not a valid PDF (invalid magic header)")
     file.file.seek(0)  # Rewind to start for the actual ingest
 
-    collection_id = resolve_collection_id(notebook_id)
+    collection_id = nb.get("r2r_collection_id") or None
 
     with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
         tmp_path = tmp.name

@@ -53,7 +53,7 @@ class TestAskWithNotebook:
         fake_nb = {"id": "nb-1", "r2r_collection_id": "col-abc"}
         fake_result = {"answer": "scoped answer", "citations": []}
 
-        with mock.patch("apps.api.routes.ask.notebook_store.get_notebook", return_value=fake_nb), \
+        with mock.patch("apps.api.routes.notebooks.notebook_store.get_notebook", return_value=fake_nb), \
              mock.patch("apps.api.routes.ask.r2r_client.rag_query", return_value=fake_result) as mock_rag:
             response = client.post("/ask", json={"question": "What?", "notebook_id": "nb-1"})
 
@@ -72,7 +72,7 @@ class TestAskWithNotebook:
 
     def test_ask_with_unknown_notebook_returns_404(self, client):
         """POST /ask with non-existent notebook_id returns 404."""
-        with mock.patch("apps.api.routes.ask.notebook_store.get_notebook", return_value=None):
+        with mock.patch("apps.api.routes.notebooks.notebook_store.get_notebook", return_value=None):
             response = client.post("/ask", json={"question": "?", "notebook_id": "ghost"})
         assert response.status_code == 404
 
@@ -88,7 +88,7 @@ class TestAskWithNotebook:
             "confidence_label": "low",
             "needs_human_review": True,
         }
-        with mock.patch("apps.api.routes.ask.notebook_store.get_notebook", return_value=fake_nb), \
+        with mock.patch("apps.api.routes.notebooks.notebook_store.get_notebook", return_value=fake_nb), \
              mock.patch("apps.api.routes.ask.r2r_client.rag_query", return_value=fake_result):
             response = client.post("/ask", json={"question": "?", "notebook_id": "nb-empty"})
         assert response.status_code == 200

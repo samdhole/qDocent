@@ -2,7 +2,7 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from apps.api.services import notebook_store, r2r_client
+from apps.api.services import r2r_client
 from apps.api.routes.notebooks import resolve_collection_id
 
 router = APIRouter()
