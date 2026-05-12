@@ -41,7 +41,7 @@ function phaseLabel(phase: StreamPhase): string {
   }
 }
 
-export default function ConversationView() {
+export default function ConversationView({ notebookId }: { notebookId?: string } = {}) {
   const { messages, pending, phase, partialText, sendMessage, reset } = useConversationStream();
   const [queryMode, setQueryMode] = useQueryMode();
   const [documents, setDocuments] = useState<SourceDocument[]>([]);
@@ -161,6 +161,7 @@ export default function ConversationView() {
             void sendMessage(text, {
               docOnly: queryMode === "documents",
               documentIds: attached?.map((doc) => doc.document_id),
+              notebookId,
             })
           }}
         />

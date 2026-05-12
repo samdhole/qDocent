@@ -7,6 +7,12 @@ import type { AskResponse, ChatMessage, ConversationStartResponse } from "@/lib/
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 const MESSAGES_KEY = "qdocent.messages";
 
+interface SendMessageOpts {
+  docOnly?: boolean;
+  documentIds?: string[];
+  notebookId?: string;
+}
+
 export type StreamPhase = "idle" | "searching" | "found_results" | "generating";
 
 export function useConversationStream() {
@@ -65,7 +71,7 @@ export function useConversationStream() {
   }
 
   const sendMessage = useCallback(
-    async (text: string, opts?: { docOnly?: boolean; documentIds?: string[] }) => {
+    async (text: string, opts?: SendMessageOpts) => {
       const trimmed = text.trim();
       if (!trimmed || pending) return;
       setPending(true);
@@ -97,16 +103,17 @@ export function useConversationStream() {
         };
         setMessages((prev) => [...prev, userMessage]);
 
+        const body: Record<string, unknown> = { message: trimmed };
+        if (opts?.docOnly) body.doc_only = true;
+        if (opts?.documentIds?.length) body.document_ids = opts.documentIds;
+        if (opts?.notebookId) body.notebook_id = opts.notebookId;
+
         const res = await fetch(
           `${API}/conversations/${activeConversationId}/messages/stream`,
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              message: trimmed,
-              ...(opts?.docOnly && { doc_only: true }),
-              ...(opts?.documentIds?.length && { document_ids: opts.documentIds }),
-            }),
+            body: JSON.stringify(body),
           },
         );
         if (!res.ok || !res.body) {
