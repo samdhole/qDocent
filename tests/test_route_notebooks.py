@@ -339,21 +339,22 @@ class TestIngestURL:
         mock_store.get_notebook.return_value = {"id": "nb-1", "r2r_collection_id": "col-abc"}
         mock_store.add_document.return_value = None
 
-        with mock.patch("apps.api.routes.notebooks.r2r_client.ingest_source_with_pipeline") as mock_ingest:
-            mock_ingest.return_value = {
-                "document_id": "web_doc_id",
-                "r2r": "ok",
-                "quality_report": None,
-                "source_url": None,
-                "r2r_document_ids": [],
-                "figures": [],
-                "figures_r2r": None,
-                "ingestion_mode": "web",
-            }
-            resp = client.post(
-                "/notebooks/nb-1/ingest/url",
-                json={"url": "https://example.com/docs"},
-            )
+        with mock.patch("socket.gethostbyname", return_value="93.184.216.34"):  # example.com's real IP
+            with mock.patch("apps.api.routes.notebooks.r2r_client.ingest_source_with_pipeline") as mock_ingest:
+                mock_ingest.return_value = {
+                    "document_id": "web_doc_id",
+                    "r2r": "ok",
+                    "quality_report": None,
+                    "source_url": None,
+                    "r2r_document_ids": [],
+                    "figures": [],
+                    "figures_r2r": None,
+                    "ingestion_mode": "web",
+                }
+                resp = client.post(
+                    "/notebooks/nb-1/ingest/url",
+                    json={"url": "https://example.com/docs"},
+                )
 
         assert resp.status_code == 201
         assert resp.json()["document_id"] == "web_doc_id"
@@ -367,21 +368,22 @@ class TestIngestURL:
         mock_store.get_notebook.return_value = {"id": "nb-1", "r2r_collection_id": "col-abc"}
         mock_store.add_document.return_value = None
 
-        with mock.patch("apps.api.routes.notebooks.r2r_client.ingest_source_with_pipeline") as mock_ingest:
-            mock_ingest.return_value = {
-                "document_id": "web_doc_id",
-                "r2r": "ok",
-                "quality_report": None,
-                "source_url": None,
-                "r2r_document_ids": [],
-                "figures": [],
-                "figures_r2r": None,
-                "ingestion_mode": "web",
-            }
-            resp = client.post(
-                "/notebooks/nb-1/ingest/url",
-                json={"url": "http://example.com/page"},
-            )
+        with mock.patch("socket.gethostbyname", return_value="93.184.216.34"):  # example.com's real IP
+            with mock.patch("apps.api.routes.notebooks.r2r_client.ingest_source_with_pipeline") as mock_ingest:
+                mock_ingest.return_value = {
+                    "document_id": "web_doc_id",
+                    "r2r": "ok",
+                    "quality_report": None,
+                    "source_url": None,
+                    "r2r_document_ids": [],
+                    "figures": [],
+                    "figures_r2r": None,
+                    "ingestion_mode": "web",
+                }
+                resp = client.post(
+                    "/notebooks/nb-1/ingest/url",
+                    json={"url": "http://example.com/page"},
+                )
 
         assert resp.status_code == 201
 
@@ -403,3 +405,39 @@ class TestIngestURL:
         )
         assert resp.status_code == 404
         assert "not found" in resp.json()["detail"].lower()
+
+    def test_rejects_loopback_url(self, client, mock_store):
+        """POST /notebooks/{id}/ingest/url rejects http://127.0.0.1 (SSRF protection)."""
+        mock_store.get_notebook.return_value = {"id": "nb-1", "r2r_collection_id": "col-abc"}
+        resp = client.post(
+            "/notebooks/nb-1/ingest/url",
+            json={"url": "http://127.0.0.1/admin"},
+        )
+        assert resp.status_code == 422
+        assert "private" in resp.json()["detail"].lower() or "reserved" in resp.json()["detail"].lower()
+
+    def test_rejects_link_local_url(self, client, mock_store):
+        """POST /notebooks/{id}/ingest/url rejects http://169.254.x.x (SSRF protection)."""
+        mock_store.get_notebook.return_value = {"id": "nb-1", "r2r_collection_id": "col-abc"}
+        resp = client.post(
+            "/notebooks/nb-1/ingest/url",
+            json={"url": "http://169.254.169.254/latest/meta-data/"},
+        )
+        assert resp.status_code == 422
+        assert "private" in resp.json()["detail"].lower() or "reserved" in resp.json()["detail"].lower()
+
+    def test_pipeline_runtime_error_returns_502(self, client, mock_store):
+        """POST /notebooks/{id}/ingest/url returns 502 when pipeline fails with RuntimeError."""
+        mock_store.get_notebook.return_value = {"id": "nb-1", "r2r_collection_id": "col-abc"}
+
+        # Mock socket.gethostbyname so example.com resolves to a public IP (passes SSRF check)
+        with mock.patch("socket.gethostbyname", return_value="93.184.216.34"):  # example.com's real IP
+            with mock.patch("apps.api.routes.notebooks.r2r_client.ingest_source_with_pipeline") as mock_ingest:
+                mock_ingest.side_effect = RuntimeError("Network error fetching URL")
+                resp = client.post(
+                    "/notebooks/nb-1/ingest/url",
+                    json={"url": "https://example.com/docs"},
+                )
+
+        assert resp.status_code == 502
+        assert "Failed to fetch" in resp.json()["detail"]

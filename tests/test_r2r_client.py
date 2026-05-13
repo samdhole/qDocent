@@ -1102,3 +1102,78 @@ class TestRagQueryBracketRewrite:
 
         assert result["answer"] == "No citations available [cccccccc]."
         assert result["citations"] == []
+
+
+
+
+
+class TestIngestSourceWithPipeline:
+    """Test ingest_source_with_pipeline() for multi-format sources (DOCX, PPTX, URLs)."""
+
+    @mock.patch("apps.api.services.r2r_client.write_chunks_manifest")
+    @mock.patch("apps.api.services.r2r_client.write_document_manifest")
+    @mock.patch("apps.api.services.r2r_client.ingest_prechunked_document")
+    @mock.patch("packages.ingestion.pipeline.run_pipeline_for_source")
+    def test_ingestion_mode_is_string_for_valid_source(
+        self, mock_pipeline, mock_ingest_chunks, mock_manifest, mock_chunks_manifest
+    ):
+        """ingestion_mode is extracted as a string from classifier dict."""
+        mock_pipeline.return_value = {
+            "report": {"document_id": "docx_test", "tables_detected": 0},
+            "chunks": [{"text": "DOCX content", "document_id": "docx_test", "source_file": "test.docx"}],
+            "classifier": {
+                "document_type": "docx",
+                "recommended_parser": "docx",
+                "recommended_template": "general",
+            },
+            "figures": [],
+            "figure_manifest": None,
+        }
+        mock_ingest_chunks.return_value = "ok"
+
+        from apps.api.services.r2r_client import ingest_source_with_pipeline
+
+        result = ingest_source_with_pipeline("test.docx", original_filename="test.docx")
+
+        # CRITICAL FIX 1: ingestion_mode must be a string, not a dict
+        assert isinstance(result["ingestion_mode"], str)
+        assert result["ingestion_mode"] == "docx"
+        assert result["document_id"] == "docx_test"
+
+    @mock.patch("packages.ingestion.pipeline.run_pipeline_for_source")
+    def test_pipeline_exception_propagates_as_runtime_error(self, mock_pipeline):
+        """Pipeline RuntimeError propagates (not swallowed) so route handler can catch it."""
+        mock_pipeline.side_effect = RuntimeError("Network error fetching URL")
+
+        from apps.api.services.r2r_client import ingest_source_with_pipeline
+
+        with pytest.raises(RuntimeError, match="Network error"):
+            ingest_source_with_pipeline("https://example.com/doc")
+
+    @mock.patch("apps.api.services.r2r_client.write_chunks_manifest")
+    @mock.patch("apps.api.services.r2r_client.write_document_manifest")
+    @mock.patch("apps.api.services.r2r_client.ingest_prechunked_document")
+    @mock.patch("packages.ingestion.pipeline.run_pipeline_for_source")
+    def test_url_ingestion_sets_correct_ingestion_mode(
+        self, mock_pipeline, mock_ingest_chunks, mock_manifest, mock_chunks_manifest
+    ):
+        """URL sources get ingestion_mode='web'."""
+        mock_pipeline.return_value = {
+            "report": {"document_id": "url_abc123", "tables_detected": 0},
+            "chunks": [{"text": "Web content", "document_id": "url_abc123", "source_file": "https://example.com"}],
+            "classifier": {
+                "document_type": "web",
+                "recommended_parser": "web",
+                "recommended_template": "general",
+            },
+            "figures": [],
+            "figure_manifest": None,
+        }
+        mock_ingest_chunks.return_value = "ok"
+
+        from apps.api.services.r2r_client import ingest_source_with_pipeline
+
+        result = ingest_source_with_pipeline("https://example.com/docs", original_filename="https://example.com/docs")
+
+        assert result["ingestion_mode"] == "web"
+        assert isinstance(result["ingestion_mode"], str)

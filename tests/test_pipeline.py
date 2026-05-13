@@ -178,3 +178,31 @@ class TestRunPipelineForSource:
         from packages.ingestion.pipeline import run_pipeline_for_source
         with pytest.raises(ValueError, match="PDF files must use run_pipeline"):
             run_pipeline_for_source(str(fake_pdf), source_file="test.pdf")
+
+
+class TestMakeDocumentId:
+    """Test _make_document_id() for URL collision prevention."""
+
+    def test_url_document_ids_are_unique(self):
+        """Two URLs with same stem produce different document_ids."""
+        from packages.ingestion.pipeline import _make_document_id
+
+        url1 = "https://example.com/docs"
+        url2 = "https://other.com/docs"
+
+        id1 = _make_document_id("docs", path_or_url=url1)
+        id2 = _make_document_id("docs", path_or_url=url2)
+
+        assert id1 != id2, f"URLs with same stem should produce different IDs: {id1} vs {id2}"
+        assert "docs" in id1, "ID should contain the stem"
+        assert "docs" in id2, "ID should contain the stem"
+
+    def test_file_based_document_ids_unchanged(self):
+        """File-based source IDs still work as before."""
+        from packages.ingestion.pipeline import _make_document_id
+
+        id1 = _make_document_id("report.pdf")
+        id2 = _make_document_id("report.pdf")
+
+        assert id1 == id2, "Same filename should produce same ID"
+        assert id1 == "report"

@@ -1,6 +1,6 @@
 """Tests for web_loader — mocks crawl4ai so no network calls in CI."""
 import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import patch
 from packages.ingestion.web_loader import load_url
 
 

@@ -34,11 +34,14 @@ def _fetch_url_markdown(url: str) -> str:
         return asyncio.run(_async_fetch(url))
     except RuntimeError as exc:
         # asyncio.run raises RuntimeError if an event loop is already running
-        # (e.g. inside Jupyter). Fall back to nest_asyncio or a thread executor.
-        import concurrent.futures
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-            future = pool.submit(asyncio.run, _async_fetch(url))
-            return future.result()
+        # (e.g. inside Jupyter). Re-raise legitimate errors (crawl4ai failures);
+        # only catch the specific "event loop already running" case.
+        if "cannot run the event loop while another loop is running" in str(exc) or "This event loop is already running" in str(exc):
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                future = pool.submit(asyncio.run, _async_fetch(url))
+                return future.result()
+        raise  # Re-raise legitimate pipeline errors
 
 
 async def _async_fetch(url: str) -> str:
@@ -55,7 +58,6 @@ def _markdown_to_pages(markdown: str) -> list[dict[str, Any]]:
     """Split markdown on H1–H3 headings; each section becomes a page dict."""
     # Split on headings, keeping the heading text
     parts = _SECTION_SPLIT_RE.split(markdown)
-    heading_matches = list(_SECTION_SPLIT_RE.finditer(markdown))
 
     pages = []
     for i, part in enumerate(parts):

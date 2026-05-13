@@ -364,8 +364,8 @@ def ingest_source_with_pipeline(
             len(pipeline_result.get("chunks", [])),
             pipeline_result.get("classifier", "unknown"),
         )
-    except Exception as exc:
-        log.warning("Pipeline failed for source: %s", exc)
+    except RuntimeError:
+        raise  # Re-raise pipeline errors so the route handler can catch them
 
     chunks = pipeline_result.get("chunks", [])
     report = pipeline_result.get("report", {})
@@ -391,11 +391,18 @@ def ingest_source_with_pipeline(
         r2r_result = None
         document_id = report.get("document_id")
 
+    # Extract ingestion_mode as a string from the classifier dict
+    classifier = pipeline_result.get("classifier", {})
+    if isinstance(classifier, dict):
+        ingestion_mode = classifier.get("document_type", "unknown")
+    else:
+        ingestion_mode = str(classifier)
+
     return {
         "r2r": str(r2r_result) if r2r_result else None,
         "quality_report": report,
         "document_id": document_id,
-        "ingestion_mode": pipeline_result.get("classifier", "unknown"),
+        "ingestion_mode": ingestion_mode,
         "source_url": source_url,
         "r2r_document_ids": r2r_document_ids,
         "figures": [],

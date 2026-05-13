@@ -1,8 +1,12 @@
 # pattern: Imperative Shell
+import ipaddress
 import os
 import shutil
+import socket
 import tempfile
 from pathlib import Path
+from urllib.parse import urlparse
+
 from fastapi import APIRouter, HTTPException, UploadFile, File
 from pydantic import BaseModel
 
@@ -11,6 +15,20 @@ from apps.api.services import notebook_store, r2r_client
 router = APIRouter(prefix="/notebooks", tags=["notebooks"])
 
 _ALLOWED_EXTENSIONS = {".pdf", ".docx", ".pptx"}
+
+
+def _is_safe_url(url: str) -> bool:
+    """Return False if URL resolves to a private/loopback/link-local address.
+
+    Prevents SSRF attacks by rejecting private IP ranges.
+    """
+    try:
+        hostname = urlparse(url).hostname or ""
+        ip = ipaddress.ip_address(socket.gethostbyname(hostname))
+        return not (ip.is_private or ip.is_loopback or ip.is_link_local)
+    except Exception:
+        # If we can't resolve or parse, reject to be safe
+        return False
 
 
 def resolve_collection_id(notebook_id: str | None) -> str | None:
@@ -239,6 +257,8 @@ def ingest_notebook_url(notebook_id: str, body: UrlIngestBody) -> dict:
     url = body.url.strip()
     if not (url.startswith("http://") or url.startswith("https://")):
         raise HTTPException(status_code=422, detail="URL must start with http:// or https://")
+    if not _is_safe_url(url):
+        raise HTTPException(status_code=422, detail="URL resolves to a private or reserved IP address")
 
     collection_id = nb.get("r2r_collection_id") or None
 

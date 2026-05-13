@@ -98,7 +98,8 @@ def run_pipeline_for_source(
         classifier_name = source_type.value  # "docx" or "pptx"
         chunk_template = "general"
 
-    document_id = _make_document_id(effective_source)
+    # Pass path_or_url to _make_document_id for URL hash collision detection
+    document_id = _make_document_id(effective_source, path_or_url=path_or_url if source_type == SourceType.URL else None)
 
     chunks = chunk_document(
         pages=pages,
@@ -134,8 +135,22 @@ def run_pipeline_for_source(
     }
 
 
-def _make_document_id(source_file: str) -> str:
-    """Deterministic document_id from source_file name (same as existing pipeline)."""
+def _make_document_id(source_file: str, path_or_url: str | None = None) -> str:
+    """Deterministic document_id from source_file name.
+
+    For URL sources, appends URL hash to avoid collisions (e.g.,
+    https://example.com/docs and https://other.com/docs both have stem 'docs').
+    """
+    import hashlib
+
+    # Check if this is a URL
+    if path_or_url and (path_or_url.startswith("http://") or path_or_url.startswith("https://")):
+        stem = Path(path_or_url).stem or "url"
+        slug = re.sub(r"[^A-Za-z0-9_-]", "_", stem)[:20]
+        url_hash = hashlib.sha1(path_or_url.encode()).hexdigest()[:8]
+        return f"{slug}_{url_hash}"
+
+    # File-based source
     stem = Path(source_file).stem
     slug = re.sub(r"[^A-Za-z0-9_-]", "_", stem)[:40] or "document"
     return slug
