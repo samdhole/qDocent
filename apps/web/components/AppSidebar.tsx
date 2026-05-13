@@ -3,7 +3,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, BookOpen, FileText, LogOut, MessageSquare, MessageSquareText, Moon, Sun, Workflow } from "lucide-react";
+import { BookOpen, FileText, LogOut, MessageSquare, MessageSquareText, Moon, Sparkles, Sun, Workflow } from "lucide-react";
 import { useTheme } from "next-themes";
 
 import { cn } from "@/lib/utils";
@@ -16,7 +16,7 @@ const NAV_ITEMS = [
   { href: "/conversations", label: "Conversations", icon: MessageSquare },
   { href: "/documents", label: "Documents", icon: FileText },
   { href: "/workflows", label: "Workflows", icon: Workflow },
-  { href: "/evals", label: "Evaluations", icon: BarChart3 },
+  { href: "/demo", label: "Demo", icon: Sparkles },
 ] as const;
 
 type Props = {
