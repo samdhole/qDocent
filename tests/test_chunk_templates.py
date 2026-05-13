@@ -4,6 +4,8 @@ import pytest
 from packages.ingestion.chunk_templates import (
     _make_chunk,
     _split_text,
+    _union_bbox,
+    _tight_bbox,
     chunk_document,
 )
 
@@ -262,3 +264,102 @@ class TestChunkDocument:
         )
 
         assert len(chunks) == 0
+
+
+class TestBboxHelpers:
+    """_union_bbox and _tight_bbox compute tight paragraph bboxes."""
+
+    def test_union_bbox_single_line(self):
+        lines = [{"x0": 10, "top": 20, "x1": 300, "bottom": 35}]
+        assert _union_bbox(lines) == [10, 20, 300, 35]
+
+    def test_union_bbox_multiple_lines(self):
+        lines = [
+            {"x0": 10, "top": 20, "x1": 300, "bottom": 35},
+            {"x0": 15, "top": 40, "x1": 280, "bottom": 55},
+        ]
+        assert _union_bbox(lines) == [10, 20, 300, 55]
+
+    def test_union_bbox_empty_returns_fallback_shape(self):
+        # Empty input → [0,0,0,0]
+        assert _union_bbox([]) == [0.0, 0.0, 0.0, 0.0]
+
+    def test_tight_bbox_matches_lines_in_chunk(self):
+        text_lines = [
+            {"text": "The quick brown fox", "x0": 10, "top": 20, "x1": 300, "bottom": 35},
+            {"text": "jumps over the lazy dog", "x0": 10, "top": 40, "x1": 280, "bottom": 55},
+            {"text": "Unrelated sentence here", "x0": 10, "top": 100, "x1": 200, "bottom": 115},
+        ]
+        chunk_text = "The quick brown fox jumps over the lazy dog"
+        page_bbox = [0, 0, 612, 792]
+        result = _tight_bbox(text_lines, chunk_text, page_bbox)
+        # Should match first two lines, NOT the third
+        assert result[1] == pytest.approx(20, abs=1)   # top = first line top
+        assert result[3] == pytest.approx(55, abs=1)   # bottom = second line bottom
+        # Tight bbox must be smaller than page
+        assert result[3] < page_bbox[3]
+
+    def test_tight_bbox_falls_back_to_page_bbox_when_no_match(self):
+        text_lines = [{"text": "xyz", "x0": 10, "top": 20, "x1": 100, "bottom": 35}]
+        chunk_text = "completely unrelated text with no overlap"
+        page_bbox = [0, 0, 612, 792]
+        result = _tight_bbox(text_lines, chunk_text, page_bbox)
+        assert result == page_bbox
+
+    def test_tight_bbox_empty_lines_falls_back(self):
+        result = _tight_bbox([], "some chunk text", [0, 0, 612, 792])
+        assert result == [0, 0, 612, 792]
+
+
+class TestChunkBboxPrecision:
+    """chunk_document must produce tight (not page-wide) bboxes for text chunks."""
+
+    def _make_page(self, pnum: int = 1) -> dict:
+        return {
+            "page_number": pnum,
+            "text": "Introduction\n\nThis is the first paragraph of the document.\n\nSecond Section\n\nThis is another paragraph with different content.",
+            "tables": [],
+            "confidence": 100.0,
+            "bbox": [0, 0, 612, 792],
+            "text_lines": [
+                {"text": "Introduction", "x0": 72, "top": 60, "x1": 200, "bottom": 76},
+                {"text": "This is the first paragraph of the document.", "x0": 72, "top": 90, "x1": 500, "bottom": 106},
+                {"text": "Second Section", "x0": 72, "top": 200, "x1": 220, "bottom": 216},
+                {"text": "This is another paragraph with different content.", "x0": 72, "top": 230, "x1": 480, "bottom": 246},
+            ],
+            "parser": "fast_text",
+        }
+
+    def test_text_chunk_bbox_not_full_page(self):
+        pages = [self._make_page()]
+        chunks = chunk_document(
+            pages=pages,
+            normalized_tables=[],
+            document_id="test",
+            source_file="test.pdf",
+            parser="fast_text",
+            chunk_template="policy",
+        )
+        text_chunks = [c for c in chunks if "paragraph" in c["text"].lower()]
+        assert text_chunks, "expected at least one text chunk"
+        chunk = text_chunks[0]
+        # The chunk bbox should NOT span the full page height
+        assert chunk["bbox"][3] < 792, "bbox bottom should be less than page height"
+        # The chunk bbox should start close to where the text is (top < 150)
+        assert chunk["bbox"][1] < 150, "bbox top should be near the actual text"
+
+    def test_fallback_when_no_text_lines(self):
+        """When text_lines is empty, bbox falls back to page bbox — no crash."""
+        page = self._make_page()
+        page["text_lines"] = []
+        chunks = chunk_document(
+            pages=[page],
+            normalized_tables=[],
+            document_id="test",
+            source_file="test.pdf",
+            parser="fast_text",
+            chunk_template="policy",
+        )
+        assert chunks, "should produce chunks even without text_lines"
+        for chunk in chunks:
+            assert "bbox" in chunk

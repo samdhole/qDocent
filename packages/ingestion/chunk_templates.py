@@ -91,7 +91,8 @@ def _heading_aware_chunks(
     for page in pages:
         text = page["text"]
         confidence = page["confidence"]
-        bbox = page["bbox"]
+        page_bbox = page["bbox"]
+        text_lines = page.get("text_lines", [])
         pnum = page["page_number"]
 
         # Split on headings
@@ -119,7 +120,7 @@ def _heading_aware_chunks(
                             page_start=pnum,
                             page_end=pnum,
                             section_path=current_section,
-                            bbox=bbox,
+                            bbox=_tight_bbox(text_lines, sub, page_bbox),
                             parser=parser,
                             chunk_template=chunk_template,
                             confidence=confidence,
@@ -137,7 +138,8 @@ def _clause_aware_chunks(
         text = page["text"]
         pnum = page["page_number"]
         confidence = page["confidence"]
-        bbox = page["bbox"]
+        page_bbox = page["bbox"]
+        text_lines = page.get("text_lines", [])
 
         clauses = _CLAUSE_RE.split(text)
         for i, clause in enumerate(clauses):
@@ -154,7 +156,7 @@ def _clause_aware_chunks(
                             page_start=pnum,
                             page_end=pnum,
                             section_path=f"Clause {i+1}",
-                            bbox=bbox,
+                            bbox=_tight_bbox(text_lines, sub, page_bbox),
                             parser=parser,
                             chunk_template=chunk_template,
                             confidence=confidence,
@@ -216,3 +218,37 @@ def _split_text(text: str, max_chars: int) -> list[str]:
         parts.append(text[:cut].strip())
         text = text[cut:].strip()
     return parts
+
+
+def _union_bbox(lines: list[dict]) -> list[float]:
+    """Union bbox over a list of line dicts with {x0, top, x1, bottom}."""
+    if not lines:
+        return [0.0, 0.0, 0.0, 0.0]
+    return [
+        min(l["x0"] for l in lines),
+        min(l["top"] for l in lines),
+        max(l["x1"] for l in lines),
+        max(l["bottom"] for l in lines),
+    ]
+
+
+def _tight_bbox(
+    text_lines: list[dict],
+    chunk_text: str,
+    fallback_bbox: list[float],
+    min_match_len: int = 10,
+) -> list[float]:
+    """Return tight union bbox of lines that appear in chunk_text.
+
+    Filters lines shorter than min_match_len to avoid matching single short words
+    that appear everywhere. Falls back to fallback_bbox when no lines match.
+    """
+    if not text_lines:
+        return fallback_bbox
+    chunk_norm = " ".join(chunk_text.split()).lower()
+    matching = [
+        l for l in text_lines
+        if len(l["text"]) >= min_match_len
+        and " ".join(l["text"].split()).lower() in chunk_norm
+    ]
+    return _union_bbox(matching) if matching else fallback_bbox
