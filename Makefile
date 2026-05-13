@@ -1,4 +1,4 @@
-.PHONY: setup r2r api web smoke ingest eval demo-check clean test
+.PHONY: setup r2r api web smoke ingest eval demo-check demo-setup clean test
 
 setup:
 	uv venv .venv
@@ -25,6 +25,9 @@ eval:
 
 demo-check:
 	uv run python scripts/demo_readiness.py
+
+demo-setup:
+	uv run python scripts/setup_demo_corpus.py
 
 clean:
 	rm -rf .pytest_cache
