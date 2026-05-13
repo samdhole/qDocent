@@ -1,3 +1,4 @@
+// pattern: Imperative Shell
 "use client";
 
 import { useEffect, useState } from "react";
@@ -14,14 +15,14 @@ type HealthState = "loading" | "live" | "offline";
 
 export function DemoAskBox() {
   const notebookId = process.env.NEXT_PUBLIC_DEMO_NOTEBOOK_ID ?? "";
-  const [healthState, setHealthState] = useState<HealthState>("loading");
+  const [healthState, setHealthState] = useState<HealthState>(
+    notebookId ? "loading" : "offline"
+  );
 
   useEffect(() => {
-    if (!notebookId) {
-      setHealthState("offline");
-      return;
-    }
+    if (!notebookId) return;
 
+    // fire-and-forget: AbortSignal.timeout(2000) bounds the work; setState-on-unmount is silent in React 19
     fetch(`${API}/health`, { signal: AbortSignal.timeout(2000) })
       .then((res) => {
         setHealthState(res.ok ? "live" : "offline");

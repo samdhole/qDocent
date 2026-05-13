@@ -1,6 +1,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import { DemoAskBox } from "./DemoAskBox";
+import type { AskResponse } from "@/lib/types";
 
 // Mock the imported components
 vi.mock("@/components/ConversationView", () => ({
@@ -8,7 +9,7 @@ vi.mock("@/components/ConversationView", () => ({
 }));
 
 vi.mock("@/components/AnswerCard", () => ({
-  default: ({ result }: any) => (
+  default: ({ result }: { result: AskResponse }) => (
     <div data-testid="answer-card">
       {result.question}: {result.answer}
     </div>
@@ -16,7 +17,7 @@ vi.mock("@/components/AnswerCard", () => ({
 }));
 
 vi.mock("@/components/ui/badge", () => ({
-  Badge: ({ children, variant }: any) => (
+  Badge: ({ children, variant }: { children: React.ReactNode; variant?: string }) => (
     <div data-testid="badge" data-variant={variant}>
       {children}
     </div>
@@ -37,9 +38,11 @@ vi.mock("./data/example_qa.json", () => ({
 }));
 
 describe("DemoAskBox", () => {
+  const mockFetch = vi.fn<Parameters<typeof fetch>, ReturnType<typeof fetch>>();
+
   beforeEach(() => {
     vi.clearAllMocks();
-    global.fetch = vi.fn();
+    global.fetch = mockFetch as unknown as typeof fetch;
   });
 
   afterEach(() => {
@@ -48,11 +51,11 @@ describe("DemoAskBox", () => {
 
   it("renders loading skeleton initially", () => {
     // Set up: mock fetch that will never resolve quickly
-    (global.fetch as any).mockImplementation(
+    mockFetch.mockImplementation(
       () =>
         new Promise((resolve) =>
           setTimeout(
-            () => resolve({ ok: true }),
+            () => resolve(new Response(JSON.stringify({ ok: true }), { status: 200 })),
             10000 // resolve after 10s, longer than any test
           )
         )
@@ -70,7 +73,7 @@ describe("DemoAskBox", () => {
 
   it("shows ConversationView when API is healthy", async () => {
     // Set up: mock successful health check
-    (global.fetch as any).mockResolvedValueOnce({ ok: true });
+    mockFetch.mockResolvedValueOnce(new Response(JSON.stringify({ status: "ok" }), { status: 200 }));
 
     vi.stubEnv("NEXT_PUBLIC_DEMO_NOTEBOOK_ID", "test-notebook-id");
 
@@ -84,7 +87,7 @@ describe("DemoAskBox", () => {
 
   it("shows cached answer when API is unavailable (health check fails)", async () => {
     // Set up: mock failed health check
-    (global.fetch as any).mockRejectedValueOnce(new Error("Network error"));
+    mockFetch.mockRejectedValueOnce(new Error("Network error"));
 
     vi.stubEnv("NEXT_PUBLIC_DEMO_NOTEBOOK_ID", "test-notebook-id");
 
@@ -114,18 +117,18 @@ describe("DemoAskBox", () => {
     });
 
     // Verify: fetch was never called
-    expect(global.fetch).not.toHaveBeenCalled();
+    expect(mockFetch).not.toHaveBeenCalled();
   });
 
   it("calls health endpoint with correct URL and timeout", async () => {
     // Set up
-    (global.fetch as any).mockResolvedValueOnce({ ok: true });
+    mockFetch.mockResolvedValueOnce(new Response(JSON.stringify({ status: "ok" }), { status: 200 }));
     vi.stubEnv("NEXT_PUBLIC_DEMO_NOTEBOOK_ID", "test-notebook-id");
 
     render(<DemoAskBox />);
 
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith(
+      expect(mockFetch).toHaveBeenCalledWith(
         "http://localhost:8000/health",
         expect.objectContaining({
           signal: expect.any(AbortSignal),
@@ -136,7 +139,7 @@ describe("DemoAskBox", () => {
 
   it("shows cached answer when health check returns non-200 status", async () => {
     // Set up: mock health check returning error status
-    (global.fetch as any).mockResolvedValueOnce({ ok: false });
+    mockFetch.mockResolvedValueOnce(new Response(JSON.stringify({ status: "error" }), { status: 500 }));
 
     vi.stubEnv("NEXT_PUBLIC_DEMO_NOTEBOOK_ID", "test-notebook-id");
 
