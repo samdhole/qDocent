@@ -49,6 +49,11 @@ def _parse_fast_text(path: Path) -> list[dict[str, Any]]:
         for i, page in enumerate(pdf.pages):
             text = page.extract_text() or ""
             bbox = [page.bbox[0], page.bbox[1], page.bbox[2], page.bbox[3]]
+            text_lines = [
+                {"text": l["text"], "x0": l["x0"], "top": l["top"], "x1": l["x1"], "bottom": l["bottom"]}
+                for l in page.extract_text_lines(return_chars=False)
+                if l.get("text", "").strip()
+            ]
             pages.append(
                 {
                     "page_number": i + 1,
@@ -56,6 +61,7 @@ def _parse_fast_text(path: Path) -> list[dict[str, Any]]:
                     "tables": [],
                     "confidence": 100.0,
                     "bbox": bbox,
+                    "text_lines": text_lines,
                     "parser": "fast_text",
                 }
             )
@@ -66,10 +72,16 @@ def _parse_table_aware(path: Path) -> list[dict[str, Any]]:
     # First pass: get text per page via pdfplumber
     text_by_page: dict[int, str] = {}
     bbox_by_page: dict[int, list[float]] = {}
+    text_lines_by_page: dict[int, list[dict]] = {}
     with pdfplumber.open(str(path)) as pdf:
         for i, page in enumerate(pdf.pages):
             text_by_page[i + 1] = page.extract_text() or ""
             bbox_by_page[i + 1] = list(page.bbox)
+            text_lines_by_page[i + 1] = [
+                {"text": l["text"], "x0": l["x0"], "top": l["top"], "x1": l["x1"], "bottom": l["bottom"]}
+                for l in page.extract_text_lines(return_chars=False)
+                if l.get("text", "").strip()
+            ]
 
     # Second pass: extract tables via camelot (pdfium backend, no Ghostscript needed)
     tables_by_page: dict[int, list[dict]] = {}
@@ -98,6 +110,7 @@ def _parse_table_aware(path: Path) -> list[dict[str, Any]]:
                 "tables": tables_by_page.get(pnum, []),
                 "confidence": 100.0,
                 "bbox": bbox_by_page[pnum],
+                "text_lines": text_lines_by_page.get(pnum, []),
                 "parser": "table_aware",
             }
         )
@@ -131,6 +144,7 @@ def _parse_ocr(path: Path) -> list[dict[str, Any]]:
                 "tables": [],
                 "confidence": confidence,
                 "bbox": [rect.x0, rect.y0, rect.x1, rect.y1],
+                "text_lines": [],
                 "parser": "ocr",
             }
         )
