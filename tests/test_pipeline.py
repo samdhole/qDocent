@@ -1,5 +1,6 @@
 """Tests for ingestion pipeline."""
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
@@ -132,3 +133,48 @@ class TestPipeline:
             assert chunk.get("source_file") == "original_upload.pdf", (
                 f"chunk source_file={chunk.get('source_file')!r}, expected 'original_upload.pdf'"
             )
+
+
+class TestRunPipelineForSource:
+    """run_pipeline_for_source routes DOCX/URL to the right loader."""
+
+    def _make_pages(self):
+        return [
+            {
+                "page_number": 1,
+                "text": "This is a policy document with refund details.",
+                "tables": [],
+                "confidence": 100.0,
+                "bbox": [0, 0, 612, 792],
+                "text_lines": [],
+                "parser": "docling",
+            }
+        ]
+
+    def test_docx_routes_to_docling(self, tmp_path):
+        fake_docx = tmp_path / "test.docx"
+        fake_docx.write_bytes(b"PK")  # minimal zip magic bytes
+        with patch("packages.ingestion.docling_loader.load_document_with_docling", return_value=self._make_pages()) as mock_load:
+            from packages.ingestion.pipeline import run_pipeline_for_source
+            result = run_pipeline_for_source(str(fake_docx), source_file="test.docx")
+        mock_load.assert_called_once_with(str(fake_docx))
+        assert "chunks" in result
+        assert "report" in result
+        assert result["figures"] == []
+        assert result["figure_manifest"] is None
+
+    def test_url_routes_to_web_loader(self):
+        with patch("packages.ingestion.web_loader.load_url", return_value=self._make_pages()) as mock_load:
+            from packages.ingestion.pipeline import run_pipeline_for_source
+            result = run_pipeline_for_source("https://example.com/docs", source_file="example.com")
+        mock_load.assert_called_once_with("https://example.com/docs")
+        assert "chunks" in result
+        assert result["figures"] == []
+
+    def test_pdf_raises_value_error(self, tmp_path):
+        """PDF files must go through run_pipeline, not run_pipeline_for_source."""
+        fake_pdf = tmp_path / "test.pdf"
+        fake_pdf.write_bytes(b"%PDF-")
+        from packages.ingestion.pipeline import run_pipeline_for_source
+        with pytest.raises(ValueError, match="PDF files must use run_pipeline"):
+            run_pipeline_for_source(str(fake_pdf), source_file="test.pdf")
