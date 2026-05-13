@@ -17,7 +17,9 @@ from apps.api.services.document_store import (
     save_source_pdf,
     write_chunks_manifest,
     write_document_manifest,
+    write_questions_cache,
 )
+from apps.api.services.question_generator import generate_questions
 from apps.api.services.figure_store import figures_for_response
 from apps.api.services.r2r_chunk_adapter import (
     chunks_for_r2r,
@@ -329,6 +331,10 @@ def ingest_file_with_pipeline(
             r2r_document_ids=r2r_document_ids,
         )
         write_chunks_manifest(report["document_id"], chunks)
+        _previews = [(c.get("text") or "")[:200] for c in chunks if (c.get("text") or "").strip()]
+        _questions = generate_questions(_previews[:15])
+        if _questions:
+            write_questions_cache(report["document_id"], _questions)
 
     return {
         "r2r": str(r2r_result),
@@ -392,6 +398,10 @@ def ingest_source_with_pipeline(
                 r2r_document_ids=r2r_document_ids,
             )
             write_chunks_manifest(document_id, chunks)
+            _previews = [(c.get("text") or "")[:200] for c in chunks if (c.get("text") or "").strip()]
+            _questions = generate_questions(_previews[:15])
+            if _questions:
+                write_questions_cache(document_id, _questions)
     else:
         r2r_result = None
         document_id = report.get("document_id")

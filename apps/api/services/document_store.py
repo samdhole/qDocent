@@ -114,6 +114,32 @@ def load_chunks_manifest(document_id: str) -> list[dict[str, Any]] | None:
     return chunks
 
 
+def write_questions_cache(document_id: str, questions: list[str]) -> Path:
+    """Persist generated questions so they can be served without re-calling Gemini."""
+    target_dir = DOCUMENTS_DIR / _safe_segment(document_id)
+    target_dir.mkdir(parents=True, exist_ok=True)
+    target = target_dir / "questions.json"
+    target.write_text(json.dumps({"questions": questions}, indent=2), encoding="utf-8")
+    return target
+
+
+def load_questions_cache(document_id: str) -> list[str] | None:
+    """Return cached questions, or None if not yet generated."""
+    try:
+        path = DOCUMENTS_DIR / _safe_segment(document_id) / "questions.json"
+    except ValueError:
+        return None
+    if not path.exists():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        _log.warning("Corrupt questions cache for %r: %s", document_id, exc)
+        return None
+    qs = data.get("questions") if isinstance(data, dict) else None
+    return qs if isinstance(qs, list) else None
+
+
 def source_pdf_path(document_id: str) -> Path | None:
     """Return the stored source PDF for a document ID, if present."""
     try:

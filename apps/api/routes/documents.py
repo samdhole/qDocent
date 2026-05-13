@@ -7,8 +7,10 @@ from apps.api.services.document_store import (
     delete_source_document,
     load_chunks_manifest,
     load_document_manifest,
+    load_questions_cache,
     list_source_documents,
     source_pdf_path,
+    write_questions_cache,
 )
 from apps.api.services.question_generator import generate_questions
 
@@ -57,7 +59,10 @@ def delete_document(document_id: str) -> dict:
 
 @router.get("/{document_id}/questions")
 def get_document_questions(document_id: str) -> dict:
-    """Generate suggested questions from a document's chunk previews via LLM."""
+    """Return suggested questions, using ingest-time cache when available."""
+    cached = load_questions_cache(document_id)
+    if cached is not None:
+        return {"document_id": document_id, "questions": cached}
     chunks = load_chunks_manifest(document_id)
     if chunks is None:
         raise HTTPException(status_code=404, detail=f"No chunk manifest for '{document_id}'.")
@@ -67,4 +72,6 @@ def get_document_questions(document_id: str) -> dict:
         if isinstance(chunk.get("text_preview"), str) and chunk["text_preview"].strip()
     ]
     questions = generate_questions(text_previews)
+    if questions:
+        write_questions_cache(document_id, questions)
     return {"document_id": document_id, "questions": questions}

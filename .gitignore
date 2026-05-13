@@ -32,6 +32,7 @@ reports/ingestion/docs_*.json
 reports/ingestion/docs_*.md
 reports/ingestion/example.*
 reports/ingestion/test.*
+reports/ingestion/test_*
 
 # R2R upstream clone
 external/
