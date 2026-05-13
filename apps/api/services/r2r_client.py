@@ -337,6 +337,72 @@ def ingest_file_with_pipeline(
     }
 
 
+def ingest_source_with_pipeline(
+    path_or_url: str, original_filename: str | None = None, collection_id: str | None = None
+) -> dict:
+    """Ingest a non-PDF source (DOCX, PPTX, or web URL) via run_pipeline_for_source.
+
+    path_or_url: file path to DOCX/PPTX or URL string to web resource.
+    original_filename: original uploaded filename or URL. When provided, threads through
+    to run_pipeline_for_source so quality reports show the real filename instead of temp path.
+    collection_id: optional R2R collection ID to associate the document with.
+
+    Returns combined result: R2R response + quality report + figures list.
+    For DOCX/PPTX, figures list is empty and no source PDF is saved.
+    For URLs, source_url is None (no local PDF to serve).
+    """
+    from packages.ingestion.pipeline import run_pipeline_for_source
+
+    log = logging.getLogger(__name__)
+    pipeline_result: dict = {}
+    try:
+        pipeline_result = run_pipeline_for_source(
+            path_or_url, source_file=original_filename or path_or_url, collection_id=collection_id
+        )
+        log.info(
+            "Pipeline complete: %d chunks, classifier=%s",
+            len(pipeline_result.get("chunks", [])),
+            pipeline_result.get("classifier", "unknown"),
+        )
+    except Exception as exc:
+        log.warning("Pipeline failed for source: %s", exc)
+
+    chunks = pipeline_result.get("chunks", [])
+    report = pipeline_result.get("report", {})
+    source_url = None
+    r2r_document_ids: list[str] = []
+
+    if chunks:
+        chunks = _valid_chunks(chunks)
+    if chunks:
+        r2r_result = ingest_prechunked_document(chunks, report, collection_id=collection_id)
+        primary_r2r_id = _r2r_document_id_from_response(r2r_result)
+        if primary_r2r_id:
+            r2r_document_ids.append(primary_r2r_id)
+        document_id = report.get("document_id")
+        if document_id and chunks:
+            write_document_manifest(
+                document_id,
+                source_file=original_filename or path_or_url,
+                r2r_document_ids=r2r_document_ids,
+            )
+            write_chunks_manifest(document_id, chunks)
+    else:
+        r2r_result = None
+        document_id = report.get("document_id")
+
+    return {
+        "r2r": str(r2r_result) if r2r_result else None,
+        "quality_report": report,
+        "document_id": document_id,
+        "ingestion_mode": pipeline_result.get("classifier", "unknown"),
+        "source_url": source_url,
+        "r2r_document_ids": r2r_document_ids,
+        "figures": [],
+        "figures_r2r": None,
+    }
+
+
 def _r2r_document_id_from_response(response: Any) -> str | None:
     """Best-effort extraction across R2R wrapped response shapes."""
     candidates = [getattr(response, "results", None), response]

@@ -2,12 +2,15 @@
 import os
 import shutil
 import tempfile
+from pathlib import Path
 from fastapi import APIRouter, HTTPException, UploadFile, File
 from pydantic import BaseModel
 
 from apps.api.services import notebook_store, r2r_client
 
 router = APIRouter(prefix="/notebooks", tags=["notebooks"])
+
+_ALLOWED_EXTENSIONS = {".pdf", ".docx", ".pptx"}
 
 
 def resolve_collection_id(notebook_id: str | None) -> str | None:
@@ -35,6 +38,12 @@ class NotebookUpdate(BaseModel):
 
     name: str | None = None
     description: str | None = None
+
+
+class UrlIngestBody(BaseModel):
+    """Request body for URL ingestion."""
+
+    url: str
 
 
 @router.get("")
@@ -137,52 +146,110 @@ def list_notebook_documents(notebook_id: str) -> list[dict]:
 
 @router.post("/{notebook_id}/documents", status_code=201)
 def ingest_notebook_document(notebook_id: str, file: UploadFile = File(...)) -> dict:
-    """Ingest a PDF document into a notebook.
+    """Ingest a PDF, DOCX, or PPTX document into a notebook.
 
     The document is scoped to the notebook's R2R collection during ingestion.
     Membership is recorded in SQLite.
 
     Args:
         notebook_id: ID of the notebook to ingest into.
-        file: PDF file to ingest.
+        file: PDF, DOCX, or PPTX file to ingest.
 
     Returns:
         Result dict with status, ingestion result, and document_id.
 
     Raises:
         HTTPException: 404 if notebook not found.
-        HTTPException: 422 if file is not a PDF.
+        HTTPException: 422 if file type is not accepted.
     """
     nb = notebook_store.get_notebook(notebook_id)
     if not nb:
         raise HTTPException(status_code=404, detail="Notebook not found")
 
-    # Validate file type — 422 for non-PDF
+    # Validate file type — 422 for non-accepted extensions
     filename = file.filename or ""
-    if not filename.lower().endswith(".pdf"):
-        raise HTTPException(status_code=422, detail="Only PDF files are accepted")
-
-    # Validate PDF magic header to prevent non-PDF files with fake extensions
-    header = file.file.read(5)
-    if header != b"%PDF-":
-        raise HTTPException(status_code=422, detail="File is not a valid PDF (invalid magic header)")
-    file.file.seek(0)  # Rewind to start for the actual ingest
+    ext = Path(filename).suffix.lower()
+    if ext not in _ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Only {sorted(_ALLOWED_EXTENSIONS)} files are accepted. Got '{ext or 'no extension'}'.",
+        )
 
     collection_id = nb.get("r2r_collection_id") or None
 
-    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+    with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tmp:
         tmp_path = tmp.name
         shutil.copyfileobj(file.file, tmp)
 
     try:
-        result = r2r_client.ingest_file_with_pipeline(
-            tmp_path,
-            original_filename=filename,
-            collection_id=collection_id,
-        )
+        if ext == ".pdf":
+            # Validate PDF magic header to prevent non-PDF files with fake extensions
+            with open(tmp_path, "rb") as f:
+                header = f.read(5)
+            if header != b"%PDF-":
+                raise HTTPException(status_code=422, detail="File is not a valid PDF (invalid magic header)")
+            result = r2r_client.ingest_file_with_pipeline(
+                tmp_path,
+                original_filename=filename,
+                collection_id=collection_id,
+            )
+        else:
+            # DOCX or PPTX — use ingest_source_with_pipeline
+            result = r2r_client.ingest_source_with_pipeline(
+                tmp_path,
+                original_filename=filename,
+                collection_id=collection_id,
+            )
     finally:
         if os.path.exists(tmp_path):
             os.unlink(tmp_path)
+
+    # Record membership in SQLite
+    document_id = (result or {}).get("document_id") or ""
+    if document_id:
+        notebook_store.add_document(notebook_id, document_id)
+
+    return {"status": "ok", "result": result, "document_id": document_id}
+
+
+@router.post("/{notebook_id}/ingest/url", status_code=201)
+def ingest_notebook_url(notebook_id: str, body: UrlIngestBody) -> dict:
+    """Ingest a web page URL into a notebook.
+
+    The URL is fetched and converted to markdown via crawl4ai, then chunked.
+    The document is scoped to the notebook's R2R collection during ingestion.
+    Membership is recorded in SQLite.
+
+    Args:
+        notebook_id: ID of the notebook to ingest into.
+        body: Request body with URL.
+
+    Returns:
+        Result dict with status, ingestion result, and document_id.
+
+    Raises:
+        HTTPException: 404 if notebook not found.
+        HTTPException: 422 if URL is invalid.
+        HTTPException: 502 if URL fetch fails.
+    """
+    nb = notebook_store.get_notebook(notebook_id)
+    if not nb:
+        raise HTTPException(status_code=404, detail="Notebook not found")
+
+    url = body.url.strip()
+    if not (url.startswith("http://") or url.startswith("https://")):
+        raise HTTPException(status_code=422, detail="URL must start with http:// or https://")
+
+    collection_id = nb.get("r2r_collection_id") or None
+
+    try:
+        result = r2r_client.ingest_source_with_pipeline(
+            url,
+            original_filename=url,
+            collection_id=collection_id,
+        )
+    except RuntimeError as exc:
+        raise HTTPException(status_code=502, detail=f"Failed to fetch URL: {exc}") from exc
 
     # Record membership in SQLite
     document_id = (result or {}).get("document_id") or ""

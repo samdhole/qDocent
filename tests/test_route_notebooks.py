@@ -262,3 +262,144 @@ class TestIngestNotebookDocument:
         )
         assert resp.status_code == 404
         assert "not found" in resp.json()["detail"].lower()
+
+
+class TestIngestDocxDocument:
+    """Test POST /notebooks/{id}/documents endpoint with DOCX files."""
+
+    def test_accepts_docx_file(self, client, mock_store):
+        """POST /notebooks/{id}/documents with DOCX returns 201 and records membership."""
+        mock_store.get_notebook.return_value = {"id": "nb-1", "r2r_collection_id": "col-abc"}
+        mock_store.add_document.return_value = None
+        fake_docx = io.BytesIO(b"PK\x03\x04")  # ZIP magic bytes (DOCX is a ZIP)
+
+        with mock.patch("apps.api.routes.notebooks.r2r_client.ingest_source_with_pipeline") as mock_ingest:
+            mock_ingest.return_value = {
+                "document_id": "doc-new",
+                "r2r": "ok",
+                "quality_report": None,
+                "source_url": None,
+                "r2r_document_ids": [],
+                "figures": [],
+                "figures_r2r": None,
+                "ingestion_mode": "docx",
+            }
+            resp = client.post(
+                "/notebooks/nb-1/documents",
+                files={"file": ("policy.docx", fake_docx, "application/vnd.openxmlformats-officedocument.wordprocessingml.document")},
+            )
+
+        assert resp.status_code == 201
+        assert resp.json()["document_id"] == "doc-new"
+        mock_ingest.assert_called_once()
+        call_kwargs = mock_ingest.call_args[1]
+        assert call_kwargs.get("collection_id") == "col-abc"
+        mock_store.add_document.assert_called_once_with("nb-1", "doc-new")
+
+    def test_accepts_pptx_file(self, client, mock_store):
+        """POST /notebooks/{id}/documents with PPTX returns 201 and records membership."""
+        mock_store.get_notebook.return_value = {"id": "nb-1", "r2r_collection_id": "col-abc"}
+        mock_store.add_document.return_value = None
+        fake_pptx = io.BytesIO(b"PK\x03\x04")  # ZIP magic bytes (PPTX is a ZIP)
+
+        with mock.patch("apps.api.routes.notebooks.r2r_client.ingest_source_with_pipeline") as mock_ingest:
+            mock_ingest.return_value = {
+                "document_id": "doc-new",
+                "r2r": "ok",
+                "quality_report": None,
+                "source_url": None,
+                "r2r_document_ids": [],
+                "figures": [],
+                "figures_r2r": None,
+                "ingestion_mode": "pptx",
+            }
+            resp = client.post(
+                "/notebooks/nb-1/documents",
+                files={"file": ("slides.pptx", fake_pptx, "application/vnd.openxmlformats-officedocument.presentationml.presentation")},
+            )
+
+        assert resp.status_code == 201
+        assert resp.json()["document_id"] == "doc-new"
+
+    def test_rejects_exe_file(self, client, mock_store):
+        """POST /notebooks/{id}/documents with .exe returns 422."""
+        mock_store.get_notebook.return_value = {"id": "nb-1", "r2r_collection_id": "col-abc"}
+        resp = client.post(
+            "/notebooks/nb-1/documents",
+            files={"file": ("evil.exe", io.BytesIO(b"MZ"), "application/octet-stream")},
+        )
+        assert resp.status_code == 422
+
+
+class TestIngestURL:
+    """Test POST /notebooks/{id}/ingest/url endpoint."""
+
+    def test_accepts_valid_https_url(self, client, mock_store):
+        """POST /notebooks/{id}/ingest/url with HTTPS URL returns 201 and records membership."""
+        mock_store.get_notebook.return_value = {"id": "nb-1", "r2r_collection_id": "col-abc"}
+        mock_store.add_document.return_value = None
+
+        with mock.patch("apps.api.routes.notebooks.r2r_client.ingest_source_with_pipeline") as mock_ingest:
+            mock_ingest.return_value = {
+                "document_id": "web_doc_id",
+                "r2r": "ok",
+                "quality_report": None,
+                "source_url": None,
+                "r2r_document_ids": [],
+                "figures": [],
+                "figures_r2r": None,
+                "ingestion_mode": "web",
+            }
+            resp = client.post(
+                "/notebooks/nb-1/ingest/url",
+                json={"url": "https://example.com/docs"},
+            )
+
+        assert resp.status_code == 201
+        assert resp.json()["document_id"] == "web_doc_id"
+        mock_ingest.assert_called_once()
+        call_kwargs = mock_ingest.call_args[1]
+        assert call_kwargs.get("collection_id") == "col-abc"
+        mock_store.add_document.assert_called_once_with("nb-1", "web_doc_id")
+
+    def test_accepts_valid_http_url(self, client, mock_store):
+        """POST /notebooks/{id}/ingest/url with HTTP URL returns 201."""
+        mock_store.get_notebook.return_value = {"id": "nb-1", "r2r_collection_id": "col-abc"}
+        mock_store.add_document.return_value = None
+
+        with mock.patch("apps.api.routes.notebooks.r2r_client.ingest_source_with_pipeline") as mock_ingest:
+            mock_ingest.return_value = {
+                "document_id": "web_doc_id",
+                "r2r": "ok",
+                "quality_report": None,
+                "source_url": None,
+                "r2r_document_ids": [],
+                "figures": [],
+                "figures_r2r": None,
+                "ingestion_mode": "web",
+            }
+            resp = client.post(
+                "/notebooks/nb-1/ingest/url",
+                json={"url": "http://example.com/page"},
+            )
+
+        assert resp.status_code == 201
+
+    def test_rejects_non_url(self, client, mock_store):
+        """POST /notebooks/{id}/ingest/url with non-URL returns 422."""
+        mock_store.get_notebook.return_value = {"id": "nb-1", "r2r_collection_id": "col-abc"}
+        resp = client.post(
+            "/notebooks/nb-1/ingest/url",
+            json={"url": "not-a-url"},
+        )
+        assert resp.status_code == 422
+
+    def test_404_when_notebook_not_found(self, client, mock_store):
+        """POST /notebooks/{id}/ingest/url returns 404 when notebook doesn't exist."""
+        mock_store.get_notebook.return_value = None
+        resp = client.post(
+            "/notebooks/ghost/ingest/url",
+            json={"url": "https://example.com"},
+        )
+        assert resp.status_code == 404
+        assert "not found" in resp.json()["detail"].lower()
