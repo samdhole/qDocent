@@ -197,12 +197,35 @@ class TestMakeDocumentId:
         assert "docs" in id1, "ID should contain the stem"
         assert "docs" in id2, "ID should contain the stem"
 
-    def test_file_based_document_ids_unchanged(self):
-        """File-based source IDs still work as before."""
+    def test_file_based_document_ids_are_stable(self):
+        """Same filename always produces the same document_id (deterministic)."""
         from packages.ingestion.pipeline import _make_document_id
 
         id1 = _make_document_id("report.pdf")
         id2 = _make_document_id("report.pdf")
 
-        assert id1 == id2, "Same filename should produce same ID"
-        assert id1 == "report"
+        assert id1 == id2, "Same filename should produce the same ID"
+
+    def test_file_based_ids_differ_by_extension(self):
+        """Same stem with different extensions produce different document_ids."""
+        from packages.ingestion.pipeline import _make_document_id
+        import re
+
+        id_docx = _make_document_id("financial_report.docx")
+        id_pptx = _make_document_id("financial_report.pptx")
+        id_pdf = _make_document_id("financial_report.pdf")
+
+        assert id_docx != id_pptx, "DOCX and PPTX with same stem must differ"
+        assert id_docx != id_pdf, "DOCX and PDF with same stem must differ"
+        assert id_pptx != id_pdf, "PPTX and PDF with same stem must differ"
+
+    def test_file_based_id_format(self):
+        """File-based ID follows the slug_ext_hash format."""
+        from packages.ingestion.pipeline import _make_document_id
+        import re
+
+        doc_id = _make_document_id("financial_report.docx")
+        # Expect: slug_ext_6charhex
+        assert re.match(r"^[A-Za-z0-9_-]+_[a-z]+_[0-9a-f]{6}$", doc_id), (
+            f"ID format unexpected: {doc_id}"
+        )

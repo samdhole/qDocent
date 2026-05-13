@@ -46,13 +46,13 @@ def _generate_page_content(
     one-shot retrieval. When the page declares source_doc_ids, scope by document IDs;
     otherwise fall back to the notebook's R2R collection scope.
     """
+    page_log = logging.LoggerAdapter(log, {"job_id": job_id, "notebook_id": notebook_id})
     try:
         # Retrieve relevant chunks from R2R using source_doc_ids or collection_id
         retrieval_result = r2r_client.rag_query(
             query=f"Explain: {page.title}. {page.description}",
             document_ids=page.source_doc_ids if page.source_doc_ids else None,
             collection_id=r2r_collection_id if not page.source_doc_ids else None,
-            search_strategy="hyde",
         )
         chunk_texts = [ctx.get("text", "") for ctx in retrieval_result.get("retrieved_contexts", [])]
         chunk_context = "\n\n".join(chunk_texts) if chunk_texts else "(No source material retrieved)"
@@ -65,10 +65,10 @@ def _generate_page_content(
 
         # Store the generated content
         wiki_store.update_page_content(notebook_id, page.slug, content)
-        log.info("Generated page '%s' for notebook %s", page.slug, notebook_id)
+        page_log.info("Generated page '%s'", page.slug)
 
     except Exception as exc:
-        log.exception("Failed to generate page '%s'", page.slug)
+        page_log.exception("Failed to generate page '%s'", page.slug)
         wiki_store.update_page_content(
             notebook_id, page.slug,
             f"# {page.title}\n\n*Error generating this page: {exc}*"

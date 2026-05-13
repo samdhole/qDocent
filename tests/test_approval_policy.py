@@ -1,5 +1,5 @@
 """Tests for approval policy rules."""
-from packages.workflows.approval_policy import confidence_from_contexts, requires_approval
+from packages.workflows.approval_policy import requires_approval
 
 
 class TestRequiresApproval:
@@ -97,54 +97,3 @@ class TestRequiresApproval:
         assert result is False
 
 
-class TestConfidenceFromContexts:
-    """Test confidence_from_contexts() scoring logic."""
-
-    def test_low_confidence_empty_contexts(self):
-        """confidence_from_contexts returns 'low' for empty list."""
-        result = confidence_from_contexts([])
-        assert result == "low"
-
-    def test_high_confidence_high_score(self):
-        """confidence_from_contexts returns 'high' for score >= 0.80."""
-        result = confidence_from_contexts([{"score": 0.90}])
-        assert result == "high"
-
-    def test_high_confidence_boundary(self):
-        """confidence_from_contexts returns 'high' for score == 0.80."""
-        result = confidence_from_contexts([{"score": 0.80}])
-        assert result == "high"
-
-    def test_medium_confidence_high_threshold(self):
-        """confidence_from_contexts returns 'medium' for score >= 0.50 and < 0.80."""
-        result = confidence_from_contexts([{"score": 0.75}])
-        assert result == "medium"
-
-    def test_medium_confidence_low_threshold(self):
-        """confidence_from_contexts returns 'medium' for score == 0.50."""
-        result = confidence_from_contexts([{"score": 0.50}])
-        assert result == "medium"
-
-    def test_low_confidence_below_threshold(self):
-        """confidence_from_contexts returns 'low' for score < 0.50."""
-        result = confidence_from_contexts([{"score": 0.49}])
-        assert result == "low"
-
-    def test_low_confidence_zero_score(self):
-        """confidence_from_contexts returns 'low' for score == 0.0."""
-        result = confidence_from_contexts([{"score": 0.0}])
-        assert result == "low"
-
-    def test_uses_top_score_only(self):
-        """confidence_from_contexts uses only the first (highest) score."""
-        result = confidence_from_contexts([
-            {"score": 0.90},
-            {"score": 0.70},
-            {"score": 0.50},
-        ])
-        assert result == "high"
-
-    def test_handles_missing_score_key(self):
-        """confidence_from_contexts handles missing 'score' key gracefully."""
-        result = confidence_from_contexts([{"text": "some text"}])
-        assert result == "low"

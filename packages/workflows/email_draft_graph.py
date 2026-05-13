@@ -10,46 +10,27 @@ import logging
 import os
 from typing import Any
 
-import httpx
 from dotenv import load_dotenv
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph.graph import END, START, StateGraph
-from r2r import R2RClient
-from shared.abstractions.exception import R2RException
 
+from apps.api.services import r2r_client
 from packages.workflows.state import SupportState
 
 load_dotenv()
 
-_R2R_URL = os.getenv("R2R_BASE_URL", "http://localhost:7272")
 _LLM_MODEL = os.getenv("RAGAS_EVAL_MODEL", "gemini-3-flash-preview")
-_SEARCH_SETTINGS: dict[str, Any] = {"limit": 3, "graph_settings": {"enabled": False}}
 
 
 def retrieve_policy(state: SupportState) -> SupportState:
+    """Retrieve relevant policy chunks from R2R via the shared r2r_client boundary."""
     log = logging.getLogger(__name__)
     try:
-        client = R2RClient(base_url=_R2R_URL)
-        response = client.retrieval.rag(
-            query=state["customer_message"],
-            search_settings=_SEARCH_SETTINGS,
-        )
-        inner = getattr(response, "results", response)
-        agg = getattr(inner, "search_results", None)
-        chunks = getattr(agg, "chunk_search_results", None) or [] if agg else []
-        contexts = [
-            {"text": getattr(r, "text", "")[:300], "score": round(getattr(r, "score", 0.0) or 0.0, 4)}
-            for r in chunks
-        ]
-        citations = [
-            {"document": (getattr(r, "metadata", {}) or {}).get("source_file", "unknown")}
-            for r in chunks
-        ]
-    except (httpx.ConnectError, httpx.HTTPStatusError, httpx.TimeoutException, R2RException) as exc:
+        result = r2r_client.rag_query(query=state["customer_message"])
+    except Exception as exc:
         log.warning("R2R retrieval failed: %s", exc, exc_info=True)
-        contexts, citations = [], []
-
-    return {**state, "retrieved_contexts": contexts, "citations": citations}
+        result = {"retrieved_contexts": [], "citations": [], "answer": "", "confidence_label": "low"}
+    return {**state, "retrieved_contexts": result["retrieved_contexts"], "citations": result["citations"]}
 
 
 def _fallback_email_draft(customer_message: str, contexts: list[dict[str, Any]]) -> str:
@@ -87,7 +68,7 @@ def draft_email(state: SupportState) -> SupportState:
         "draft_response": draft,
         "confidence_label": confidence,
         "requires_human_approval": True,  # Always — email send is an external action
-        "final_response": "[Awaiting human approval before sending email]",
+        "final_response": draft,
     }
 
 

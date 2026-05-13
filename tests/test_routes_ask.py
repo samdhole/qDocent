@@ -93,3 +93,20 @@ class TestAskWithNotebook:
             response = client.post("/ask", json={"question": "?", "notebook_id": "nb-empty"})
         assert response.status_code == 200
         assert response.json()["confidence_label"] == "low"
+
+
+class TestAskInputLimits:
+    """Finding 6: /ask must reject questions over 4000 characters."""
+
+    def test_ask_rejects_question_over_4000_chars(self):
+        """POST /ask with a 4001-char question returns 422."""
+        client = TestClient(app)
+        response = client.post("/ask", json={"question": "x" * 4001})
+        assert response.status_code == 422
+
+    def test_ask_accepts_question_at_limit(self):
+        """POST /ask with exactly 4000 chars is accepted (not rejected)."""
+        client = TestClient(app)
+        with mock.patch("apps.api.routes.ask.r2r_client.rag_query", return_value={"answer": "ok"}):
+            response = client.post("/ask", json={"question": "x" * 4000})
+        assert response.status_code == 200

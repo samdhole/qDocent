@@ -132,7 +132,7 @@ def mark_stale_jobs(notebook_id: str) -> None:
             _ensure_tables(conn)
             conn.execute(
                 "UPDATE wiki_jobs SET status = 'failed', error = 'superseded', updated_at = ? "
-                "WHERE notebook_id = ? AND status = 'running'",
+                "WHERE notebook_id = ? AND status IN ('running', 'queued')",
                 (_now_iso(), notebook_id),
             )
             conn.commit()

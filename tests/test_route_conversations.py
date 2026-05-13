@@ -141,6 +141,36 @@ class TestPostMessageStream:
             assert "R2R unavailable" in response.text
 
 
+class TestMessageInputLimits:
+    """Finding 6: /conversations message endpoints must reject messages over 4000 characters."""
+
+    def test_post_message_rejects_over_4000_chars(self, client):
+        """POST /conversations/{id}/messages with 4001-char message returns 422."""
+        response = client.post(
+            "/conversations/conv-1/messages",
+            json={"message": "x" * 4001},
+        )
+        assert response.status_code == 422
+
+    def test_post_message_stream_rejects_over_4000_chars(self, client):
+        """POST /conversations/{id}/messages/stream with 4001-char message returns 422."""
+        response = client.post(
+            "/conversations/conv-1/messages/stream",
+            json={"message": "x" * 4001},
+        )
+        assert response.status_code == 422
+
+    def test_post_message_accepts_message_at_limit(self, client):
+        """POST /conversations/{id}/messages with exactly 4000 chars is accepted."""
+        with mock.patch("apps.api.routes.conversations.r2r_agent.agent_query") as mock_query:
+            mock_query.return_value = {"answer": "ok", "citations": []}
+            response = client.post(
+                "/conversations/conv-1/messages",
+                json={"message": "x" * 4000},
+            )
+        assert response.status_code == 200
+
+
 class TestPostMessageWithNotebook:
     """Test POST /conversations/{conversation_id}/messages with notebook_id."""
 

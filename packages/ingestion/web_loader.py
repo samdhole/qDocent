@@ -44,11 +44,38 @@ def _fetch_url_markdown(url: str) -> str:
         raise  # Re-raise legitimate pipeline errors
 
 
-async def _async_fetch(url: str) -> str:
-    from crawl4ai import AsyncWebCrawler  # lazy import
+async def _safe_before_goto(page, context, url, config, **kwargs):
+    """SSRF guard that fires inside Playwright right before each navigation.
 
+    Runs in the same timing window as the actual navigation, making DNS
+    rebinding attacks ineffective — the rebind would already be in effect
+    when we check, so private IPs are caught here even if the pre-flight
+    check in _is_safe_url() passed.
+    """
+    import ipaddress
+    import socket
+    from urllib.parse import urlparse as _urlparse
+    hostname = _urlparse(url).hostname or ""
+    try:
+        for _, _, _, _, sockaddr in socket.getaddrinfo(hostname, None):
+            ip = ipaddress.ip_address(sockaddr[0])
+            if ip.is_private or ip.is_loopback or ip.is_link_local:
+                raise RuntimeError(f"SSRF blocked: {url} resolved to private IP {ip}")
+    except RuntimeError:
+        raise
+    except Exception:
+        raise RuntimeError(f"SSRF blocked: could not resolve {hostname}")
+
+
+async def _async_fetch(url: str) -> str:
+    from crawl4ai import AsyncWebCrawler, CrawlerRunConfig  # lazy import
+
+    config = CrawlerRunConfig(
+        word_count_threshold=10,
+        hooks={"before_goto": _safe_before_goto},
+    )
     async with AsyncWebCrawler(verbose=False) as crawler:
-        result = await crawler.arun(url=url, word_count_threshold=10)
+        result = await crawler.arun(url=url, config=config)
     if not getattr(result, "success", True):
         raise RuntimeError(f"crawl4ai failed for '{url}': {getattr(result, 'error_message', 'unknown error')}")
     return getattr(result, "markdown", "") or ""

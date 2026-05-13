@@ -1,11 +1,12 @@
 """Support triage LangGraph workflow.
 
 Flow:
-  classify_intent → retrieve_context → draft_response → check_approval → send_response
+  classify_intent → retrieve_context → check_approval → send_response
 
-Human approval gate: send_response checks requires_human_approval and sets
-final_response to "[Awaiting human approval]" when True. The caller inspects
-this field and must not send the response until a human approves.
+Human approval gate: check_approval sets requires_human_approval=True when needed.
+send_response always sets final_response to the draft — no placeholder string.
+The caller inspects requires_human_approval and must gate before acting on the response.
+Note: no LangGraph checkpointer is wired; the graph always runs to completion.
 
 Nodes are pure functions. No side effects except retrieve_context (R2R call).
 """
@@ -16,27 +17,17 @@ import logging
 import os
 from typing import Any
 
-import httpx
 from dotenv import load_dotenv
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph.graph import END, START, StateGraph
-from r2r import R2RClient
-from shared.abstractions.exception import R2RException
 
-from packages.workflows.approval_policy import (
-    confidence_from_contexts,
-    requires_approval,
-)
+from apps.api.services import r2r_client
+from packages.workflows.approval_policy import requires_approval
 from packages.workflows.state import SupportState
 
 load_dotenv()
 
-_R2R_URL = os.getenv("R2R_BASE_URL", "http://localhost:7272")
 _LLM_MODEL = os.getenv("RAGAS_EVAL_MODEL", "gemini-3-flash-preview")
-_SEARCH_SETTINGS: dict[str, Any] = {
-    "limit": 5,
-    "graph_settings": {"enabled": False},
-}
 
 # Intent keywords for rule-based classification (part of the 60% deterministic budget)
 _INTENT_RULES: list[tuple[str, str]] = [
@@ -73,47 +64,19 @@ def classify_intent(state: SupportState) -> SupportState:
 
 
 def retrieve_context(state: SupportState) -> SupportState:
-    """Retrieve relevant policy chunks from R2R."""
+    """Retrieve relevant policy chunks from R2R via the shared r2r_client boundary."""
     log = logging.getLogger(__name__)
     try:
-        client = R2RClient(base_url=_R2R_URL)
-        response = client.retrieval.rag(
-            query=state["customer_message"],
-            search_settings=_SEARCH_SETTINGS,
-        )
-        inner = getattr(response, "results", response)
-        agg = getattr(inner, "search_results", None)
-        search_results = getattr(agg, "chunk_search_results", None) or [] if agg else []
-        retrieved_contexts = [
-            {
-                "chunk_id": getattr(r, "id", None),
-                "text": getattr(r, "text", "")[:400],
-                "score": round(getattr(r, "score", 0.0) or 0.0, 4),
-            }
-            for r in search_results
-        ]
-        citations = [
-            {
-                "document": (getattr(r, "metadata", {}) or {}).get("source_file", "unknown"),
-                "page": (getattr(r, "metadata", {}) or {}).get("page_start"),
-                "chunk_id": getattr(r, "id", None),
-            }
-            for r in search_results
-        ]
-        answer = getattr(inner, "generated_answer", "") or ""
-    except (httpx.ConnectError, httpx.HTTPStatusError, httpx.TimeoutException, R2RException) as exc:
+        result = r2r_client.rag_query(query=state["customer_message"])
+    except Exception as exc:
         log.warning("R2R retrieval failed: %s", exc, exc_info=True)
-        retrieved_contexts = []
-        citations = []
-        answer = ""
-
-    confidence_label = confidence_from_contexts(retrieved_contexts)
+        result = {"retrieved_contexts": [], "citations": [], "answer": "", "confidence_label": "low"}
     return {
         **state,
-        "retrieved_contexts": retrieved_contexts,
-        "citations": citations,
-        "draft_response": answer,
-        "confidence_label": confidence_label,
+        "retrieved_contexts": result["retrieved_contexts"],
+        "citations": result["citations"],
+        "draft_response": result["answer"],
+        "confidence_label": result["confidence_label"],
     }
 
 
@@ -129,14 +92,10 @@ def check_approval(state: SupportState) -> SupportState:
 
 
 def send_response(state: SupportState) -> SupportState:
-    """Set final_response. In-node guard: approval-required cases return a
-    placeholder string; callers must check requires_human_approval before using.
+    """Set final_response to the draft. requires_human_approval is advisory — the caller
+    must check it before acting. No in-process blocking without a LangGraph checkpointer.
     """
-    if state["requires_human_approval"]:
-        final = "[Awaiting human approval]"
-    else:
-        final = state["draft_response"]
-    return {**state, "final_response": final}
+    return {**state, "final_response": state["draft_response"]}
 
 
 # ── Graph ────────────────────────────────────────────────────────────────────
@@ -155,7 +114,7 @@ def _build_graph() -> Any:
     graph.add_edge("send_response", END)
 
     # No interrupt_before — requires a LangGraph checkpointer to function, which
-    # this demo doesn't wire up. The approval gate is enforced in send_response().
+    # this demo doesn't wire up. requires_human_approval is advisory; the caller gates.
     return graph.compile()
 
 
@@ -165,8 +124,8 @@ _GRAPH = _build_graph()  # Built once at import — R2R/LLM deps must be importa
 def run_support_triage(customer_message: str) -> dict[str, Any]:
     """Run the support triage workflow and return the final state dict.
 
-    When requires_human_approval is True, final_response is '[Awaiting human approval]'.
-    The caller must check this field before surfacing the response to users.
+    final_response always contains the draft answer. When requires_human_approval is True,
+    the caller must gate before surfacing or acting on the response.
     """
     initial_state: SupportState = {
         "customer_message": customer_message,

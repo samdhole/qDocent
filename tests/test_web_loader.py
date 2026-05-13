@@ -54,3 +54,42 @@ class TestWebLoader:
         with patch("packages.ingestion.web_loader._fetch_url_markdown", side_effect=fail):
             with pytest.raises(RuntimeError, match="Network timeout"):
                 load_url("https://example.com/docs")
+
+
+class TestSafeBeforeGotoHook:
+    """Unit tests for _safe_before_goto SSRF guard hook (Finding 1 — Playwright layer)."""
+
+    def _run(self, coro):
+        import asyncio
+        return asyncio.run(coro)
+
+    def test_blocks_loopback_ip(self):
+        from packages.ingestion.web_loader import _safe_before_goto
+
+        loopback = [(None, None, None, None, ("127.0.0.1", 0))]
+        with patch("socket.getaddrinfo", return_value=loopback):
+            with pytest.raises(RuntimeError, match="SSRF blocked"):
+                self._run(_safe_before_goto(None, None, "http://evil.example.com/", None))
+
+    def test_blocks_private_network_ip(self):
+        from packages.ingestion.web_loader import _safe_before_goto
+
+        private = [(None, None, None, None, ("192.168.1.100", 0))]
+        with patch("socket.getaddrinfo", return_value=private):
+            with pytest.raises(RuntimeError, match="SSRF blocked"):
+                self._run(_safe_before_goto(None, None, "http://internal.corp/", None))
+
+    def test_allows_public_ip(self):
+        from packages.ingestion.web_loader import _safe_before_goto
+
+        public = [(None, None, None, None, ("93.184.216.34", 0))]
+        with patch("socket.getaddrinfo", return_value=public):
+            # Must not raise
+            self._run(_safe_before_goto(None, None, "https://example.com/", None))
+
+    def test_blocks_on_dns_resolution_failure(self):
+        from packages.ingestion.web_loader import _safe_before_goto
+
+        with patch("socket.getaddrinfo", side_effect=OSError("NXDOMAIN")):
+            with pytest.raises(RuntimeError, match="SSRF blocked"):
+                self._run(_safe_before_goto(None, None, "http://unknown.example.com/", None))

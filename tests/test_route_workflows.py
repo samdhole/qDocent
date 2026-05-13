@@ -27,7 +27,7 @@ class TestWorkflowsRoutes:
                 "citations": [{"document": "policy.pdf"}],
                 "confidence_label": "high",
                 "requires_human_approval": True,
-                "final_response": "[Awaiting human approval]",
+                "final_response": "Refunds are available within 30 days.",
             }
 
             response = client.post(
@@ -38,7 +38,8 @@ class TestWorkflowsRoutes:
             assert response.status_code == 200
             data = response.json()
             assert data["requires_human_approval"] is True
-            assert data["final_response"] == "[Awaiting human approval]"
+            # final_response is the draft; approval is advisory — no placeholder string
+            assert data["final_response"] == "Refunds are available within 30 days."
 
     def test_post_support_triage_503_on_error(self, client):
         """POST /workflows/support/triage returns 503 when workflow fails."""
@@ -63,7 +64,7 @@ class TestWorkflowsRoutes:
                 "citations": [],
                 "confidence_label": "low",
                 "requires_human_approval": True,
-                "final_response": "[Awaiting human approval before sending email]",
+                "final_response": "Subject: RE: Your inquiry\n\nDear customer,",
             }
 
             response = client.post(
@@ -74,7 +75,8 @@ class TestWorkflowsRoutes:
             assert response.status_code == 200
             data = response.json()
             assert data["requires_human_approval"] is True
-            assert "[Awaiting human approval" in data["final_response"]
+            # final_response is the draft; approval is advisory — no placeholder string
+            assert data["final_response"] == "Subject: RE: Your inquiry\n\nDear customer,"
 
     def test_post_email_draft_503_on_error(self, client):
         """POST /workflows/support/email-draft returns 503 when workflow fails."""

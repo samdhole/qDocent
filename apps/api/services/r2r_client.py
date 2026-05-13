@@ -9,7 +9,7 @@ from uuid import UUID
 
 import httpx
 from dotenv import load_dotenv
-from r2r import R2RClient
+from r2r import R2RAsyncClient, R2RClient
 from shared.abstractions.exception import R2RException
 
 from apps.api.services.document_store import (
@@ -46,6 +46,11 @@ DEFAULT_SEARCH_SETTINGS: dict[str, Any] = {
 def get_client() -> R2RClient:
     """Public factory for the R2R SDK client. Use from other service modules."""
     return R2RClient(base_url=_BASE_URL)
+
+
+def get_async_client() -> R2RAsyncClient:
+    """Async variant of get_client() for async streaming endpoints."""
+    return R2RAsyncClient(base_url=_BASE_URL)
 
 
 def create_r2r_collection(name: str) -> str:

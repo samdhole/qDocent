@@ -56,11 +56,23 @@ class TestClassifyType:
         result = _classify_type(text, table_ratio=0.0, has_columns=False)
         assert result == "general"
 
-    def test_table_priority_over_keywords(self):
-        """table_ratio >= 0.25 takes priority over keyword matching."""
+    def test_keywords_take_priority_over_table_ratio(self):
+        """Keyword-based types take priority over the table_heavy structural heuristic."""
+        # A contract with many tables is still a legal_contract
         text = "This is a contract with agreement terms."
         result = _classify_type(text, table_ratio=0.25, has_columns=False)
-        # table_heavy should be checked first
+        assert result == "legal_contract"
+
+    def test_paper_with_tables_classified_as_paper(self):
+        """A research paper with >25% table pages must be classified as paper, not table_heavy."""
+        text = "Abstract. Introduction. Methodology. Conclusion. References."
+        result = _classify_type(text, table_ratio=0.5, has_columns=False)
+        assert result == "paper"
+
+    def test_table_heavy_fires_when_no_keyword_match(self):
+        """table_heavy is the fallback for high-table documents with no keyword signature."""
+        text = "Q1 revenue breakdown by region and segment."
+        result = _classify_type(text, table_ratio=0.25, has_columns=False)
         assert result == "table_heavy"
 
 

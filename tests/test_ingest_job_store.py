@@ -211,3 +211,37 @@ class TestTTLEviction:
 
         result = ingest_job_store.get_job(job_id)
         assert result is not None  # safe fallback — None updated_at is not expired
+
+
+class TestMarkStaleQueued:
+    """Finding 3: mark_stale_running_jobs must also clean up queued jobs."""
+
+    def test_mark_stale_also_kills_queued_jobs(self):
+        """Queued job created before crash is flipped to failed on restart."""
+        job_id = "test-stale-queued"
+        ingest_job_store.create_job(job_id, "queued.pdf")
+        # status starts as 'queued' — don't advance to 'running'
+
+        ingest_job_store.mark_stale_running_jobs()
+
+        job = ingest_job_store.get_job(job_id)
+        assert job is not None
+        assert job["status"] == "failed"
+        assert job["error"] == "interrupted by restart"
+
+
+class TestCorruptResultColumn:
+    """Finding 4: corrupt result column must not cause unhandled JSONDecodeError."""
+
+    def test_get_job_with_corrupt_result_returns_job_not_500(self):
+        """Truncated JSON in result column returns dict with result=None."""
+        job_id = "test-corrupt-result"
+        ingest_job_store.create_job(job_id, "broken.pdf")
+        # Pass a raw string as result — update_job only json.dumps dicts, not strings
+        ingest_job_store.update_job(job_id, status="completed", result="{")
+
+        job = ingest_job_store.get_job(job_id)
+
+        assert job is not None
+        assert job["result"] is None
+        assert "[result corrupted]" in (job["error"] or "")

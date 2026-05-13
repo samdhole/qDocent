@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
-from collections.abc import Generator
+from collections.abc import AsyncIterator
 from typing import Any
 
 import httpx
@@ -19,7 +19,7 @@ from apps.api.services.citation_marker_rewriter import rewrite_brackets
 from apps.api.services.document_store import load_document_manifest
 from apps.api.services.figure_store import figures_for_response
 from apps.api.services.r2r_chunk_adapter import citation_from_retrieved_text
-from apps.api.services.r2r_client import DEFAULT_SEARCH_SETTINGS, get_client
+from apps.api.services.r2r_client import DEFAULT_SEARCH_SETTINGS, get_async_client, get_client
 from apps.api.services.r2r_client_helpers import _label_from_score
 
 log = logging.getLogger(__name__)
@@ -28,8 +28,10 @@ _DOC_ONLY_NOT_FOUND = "I couldn't find this in your documents."
 
 
 def _apply_doc_only_check(result: dict[str, Any], doc_only: bool) -> dict[str, Any]:
-    """Replace the answer with the strict not-found string when doc_only is True
-    and retrieval is empty or low-confidence. Mutates and returns the same dict."""
+    """Defense-in-depth: replace answer with not-found string when doc_only=True
+    and the agent returned empty or low-confidence retrieval despite the pre-flight
+    passing. Mutates and returns the same dict.
+    """
     if doc_only and (
         not result.get("retrieved_contexts")
         or result.get("confidence_label") == "low"
@@ -39,6 +41,49 @@ def _apply_doc_only_check(result: dict[str, Any], doc_only: bool) -> dict[str, A
         result["needs_human_review"] = True
         result["doc_only_not_found"] = True
     return result
+
+
+def _preflight_top_score(query: str, search_settings: dict) -> float:
+    """Search-only pre-flight: return the top chunk score without calling the agent.
+
+    Uses client.retrieval.search() — no LLM generation, nothing written to R2R
+    conversation history. Returns 0.0 on any error (conservative: treat as no results).
+    """
+    try:
+        response = get_client().retrieval.search(
+            query=query,
+            search_settings=search_settings,
+        )
+        inner = getattr(response, "results", None) or (
+            response.get("results") if isinstance(response, dict) else None
+        ) or response
+        chunks = getattr(inner, "chunk_search_results", None) or (
+            inner.get("chunk_search_results") if isinstance(inner, dict) else []
+        ) or []
+        if not chunks:
+            return 0.0
+        first = chunks[0]
+        score = getattr(first, "score", None) or (
+            first.get("score") if isinstance(first, dict) else 0.0
+        ) or 0.0
+        return float(score)
+    except Exception:
+        return 0.0  # conservative: treat search error as no results
+
+
+def _make_not_found_result(question: str, conversation_id: str | None) -> dict[str, Any]:
+    """Standard not-found response dict, matching _assemble_from_chunks() shape."""
+    return {
+        "question": question,
+        "answer": _DOC_ONLY_NOT_FOUND,
+        "citations": [],
+        "retrieved_contexts": [],
+        "figures": [],
+        "confidence_label": "low",
+        "needs_human_review": True,
+        "conversation_id": str(conversation_id) if conversation_id else None,
+        "doc_only_not_found": True,
+    }
 
 
 def _build_search_settings(
@@ -97,10 +142,18 @@ def agent_query(
     """Send one user message in a conversation. Returns the same response
     shape as r2r_client.rag_query() so the frontend can render it identically.
 
-    When doc_only=True, applies post-hoc check: if retrieval is empty or low-confidence,
-    replaces answer with strict "I couldn't find this in your documents." string.
+    When doc_only=True, runs a search-only pre-flight first. If retrieval is
+    empty or low-confidence, returns not-found without calling the agent —
+    preventing R2R conversation history from containing a suppressed answer.
     """
     search_settings = _build_search_settings(document_ids, collection_id)
+
+    if doc_only:
+        top_score = _preflight_top_score(message, search_settings)
+        _, needs_review = _label_from_score(top_score)
+        if needs_review:  # score < 0.50 → low confidence → skip agent
+            return _make_not_found_result(message, conversation_id)
+
     try:
         response = get_client().retrieval.agent(
             message={"role": "user", "content": message},
@@ -113,58 +166,17 @@ def agent_query(
     return _apply_doc_only_check(result, doc_only)
 
 
-def _adapt_agent_response(question: str, response: Any) -> dict[str, Any]:
-    """Map the agent response (messages + metadata) to the same dict shape
-    rag_query() returns. Keeps the frontend renderer unchanged.
+def _assemble_from_chunks(
+    question: str,
+    answer: str,
+    chunk_results: list,
+    conversation_id: str | None,
+) -> dict[str, Any]:
+    """Build the standard response dict from a parsed answer and raw chunk list.
 
-    Expected shape (verified by Task 1 spike):
-        results.messages[-1].content                                          → answer text
-        results.messages[-1].metadata.aggregated_search_result (singular,
-            JSON string or dict).chunk_search_results                         → list of retrieved chunks
-        results.conversation_id                                               → conversation_id
+    Pure helper — no I/O. Called by both the non-streaming (_adapt_agent_response)
+    and streaming (_adapt_final_event) paths so citation/figure logic lives in one place.
     """
-    # Extract inner dict/object from response.results or use response directly
-    inner = (
-        getattr(response, "results", None)
-        or (response.get("results") if isinstance(response, dict) else None)
-        or response
-    )
-
-    messages = getattr(inner, "messages", None) or (
-        inner.get("messages") if isinstance(inner, dict) else []
-    )
-    last_message = messages[-1] if messages else None
-    answer = ""
-    metadata: dict[str, Any] = {}
-    if last_message is not None:
-        answer = (
-            getattr(last_message, "content", None)
-            or (last_message.get("content") if isinstance(last_message, dict) else "")
-            or ""
-        )
-        metadata = (
-            getattr(last_message, "metadata", None)
-            or (last_message.get("metadata") if isinstance(last_message, dict) else {})
-            or {}
-        )
-
-    # Handle both singular (aggregated_search_result) and plural (aggregated_search_results)
-    # The spike found singular; this handles both for forward compatibility
-    aggregated = metadata.get("aggregated_search_results") or metadata.get("aggregated_search_result") or {}
-
-    # If aggregated is a JSON string (as found in spike), parse it
-    if isinstance(aggregated, str):
-        try:
-            parsed = json.loads(aggregated)
-        except (json.JSONDecodeError, TypeError):
-            parsed = {}
-        aggregated = parsed if isinstance(parsed, dict) else {}
-    elif not isinstance(aggregated, dict):
-        # Defensive: if it's neither string nor dict (e.g., list from json.loads("[]")), reset
-        aggregated = {}
-
-    chunk_results = aggregated.get("chunk_search_results") or []
-
     citations: list[dict[str, Any]] = []
     retrieved_contexts: list[dict[str, Any]] = []
     for r in chunk_results:
@@ -216,11 +228,6 @@ def _adapt_agent_response(question: str, response: Any) -> dict[str, Any]:
 
     figures = figures_for_response(citations, retrieved_contexts)
 
-    conversation_id = (
-        getattr(inner, "conversation_id", None)
-        or (inner.get("conversation_id") if isinstance(inner, dict) else None)
-    )
-
     return {
         "question": question,
         "answer": answer,
@@ -233,14 +240,74 @@ def _adapt_agent_response(question: str, response: Any) -> dict[str, Any]:
     }
 
 
-def agent_stream(
+def _adapt_agent_response(question: str, response: Any) -> dict[str, Any]:
+    """Map the agent response (messages + metadata) to the standard response dict.
+
+    Expected shape (verified by Task 1 spike):
+        results.messages[-1].content                                          → answer text
+        results.messages[-1].metadata.aggregated_search_result (singular,
+            JSON string or dict).chunk_search_results                         → list of retrieved chunks
+        results.conversation_id                                               → conversation_id
+    """
+    inner = (
+        getattr(response, "results", None)
+        or (response.get("results") if isinstance(response, dict) else None)
+        or response
+    )
+
+    messages = getattr(inner, "messages", None) or (
+        inner.get("messages") if isinstance(inner, dict) else []
+    )
+    last_message = messages[-1] if messages else None
+    answer = ""
+    metadata: dict[str, Any] = {}
+    if last_message is not None:
+        answer = (
+            getattr(last_message, "content", None)
+            or (last_message.get("content") if isinstance(last_message, dict) else "")
+            or ""
+        )
+        metadata = (
+            getattr(last_message, "metadata", None)
+            or (last_message.get("metadata") if isinstance(last_message, dict) else {})
+            or {}
+        )
+
+    # Handle both singular (aggregated_search_result) and plural (aggregated_search_results)
+    # The spike found singular; this handles both for forward compatibility
+    aggregated = metadata.get("aggregated_search_results") or metadata.get("aggregated_search_result") or {}
+
+    # If aggregated is a JSON string (as found in spike), parse it
+    if isinstance(aggregated, str):
+        try:
+            parsed = json.loads(aggregated)
+        except (json.JSONDecodeError, TypeError):
+            parsed = {}
+        aggregated = parsed if isinstance(parsed, dict) else {}
+    elif not isinstance(aggregated, dict):
+        # Defensive: if it's neither string nor dict (e.g., list from json.loads("[]")), reset
+        aggregated = {}
+
+    chunk_results = aggregated.get("chunk_search_results") or []
+    conversation_id = (
+        getattr(inner, "conversation_id", None)
+        or (inner.get("conversation_id") if isinstance(inner, dict) else None)
+    )
+
+    return _assemble_from_chunks(question, answer, chunk_results, conversation_id)
+
+
+async def agent_stream(
     message: str,
     conversation_id: str,
     doc_only: bool = False,
     document_ids: list[str] | None = None,
     collection_id: str | None = None,
-) -> Generator[str, None, None]:
+) -> AsyncIterator[str]:
     """Stream agent events as SSE-formatted strings.
+
+    Async generator so FastAPI handles it without occupying a thread-pool
+    worker for the duration of the stream (each await releases the loop).
 
     Yields raw SSE frames (each a `data: <json>\\n\\n` line) so the route can
     pass them to `StreamingResponse` without further transformation.
@@ -251,11 +318,21 @@ def agent_stream(
     - `final`: the final adapter-shaped dict (same as agent_query() return value)
     - `error`: if R2R errors mid-stream
 
-    When doc_only=True, applies post-hoc check to final frame (same as agent_query).
+    When doc_only=True, runs a search-only pre-flight first (same as agent_query).
+    If retrieval is poor, yields a single final SSE frame with the not-found result
+    and returns without calling the agent or writing to R2R conversation history.
     """
     search_settings = _build_search_settings(document_ids, collection_id)
+
+    if doc_only:
+        top_score = _preflight_top_score(message, search_settings)
+        _, needs_review = _label_from_score(top_score)
+        if needs_review:
+            yield _sse({"type": "final", "result": _make_not_found_result(message, conversation_id)})
+            return
+
     try:
-        stream = get_client().retrieval.agent(
+        stream = await get_async_client().retrieval.agent(
             message={"role": "user", "content": message},
             conversation_id=conversation_id,
             search_settings=search_settings,
@@ -272,7 +349,7 @@ def agent_stream(
     generation_started = False
 
     try:
-        for event in stream:
+        async for event in stream:
             event_type = type(event).__name__
             if event_type == "SearchResultsEvent":
                 payload = _event_payload(event)
@@ -345,16 +422,15 @@ def _adapt_final_event(
     search_results: dict[str, Any],
     final_answer_citations: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    """Build the same dict shape `agent_query` returns, from streaming events.
+    """Build the standard response dict from streaming events.
 
-    Re-uses the citation/header/figure logic from _adapt_agent_response by
-    constructing a synthetic 'response' object — keeps the adapter logic in
-    one place (DRY).
+    Calls _assemble_from_chunks directly with the already-parsed values —
+    no synthetic response object needed.
 
     R2R no longer emits SearchResultsEvent in the streaming path; citation data
     arrives via CitationEvent / FinalAnswerEvent.data.citations instead.
     When search_results is empty, we fall back to final_answer_citations to
-    reconstruct the chunk_search_results structure expected by _adapt_agent_response.
+    reconstruct the chunk_search_results list.
     """
     final_answer = (
         (payload.get("data") or {}).get("generated_answer")
@@ -377,17 +453,7 @@ def _adapt_final_event(
             ]
         }
 
-    fake_response = {
-        "results": {
-            "messages": [
-                {
-                    "role": "assistant",
-                    "content": final_answer,
-                    "metadata": {"aggregated_search_results": search_results},
-                }
-            ],
-            "conversation_id": (payload.get("data") or {}).get("conversation_id"),
-        }
-    }
-    return _adapt_agent_response(question, fake_response)
+    chunk_results = search_results.get("chunk_search_results") or []
+    conversation_id = (payload.get("data") or {}).get("conversation_id")
+    return _assemble_from_chunks(question, final_answer, chunk_results, conversation_id)
 

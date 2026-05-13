@@ -339,7 +339,7 @@ class TestIngestURL:
         mock_store.get_notebook.return_value = {"id": "nb-1", "r2r_collection_id": "col-abc"}
         mock_store.add_document.return_value = None
 
-        with mock.patch("socket.gethostbyname", return_value="93.184.216.34"):  # example.com's real IP
+        with mock.patch("socket.getaddrinfo", return_value=[(None, None, None, None, ("93.184.216.34", 0))]):  # example.com
             with mock.patch("apps.api.routes.notebooks.r2r_client.ingest_source_with_pipeline") as mock_ingest:
                 mock_ingest.return_value = {
                     "document_id": "web_doc_id",
@@ -368,7 +368,7 @@ class TestIngestURL:
         mock_store.get_notebook.return_value = {"id": "nb-1", "r2r_collection_id": "col-abc"}
         mock_store.add_document.return_value = None
 
-        with mock.patch("socket.gethostbyname", return_value="93.184.216.34"):  # example.com's real IP
+        with mock.patch("socket.getaddrinfo", return_value=[(None, None, None, None, ("93.184.216.34", 0))]):  # example.com
             with mock.patch("apps.api.routes.notebooks.r2r_client.ingest_source_with_pipeline") as mock_ingest:
                 mock_ingest.return_value = {
                     "document_id": "web_doc_id",
@@ -430,8 +430,8 @@ class TestIngestURL:
         """POST /notebooks/{id}/ingest/url returns 502 when pipeline fails with RuntimeError."""
         mock_store.get_notebook.return_value = {"id": "nb-1", "r2r_collection_id": "col-abc"}
 
-        # Mock socket.gethostbyname so example.com resolves to a public IP (passes SSRF check)
-        with mock.patch("socket.gethostbyname", return_value="93.184.216.34"):  # example.com's real IP
+        # Mock socket.getaddrinfo so example.com resolves to a public IP (passes SSRF check)
+        with mock.patch("socket.getaddrinfo", return_value=[(None, None, None, None, ("93.184.216.34", 0))]):  # example.com
             with mock.patch("apps.api.routes.notebooks.r2r_client.ingest_source_with_pipeline") as mock_ingest:
                 mock_ingest.side_effect = RuntimeError("Network error fetching URL")
                 resp = client.post(
@@ -441,3 +441,43 @@ class TestIngestURL:
 
         assert resp.status_code == 502
         assert "Failed to fetch" in resp.json()["detail"]
+
+
+class TestIsSafeUrl:
+    """Unit tests for _is_safe_url() SSRF guard (Finding 1 hardening)."""
+
+    def test_rejects_all_addresses_when_any_private(self):
+        """Returns False when getaddrinfo yields a mix with one private address."""
+        from apps.api.routes.notebooks import _is_safe_url
+
+        # First addr is public, second is private — any private → reject
+        mixed_addrs = [
+            (None, None, None, None, ("93.184.216.34", 0)),
+            (None, None, None, None, ("10.0.0.1", 0)),
+        ]
+        with mock.patch("socket.getaddrinfo", return_value=mixed_addrs):
+            assert _is_safe_url("http://tricky.example.com/") is False
+
+    def test_rejects_reserved_address(self):
+        """Returns False when address is in a reserved range (is_reserved)."""
+        from apps.api.routes.notebooks import _is_safe_url
+
+        # 240.0.0.1 is in the reserved 240.0.0.0/4 block
+        reserved_addrs = [(None, None, None, None, ("240.0.0.1", 0))]
+        with mock.patch("socket.getaddrinfo", return_value=reserved_addrs):
+            assert _is_safe_url("http://reserved.example.com/") is False
+
+    def test_accepts_all_public_addresses(self):
+        """Returns True when all resolved addresses are public."""
+        from apps.api.routes.notebooks import _is_safe_url
+
+        public_addrs = [(None, None, None, None, ("93.184.216.34", 0))]
+        with mock.patch("socket.getaddrinfo", return_value=public_addrs):
+            assert _is_safe_url("https://example.com/") is True
+
+    def test_rejects_on_dns_failure(self):
+        """Returns False when getaddrinfo raises (fail-closed)."""
+        from apps.api.routes.notebooks import _is_safe_url
+
+        with mock.patch("socket.getaddrinfo", side_effect=OSError("NXDOMAIN")):
+            assert _is_safe_url("https://nonexistent.example.com/") is False

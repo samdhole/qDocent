@@ -11,6 +11,33 @@ class TestBuildPrompt:
         assert "Chunk A content." in prompt
         assert "Chunk B content." in prompt
 
+    def test_wraps_excerpts_in_delimiters(self):
+        """Finding 7: excerpts are wrapped in explicit DATA-only delimiters."""
+        from apps.api.services.question_generator import _build_prompt
+
+        prompt = _build_prompt(["Some excerpt."])
+
+        assert "=== BEGIN DOCUMENT EXCERPTS ===" in prompt
+        assert "=== END DOCUMENT EXCERPTS ===" in prompt
+
+    def test_delimiter_precedes_excerpt_content(self):
+        """BEGIN delimiter appears before the excerpt text."""
+        from apps.api.services.question_generator import _build_prompt
+
+        prompt = _build_prompt(["Injected content."])
+
+        begin_pos = prompt.index("=== BEGIN DOCUMENT EXCERPTS ===")
+        content_pos = prompt.index("Injected content.")
+        assert begin_pos < content_pos
+
+    def test_data_only_instruction_present(self):
+        """Prompt instructs model to treat content as DATA ONLY."""
+        from apps.api.services.question_generator import _build_prompt
+
+        prompt = _build_prompt(["anything"])
+
+        assert "DATA ONLY" in prompt
+
     def test_caps_at_max_previews(self):
         from apps.api.services.question_generator import _MAX_PREVIEWS, _build_prompt
 

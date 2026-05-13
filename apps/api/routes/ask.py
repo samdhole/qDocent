@@ -1,6 +1,6 @@
 # pattern: Imperative Shell
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from apps.api.services import r2r_client
 from apps.api.routes.notebooks import resolve_collection_id
@@ -9,7 +9,7 @@ router = APIRouter()
 
 
 class AskRequest(BaseModel):
-    question: str
+    question: str = Field(..., max_length=4000)
     notebook_id: str | None = None
 
 

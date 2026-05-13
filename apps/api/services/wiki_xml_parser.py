@@ -1,7 +1,7 @@
 # pattern: Functional Core
 from __future__ import annotations
 
-import xml.etree.ElementTree as ET
+import defusedxml.ElementTree as ET  # prevents XML bomb / XXE on LLM output
 from dataclasses import dataclass, field
 
 

@@ -130,7 +130,11 @@ def get_job(job_id: str) -> dict[str, Any] | None:
 
             # Deserialize result JSON if present
             if job_dict["result"] is not None:
-                job_dict["result"] = json.loads(job_dict["result"])
+                try:
+                    job_dict["result"] = json.loads(job_dict["result"])
+                except json.JSONDecodeError:
+                    job_dict["result"] = None
+                    job_dict["error"] = (job_dict.get("error") or "") + " [result corrupted]"
 
             return job_dict
 
@@ -152,9 +156,9 @@ def mark_stale_running_jobs() -> None:
                 """
                 UPDATE jobs
                 SET status = ?, error = ?, updated_at = ?
-                WHERE status = ?
+                WHERE status IN ('running', 'queued')
                 """,
-                ("failed", "interrupted by restart", now, "running"),
+                ("failed", "interrupted by restart", now),
             )
             conn.commit()
         finally:

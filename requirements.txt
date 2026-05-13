@@ -19,6 +19,7 @@ python-multipart>=0.0.9
 pdfplumber>=0.11.9
 docling>=2.0
 crawl4ai>=0.6
+defusedxml>=0.7
 pytesseract>=0.3.13
 Pillow>=10.0.0
 camelot-py>=1.0.9

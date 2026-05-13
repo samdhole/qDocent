@@ -150,7 +150,10 @@ def _make_document_id(source_file: str, path_or_url: str | None = None) -> str:
         url_hash = hashlib.sha1(path_or_url.encode()).hexdigest()[:8]
         return f"{slug}_{url_hash}"
 
-    # File-based source
+    # File-based source — include extension + hash to prevent same-stem collisions
+    # across formats (e.g. report.docx vs report.pptx vs report.pdf).
     stem = Path(source_file).stem
-    slug = re.sub(r"[^A-Za-z0-9_-]", "_", stem)[:40] or "document"
-    return slug
+    ext = Path(source_file).suffix.lower().lstrip(".")  # "docx", "pptx", "pdf"
+    slug = re.sub(r"[^A-Za-z0-9_-]", "_", stem)[:35] or "document"
+    content_hash = hashlib.sha1(source_file.encode()).hexdigest()[:6]
+    return f"{slug}_{ext}_{content_hash}"

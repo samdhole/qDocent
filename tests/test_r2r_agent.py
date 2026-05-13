@@ -1,8 +1,23 @@
 """Tests for R2R agent service (conversation-aware queries)."""
+import asyncio
 import json
 from unittest import mock
+from unittest.mock import AsyncMock
 
 import pytest
+
+
+async def _collect(agen):
+    """Drain an async generator into a list for synchronous test assertions."""
+    return [item async for item in agen]
+
+
+def _async_iter(*events):
+    """Return an async generator over *events, for mocking async streaming returns."""
+    async def _gen():
+        for e in events:
+            yield e
+    return _gen()
 
 
 class TestCreateConversation:
@@ -298,86 +313,62 @@ class CitationEvent:
         return {"data": {}}
 
 
+def _make_search_response(scores: list[float]) -> mock.Mock:
+    """Build a mock WrappedSearchResponse with chunks at given scores."""
+    resp = mock.Mock()
+    chunks = [mock.Mock(score=s) for s in scores]
+    resp.results.chunk_search_results = chunks
+    return resp
+
+
 class TestDocOnly:
-    """Test doc_only post-hoc check for strict document-only mode."""
+    """Test doc_only pre-flight + defense-in-depth post-hoc check for strict document-only mode."""
 
     def test_ac3_2_doc_only_empty_retrieval(self):
-        """AC3.2: doc_only=True with empty retrieval → "I couldn't find this in your documents." + low confidence."""
+        """AC3.2: doc_only=True with empty retrieval → pre-flight blocks agent, returns not-found."""
         with mock.patch("apps.api.services.r2r_agent.get_client") as mock_client_factory, \
              mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures, \
              mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
-                # Empty chunk results — LLM still tries to answer from knowledge
-                mock_message = mock.MagicMock()
-                mock_message.content = "Based on my knowledge, the refund period is 30 days."
-                mock_message.metadata = {
-                    "aggregated_search_result": json.dumps({"chunk_search_results": []})
-                }
-
-                mock_response = mock.MagicMock()
-                mock_response.results.messages = [mock_message]
-                mock_response.results.conversation_id = "conv-1"
-
-                mock_client_factory.return_value.retrieval.agent.return_value = mock_response
+                mock_client_factory.return_value.retrieval.search.return_value = _make_search_response([])
                 mock_figures.return_value = []
 
                 from apps.api.services.r2r_agent import agent_query
 
                 result = agent_query("What is the refund policy?", "conv-1", doc_only=True)
 
-                # Post-hoc check should replace LLM answer with strict not-found string
+                mock_client_factory.return_value.retrieval.agent.assert_not_called()
                 assert result["answer"] == "I couldn't find this in your documents."
                 assert result["confidence_label"] == "low"
                 assert result["needs_human_review"] is True
                 assert result["doc_only_not_found"] is True
 
     def test_ac3_3_doc_only_low_score_chunk(self):
-        """AC3.3: doc_only=True with low-score chunk (score < 0.50) → strict not-found string."""
+        """AC3.3: doc_only=True with low-score chunk (score < 0.50) → pre-flight blocks agent, returns not-found."""
         with mock.patch("apps.api.services.r2r_agent.get_client") as mock_client_factory, \
              mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures, \
              mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
-                # Single low-score chunk (score 0.3 < 0.50 threshold)
-                mock_message = mock.MagicMock()
-                mock_message.content = "The policy might be related to refunds."
-                mock_message.metadata = {
-                    "aggregated_search_result": json.dumps({
-                        "chunk_search_results": [
-                            {
-                                "text": "DocQuery Citation: document_id=doc1; source_file=policy.pdf; page_start=1; page_end=1; section_path=Overview; chunk_index=0\n\nGeneric text about policies",
-                                "metadata": {
-                                    "chunk_id": "chunk-1",
-                                    "source_file": "policy.pdf",
-                                    "page_start": 1,
-                                },
-                                "score": 0.3,  # Below 0.50 threshold → confidence_label="low"
-                                "id": "chunk-1",
-                            }
-                        ]
-                    })
-                }
-
-                mock_response = mock.MagicMock()
-                mock_response.results.messages = [mock_message]
-                mock_response.results.conversation_id = "conv-1"
-
-                mock_client_factory.return_value.retrieval.agent.return_value = mock_response
+                # score 0.3 < 0.50 → _label_from_score returns needs_review=True → agent skipped
+                mock_client_factory.return_value.retrieval.search.return_value = _make_search_response([0.3])
                 mock_figures.return_value = []
 
                 from apps.api.services.r2r_agent import agent_query
 
                 result = agent_query("What is the refund policy?", "conv-1", doc_only=True)
 
-                # Even though we have a chunk, confidence is low, so post-hoc check triggers
+                mock_client_factory.return_value.retrieval.agent.assert_not_called()
                 assert result["answer"] == "I couldn't find this in your documents."
                 assert result["confidence_label"] == "low"
                 assert result["needs_human_review"] is True
                 assert result["doc_only_not_found"] is True
 
     def test_ac3_4_doc_only_high_score_chunk(self):
-        """AC3.4: doc_only=True with high-score chunk (score >= 0.80) → original LLM answer unchanged."""
+        """AC3.4: doc_only=True with high-score chunk (score >= 0.80) → pre-flight passes, agent called, answer preserved."""
         with mock.patch("apps.api.services.r2r_agent.get_client") as mock_client_factory, \
              mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures, \
              mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
-                # High-score chunk (score 0.85 >= 0.80) → confidence_label="high"
+                # score 0.85 >= 0.50 → needs_review=False → agent IS called
+                mock_client_factory.return_value.retrieval.search.return_value = _make_search_response([0.85])
+
                 mock_message = mock.MagicMock()
                 mock_message.content = "The refund policy is 30 days."
                 mock_message.metadata = {
@@ -390,7 +381,7 @@ class TestDocOnly:
                                     "source_file": "policy.pdf",
                                     "page_start": 1,
                                 },
-                                "score": 0.85,  # Above 0.80 threshold → confidence_label="high"
+                                "score": 0.85,
                                 "id": "chunk-1",
                             }
                         ]
@@ -408,19 +399,17 @@ class TestDocOnly:
 
                 result = agent_query("What is the refund policy?", "conv-1", doc_only=True)
 
-                # High confidence + doc_only=True → post-hoc check does NOT trigger, original answer preserved
+                mock_client_factory.return_value.retrieval.agent.assert_called_once()
                 assert result["answer"] == "The refund policy is 30 days."
                 assert result["confidence_label"] == "high"
                 assert result["needs_human_review"] is False
-                # doc_only_not_found should not be set (or be False/absent)
                 assert not result.get("doc_only_not_found")
 
     def test_ac3_5_doc_only_false_empty_retrieval(self):
-        """AC3.5: doc_only=False (general mode) with empty retrieval → original LLM answer (no substitution)."""
+        """AC3.5: doc_only=False (general mode) with empty retrieval → no pre-flight, original LLM answer."""
         with mock.patch("apps.api.services.r2r_agent.get_client") as mock_client_factory, \
              mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures, \
              mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
-                # Empty retrieval, but doc_only=False → LLM can answer from knowledge
                 mock_message = mock.MagicMock()
                 mock_message.content = "Based on general knowledge, refund periods vary by industry."
                 mock_message.metadata = {
@@ -438,32 +427,26 @@ class TestDocOnly:
 
                 result = agent_query("What is the refund policy?", "conv-1", doc_only=False)
 
-                # No post-hoc substitution — doc_only=False means general mode
+                # doc_only=False → no pre-flight, no substitution
                 assert result["answer"] == "Based on general knowledge, refund periods vary by industry."
-                assert result["confidence_label"] == "low"  # Still low because no retrieval
-                assert result["needs_human_review"] is True  # Still needs review due to low confidence
-                # doc_only_not_found should not be set in general mode
+                assert result["confidence_label"] == "low"
+                assert result["needs_human_review"] is True
                 assert not result.get("doc_only_not_found")
 
     def test_ac3_2_doc_only_stream_empty_retrieval(self):
-        """AC3.2 stream path: doc_only=True with empty retrieval → not-found string + low confidence."""
+        """AC3.2 stream path: doc_only=True with empty retrieval → pre-flight blocks agent, single final SSE."""
         with mock.patch("apps.api.services.r2r_agent.get_client") as mock_client_factory, \
              mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures, \
              mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
-                # Empty retrieval via streaming — LLM tries to answer from knowledge
-                events = [
-                    SearchResultsEvent([]),  # Empty retrieval
-                    MessageEvent("Based on my knowledge, the refund period is 30 days."),
-                    FinalAnswerEvent("Based on my knowledge, the refund period is 30 days.", "conv-1"),
-                ]
-                mock_client_factory.return_value.retrieval.agent.return_value = iter(events)
+                mock_client_factory.return_value.retrieval.search.return_value = _make_search_response([])
                 mock_figures.return_value = []
 
                 from apps.api.services.r2r_agent import agent_stream
 
-                frames = list(agent_stream("What is the refund policy?", "conv-1", doc_only=True))
+                frames = asyncio.run(_collect(agent_stream("What is the refund policy?", "conv-1", doc_only=True)))
 
-                # Extract final frame
+                mock_client_factory.return_value.retrieval.agent.assert_not_called()
+
                 final_frames = [
                     json.loads(f.split("data: ")[1])
                     for f in frames
@@ -472,18 +455,20 @@ class TestDocOnly:
 
                 assert len(final_frames) == 1
                 result = final_frames[0]["result"]
-                # Post-hoc check should replace LLM answer with strict not-found string
                 assert result["answer"] == "I couldn't find this in your documents."
                 assert result["confidence_label"] == "low"
                 assert result["needs_human_review"] is True
                 assert result.get("doc_only_not_found") is True
 
     def test_ac3_4_doc_only_stream_high_score(self):
-        """AC3.4 stream path: doc_only=True with high-score chunk → original LLM answer preserved."""
+        """AC3.4 stream path: doc_only=True with high-score chunk → pre-flight passes, agent called, answer preserved."""
         with mock.patch("apps.api.services.r2r_agent.get_client") as mock_client_factory, \
+             mock.patch("apps.api.services.r2r_agent.get_async_client") as mock_async_client, \
              mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures, \
              mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
-                # High-score chunk via streaming — post-hoc check should NOT trigger
+                # score 0.85 → pre-flight passes, agent IS called via streaming
+                mock_client_factory.return_value.retrieval.search.return_value = _make_search_response([0.85])
+
                 events = [
                     SearchResultsEvent([
                         {
@@ -493,21 +478,20 @@ class TestDocOnly:
                                 "source_file": "policy.pdf",
                                 "page_start": 1,
                             },
-                            "score": 0.85,  # High score → confidence_label="high"
+                            "score": 0.85,
                             "id": "chunk-1",
                         }
                     ]),
                     MessageEvent("The refund policy is 30 days."),
                     FinalAnswerEvent("The refund policy is 30 days.", "conv-1"),
                 ]
-                mock_client_factory.return_value.retrieval.agent.return_value = iter(events)
+                mock_async_client.return_value.retrieval.agent = AsyncMock(return_value=_async_iter(*events))
                 mock_figures.return_value = []
 
                 from apps.api.services.r2r_agent import agent_stream
 
-                frames = list(agent_stream("What is the refund policy?", "conv-1", doc_only=True))
+                frames = asyncio.run(_collect(agent_stream("What is the refund policy?", "conv-1", doc_only=True)))
 
-                # Extract final frame
                 final_frames = [
                     json.loads(f.split("data: ")[1])
                     for f in frames
@@ -516,12 +500,23 @@ class TestDocOnly:
 
                 assert len(final_frames) == 1
                 result = final_frames[0]["result"]
-                # High confidence + doc_only=True → post-hoc check does NOT trigger
                 assert result["answer"] == "The refund policy is 30 days."
                 assert result["confidence_label"] == "high"
                 assert result["needs_human_review"] is False
-                # doc_only_not_found should not be set (or be False/absent)
                 assert not result.get("doc_only_not_found")
+
+    def test_doc_only_preflight_blocks_agent_call(self):
+        """Core guarantee: when pre-flight score < 0.50, agent is never called (no conversation memory divergence)."""
+        with mock.patch("apps.api.services.r2r_agent.get_client") as mock_client_factory:
+            mock_client_factory.return_value.retrieval.search.return_value = _make_search_response([])
+
+            from apps.api.services.r2r_agent import agent_query
+
+            result = agent_query("Unrelated question about Jupiter", "conv-x", doc_only=True)
+
+            mock_client_factory.return_value.retrieval.agent.assert_not_called()
+            assert result["doc_only_not_found"] is True
+            assert result["answer"] == "I couldn't find this in your documents."
 
 
 class TestAgentStream:
@@ -529,12 +524,12 @@ class TestAgentStream:
 
     def test_agent_stream_yields_status_first(self):
         """agent_stream() yields status=searching as first frame."""
-        with mock.patch("apps.api.services.r2r_agent.get_client") as mock_client_factory:
-            mock_client_factory.return_value.retrieval.agent.return_value = iter([])
+        with mock.patch("apps.api.services.r2r_agent.get_async_client") as mock_client_factory:
+            mock_client_factory.return_value.retrieval.agent = AsyncMock(return_value=_async_iter())
 
             from apps.api.services.r2r_agent import agent_stream
 
-            frames = list(agent_stream("test?", "conv-1"))
+            frames = asyncio.run(_collect(agent_stream("test?", "conv-1")))
 
             assert len(frames) >= 1
             first_frame = json.loads(frames[0].split("data: ")[1])
@@ -543,19 +538,19 @@ class TestAgentStream:
 
     def test_agent_stream_emits_token_events_per_message_event(self):
         """agent_stream() yields token frame for each MessageEvent content delta."""
-        with mock.patch("apps.api.services.r2r_agent.get_client") as mock_client_factory, \
+        with mock.patch("apps.api.services.r2r_agent.get_async_client") as mock_client_factory, \
              mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures, \
              mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
                 events = [
                     MessageEvent("Hello "),
                     MessageEvent("world"),
                 ]
-                mock_client_factory.return_value.retrieval.agent.return_value = iter(events)
+                mock_client_factory.return_value.retrieval.agent = AsyncMock(return_value=_async_iter(*events))
                 mock_figures.return_value = []
 
                 from apps.api.services.r2r_agent import agent_stream
 
-                frames = list(agent_stream("test?", "conv-1"))
+                frames = asyncio.run(_collect(agent_stream("test?", "conv-1")))
 
                 token_frames = [
                     json.loads(f.split("data: ")[1])
@@ -570,19 +565,19 @@ class TestAgentStream:
 
     def test_agent_stream_emits_final_event_with_adapted_dict(self):
         """agent_stream() yields final frame with adapted response dict."""
-        with mock.patch("apps.api.services.r2r_agent.get_client") as mock_client_factory, \
+        with mock.patch("apps.api.services.r2r_agent.get_async_client") as mock_client_factory, \
              mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures, \
              mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
                 events = [
                     MessageEvent("The answer is 42."),
                     FinalAnswerEvent("The answer is 42.", "conv-1"),
                 ]
-                mock_client_factory.return_value.retrieval.agent.return_value = iter(events)
+                mock_client_factory.return_value.retrieval.agent = AsyncMock(return_value=_async_iter(*events))
                 mock_figures.return_value = []
 
                 from apps.api.services.r2r_agent import agent_stream
 
-                frames = list(agent_stream("What is the answer?", "conv-1"))
+                frames = asyncio.run(_collect(agent_stream("What is the answer?", "conv-1")))
 
                 final_frames = [
                     json.loads(f.split("data: ")[1])
@@ -600,16 +595,16 @@ class TestAgentStream:
 
     def test_agent_stream_emits_error_when_sdk_raises(self):
         """agent_stream() yields error frame when retrieval.agent raises."""
-        with mock.patch("apps.api.services.r2r_agent.get_client") as mock_client_factory:
+        with mock.patch("apps.api.services.r2r_agent.get_async_client") as mock_client_factory:
             import httpx
 
-            mock_client_factory.return_value.retrieval.agent.side_effect = httpx.ConnectError(
-                "R2R connection failed"
+            mock_client_factory.return_value.retrieval.agent = AsyncMock(
+                side_effect=httpx.ConnectError("R2R connection failed")
             )
 
             from apps.api.services.r2r_agent import agent_stream
 
-            frames = list(agent_stream("test?", "conv-1"))
+            frames = asyncio.run(_collect(agent_stream("test?", "conv-1")))
 
             assert len(frames) >= 1
             first_frame = json.loads(frames[0].split("data: ")[1])
@@ -618,19 +613,21 @@ class TestAgentStream:
 
     def test_agent_stream_emits_error_mid_stream(self):
         """agent_stream() yields tokens then error frame when stream raises."""
-        with mock.patch("apps.api.services.r2r_agent.get_client") as mock_client_factory:
+        with mock.patch("apps.api.services.r2r_agent.get_async_client") as mock_client_factory:
             import httpx
 
-            def failing_generator():
+            async def failing_async_generator():
                 yield MessageEvent("Partial ")
                 yield MessageEvent("answer")
                 raise httpx.ReadError("Network error")
 
-            mock_client_factory.return_value.retrieval.agent.return_value = failing_generator()
+            mock_client_factory.return_value.retrieval.agent = AsyncMock(
+                return_value=failing_async_generator()
+            )
 
             from apps.api.services.r2r_agent import agent_stream
 
-            frames = list(agent_stream("test?", "conv-1"))
+            frames = asyncio.run(_collect(agent_stream("test?", "conv-1")))
 
             frame_list = [json.loads(f.split("data: ")[1]) for f in frames if "data: " in f]
 
@@ -654,7 +651,7 @@ class TestAgentStream:
         preserving monotonic forward-only phase progression:
         "Searching…" → "Reading citations…" → "Generating…"
         """
-        with mock.patch("apps.api.services.r2r_agent.get_client") as mock_client_factory, \
+        with mock.patch("apps.api.services.r2r_agent.get_async_client") as mock_client_factory, \
              mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures, \
              mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
                 events = [
@@ -664,12 +661,12 @@ class TestAgentStream:
                     MessageEvent(" world"),  # Continue generation
                     FinalAnswerEvent("hello world", "conv-1"),
                 ]
-                mock_client_factory.return_value.retrieval.agent.return_value = iter(events)
+                mock_client_factory.return_value.retrieval.agent = AsyncMock(return_value=_async_iter(*events))
                 mock_figures.return_value = []
 
                 from apps.api.services.r2r_agent import agent_stream
 
-                frames = list(agent_stream("test?", "conv-1"))
+                frames = asyncio.run(_collect(agent_stream("test?", "conv-1")))
                 frame_list = [json.loads(f.split("data: ")[1]) for f in frames if "data: " in f]
 
                 # Extract status frames to verify phase order
@@ -697,7 +694,7 @@ class TestAgentStream:
 
     def test_agent_stream_synthesizes_final_frame_when_no_final_event(self):
         """Defensive branch: loop exits without FinalAnswerEvent; synthesizes final frame from accumulated text."""
-        with mock.patch("apps.api.services.r2r_agent.get_client") as mock_client_factory, \
+        with mock.patch("apps.api.services.r2r_agent.get_async_client") as mock_client_factory, \
              mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures, \
              mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
                 # Events: search result and message delta, but no FinalAnswerEvent
@@ -717,12 +714,12 @@ class TestAgentStream:
                     MessageEvent("The refund policy is 30 days."),
                     # No FinalAnswerEvent - loop exits without it
                 ]
-                mock_client_factory.return_value.retrieval.agent.return_value = iter(events)
+                mock_client_factory.return_value.retrieval.agent = AsyncMock(return_value=_async_iter(*events))
                 mock_figures.return_value = []
 
                 from apps.api.services.r2r_agent import agent_stream
 
-                frames = list(agent_stream("What is the refund policy?", "conv-1"))
+                frames = asyncio.run(_collect(agent_stream("What is the refund policy?", "conv-1")))
 
                 # Parse all frames
                 frame_list = [json.loads(f.split("data: ")[1]) for f in frames if "data: " in f]
@@ -874,7 +871,7 @@ class TestDocumentFilter:
 
     def test_ac4_3_agent_stream_with_document_id_applies_filter(self):
         """AC4.3 stream path: agent_stream with document_id applies r2r document ID filter."""
-        with mock.patch("apps.api.services.r2r_agent.get_client") as mock_client_factory, \
+        with mock.patch("apps.api.services.r2r_agent.get_async_client") as mock_client_factory, \
              mock.patch("apps.api.services.r2r_agent.load_document_manifest") as mock_manifest, \
              mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures, \
              mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
@@ -901,13 +898,13 @@ class TestDocumentFilter:
                     MessageEvent("This is from the filtered document."),
                     FinalAnswerEvent("This is from the filtered document.", "conv-1"),
                 ]
-                mock_client_factory.return_value.retrieval.agent.return_value = iter(events)
+                mock_client_factory.return_value.retrieval.agent = AsyncMock(return_value=_async_iter(*events))
                 mock_figures.return_value = []
 
                 from apps.api.services.r2r_agent import agent_stream
 
                 # Consume the generator to trigger the actual call
-                frames = list(agent_stream("What?", "conv-1", document_ids=["doc1"]))
+                asyncio.run(_collect(agent_stream("What?", "conv-1", document_ids=["doc1"])))
 
                 # Verify that the agent was called with filters
                 call_kwargs = mock_client_factory.return_value.retrieval.agent.call_args.kwargs
@@ -1042,7 +1039,7 @@ class TestBuildSearchSettingsCollectionId:
 
     def test_agent_stream_with_collection_id(self):
         """agent_stream() also accepts collection_id and applies $overlap filter."""
-        with mock.patch("apps.api.services.r2r_agent.get_client") as mock_get, \
+        with mock.patch("apps.api.services.r2r_agent.get_async_client") as mock_get, \
              mock.patch("apps.api.services.r2r_agent.figures_for_response", return_value=[]), \
              mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
             # Simple streaming events
@@ -1050,18 +1047,18 @@ class TestBuildSearchSettingsCollectionId:
                 MessageEvent("answer"),
                 FinalAnswerEvent("answer", "conv-1"),
             ]
-            mock_get.return_value.retrieval.agent.return_value = iter(events)
+            mock_get.return_value.retrieval.agent = AsyncMock(return_value=_async_iter(*events))
 
             from apps.api.services.r2r_agent import agent_stream
 
             # Consume the generator to trigger the call
-            list(agent_stream(
+            asyncio.run(_collect(agent_stream(
                 message="q",
                 conversation_id="conv-1",
                 doc_only=False,
                 document_ids=None,
                 collection_id="col-abc",
-            ))
+            )))
 
             call_kwargs = mock_get.return_value.retrieval.agent.call_args[1]
             filters = call_kwargs["search_settings"]["filters"]

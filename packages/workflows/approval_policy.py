@@ -41,18 +41,3 @@ def requires_approval(
     return False
 
 
-def confidence_from_contexts(retrieved_contexts: list) -> str:
-    """Derive confidence_label from retrieved context quality.
-
-    high:   top result score >= 0.80
-    medium: top result score >= 0.50
-    low:    no results or score < 0.50
-    """
-    if not retrieved_contexts:
-        return "low"
-    top_score = retrieved_contexts[0].get("score", 0.0) if isinstance(retrieved_contexts[0], dict) else 0.0
-    if top_score >= 0.80:
-        return "high"
-    if top_score >= 0.50:
-        return "medium"
-    return "low"

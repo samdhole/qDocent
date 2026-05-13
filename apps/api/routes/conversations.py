@@ -2,7 +2,7 @@
 """Conversation endpoints for multi-turn RAG queries."""
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from apps.api.services import conversation_store, r2r_agent
 from apps.api.routes.notebooks import resolve_collection_id
@@ -27,7 +27,7 @@ class CreateConversationResponse(BaseModel):
 class MessageRequest(BaseModel):
     """Request body for POST /conversations/{id}/messages."""
 
-    message: str
+    message: str = Field(..., max_length=4000)
     doc_only: bool = False
     document_ids: list[str] | None = None
     notebook_id: str | None = None
@@ -81,7 +81,7 @@ def post_message(conversation_id: str, body: MessageRequest) -> dict:
 
 
 @router.post("/{conversation_id}/messages/stream")
-def post_message_stream(conversation_id: str, body: MessageRequest) -> StreamingResponse:
+async def post_message_stream(conversation_id: str, body: MessageRequest) -> StreamingResponse:
     """Stream agent response events as Server-Sent Events.
 
     Returns text/event-stream with frames containing status, token, final, or error events.

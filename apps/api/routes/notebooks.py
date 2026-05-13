@@ -24,10 +24,12 @@ def _is_safe_url(url: str) -> bool:
     """
     try:
         hostname = urlparse(url).hostname or ""
-        ip = ipaddress.ip_address(socket.gethostbyname(hostname))
-        return not (ip.is_private or ip.is_loopback or ip.is_link_local)
+        for _, _, _, _, sockaddr in socket.getaddrinfo(hostname, None):
+            ip = ipaddress.ip_address(sockaddr[0])
+            if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved:
+                return False
+        return True
     except Exception:
-        # If we can't resolve or parse, reject to be safe
         return False
 
 
@@ -167,7 +169,9 @@ def ingest_notebook_document(notebook_id: str, file: UploadFile = File(...)) -> 
     """Ingest a PDF, DOCX, or PPTX document into a notebook.
 
     The document is scoped to the notebook's R2R collection during ingestion.
-    Membership is recorded in SQLite.
+    Membership is recorded in SQLite. This endpoint is synchronous — it blocks
+    until ingestion completes and returns the full result. For async ingestion
+    with progress polling, use POST /ingest/jobs instead (PDF only).
 
     Args:
         notebook_id: ID of the notebook to ingest into.

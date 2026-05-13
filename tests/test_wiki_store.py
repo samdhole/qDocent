@@ -89,3 +89,28 @@ class TestDeleteWiki:
         wiki_store.store_structure("nb-2", "T2", "D2", [])
         wiki_store.delete_wiki("nb-1")
         assert wiki_store.get_structure("nb-2") is not None
+
+
+class TestMarkStaleJobs:
+    """Finding 3: mark_stale_jobs must clean up both running and queued jobs."""
+
+    def test_mark_stale_jobs_kills_running(self):
+        wiki_store.create_job("nb-ms", "job-run")
+        wiki_store.update_job("job-run", status="running")
+
+        wiki_store.mark_stale_jobs("nb-ms")
+
+        job = wiki_store.get_job("job-run")
+        assert job["status"] == "failed"
+        assert job["error"] == "superseded"
+
+    def test_mark_stale_jobs_also_kills_queued(self):
+        """Queued wiki job is also marked failed on re-generation (Finding 3)."""
+        wiki_store.create_job("nb-ms2", "job-q")
+        # status starts as 'queued' — no status update needed
+
+        wiki_store.mark_stale_jobs("nb-ms2")
+
+        job = wiki_store.get_job("job-q")
+        assert job["status"] == "failed"
+        assert job["error"] == "superseded"

@@ -14,7 +14,6 @@ import pdfplumber
 
 OCR_CHAR_THRESHOLD = 10  # pages with fewer chars than this are treated as scanned
 TABLE_PAGE_RATIO_THRESHOLD = 0.25  # docs with >25% table-containing pages are table_heavy
-COLUMN_GAP_THRESHOLD = 100  # points of horizontal gap indicating multi-column layout
 
 # Keyword sets for rule-based document_type detection
 _CONTRACT_KEYWORDS = re.compile(
@@ -82,13 +81,15 @@ def classify_document(pdf_path: str | Path) -> ClassificationResult:
             if page.extract_tables():
                 table_pages += 1
 
-            # Detect multi-column layout via large horizontal gap in word positions
+            # Detect multi-column layout: check whether words cluster on both left and right
+            # halves of the page (bimodal x-distribution), which indicates two columns.
             if not has_columns:
                 words = page.extract_words()
                 if len(words) > 10:
-                    x_positions = sorted(w["x0"] for w in words)
-                    gaps = [x_positions[i+1] - x_positions[i] for i in range(len(x_positions)-1)]
-                    if any(g > COLUMN_GAP_THRESHOLD for g in gaps):
+                    page_width = page.width or 612.0
+                    left_words = sum(1 for w in words if w["x0"] < page_width * 0.4)
+                    right_words = sum(1 for w in words if w["x0"] > page_width * 0.55)
+                    if left_words / len(words) > 0.2 and right_words / len(words) > 0.2:
                         has_columns = True
 
     is_scanned = scanned_pages > total_pages * 0.5
@@ -111,13 +112,19 @@ def classify_document(pdf_path: str | Path) -> ClassificationResult:
 
 
 def _classify_type(text: str, table_ratio: float, has_columns: bool) -> str:
-    """Rule-based document type detection. No LLM calls here."""
-    if table_ratio >= TABLE_PAGE_RATIO_THRESHOLD:
-        return "table_heavy"
+    """Rule-based document type detection. No LLM calls here.
+
+    Keyword-based types (legal_contract, paper, slide_deck) take priority over the
+    structural table_heavy heuristic. A research paper with many tables is still a
+    paper; table_heavy is the fallback for structurally-dominated documents with no
+    keyword signature (e.g., financial statements, data appendices).
+    """
     if _CONTRACT_KEYWORDS.search(text):
         return "legal_contract"
     if _PAPER_KEYWORDS.search(text):
         return "paper"
     if _SLIDE_KEYWORDS.search(text):
         return "slide_deck"
+    if table_ratio >= TABLE_PAGE_RATIO_THRESHOLD:
+        return "table_heavy"
     return "general"
