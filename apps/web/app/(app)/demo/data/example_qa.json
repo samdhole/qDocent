@@ -1,8 +1,19 @@
 {
-  "question": "What is this company's revenue?",
-  "answer": "Placeholder answer for the demo.",
-  "citations": [],
-  "retrieved_contexts": [],
+  "question": "What is this company's annual revenue?",
+  "answer": "The company reported total revenue of [1] $1.82 billion for fiscal year 2023, representing growth compared to the prior year.",
+  "citations": [
+    {
+      "document": "HOOD_10K_2023.pdf",
+      "page": 42,
+      "section": "Financial Statements"
+    }
+  ],
+  "retrieved_contexts": [
+    {
+      "text": "Total revenue was $1.82 billion for the fiscal year ended December 31, 2023.",
+      "score": 0.92
+    }
+  ],
   "figures": [],
   "confidence_label": "high",
   "needs_human_review": false

@@ -10,5 +10,6 @@
         }
       ]
     }
-  ]
+  ],
+  "first_page_content": "# Overview\n\nThis is placeholder content. Run `make demo-setup` to populate with real 10-K content from the demo corpus."
 }
