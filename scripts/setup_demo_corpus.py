@@ -118,7 +118,7 @@ def _download_filing() -> None:
     if FILING_PDF.exists():
         print(f"  PDF already cached: {FILING_PDF}")
         return
-    print(f"  Downloading Robinhood 2023 Annual Report PDF from SEC EDGAR...")
+    print("  Downloading Robinhood 2023 Annual Report PDF from SEC EDGAR...")
     req = urllib.request.Request(
         EDGAR_HOOD_ARS_URL,
         headers={"User-Agent": EDGAR_USER_AGENT},
@@ -134,6 +134,7 @@ def _get_existing_doc_id(notebook_id: str) -> str:
     try:
         docs = _api_get(f"/notebooks/{notebook_id}/documents")
         if docs and isinstance(docs, list):
+            # Assumes single-document Demo notebook; first doc only.
             doc_id = docs[0].get("document_id") or docs[0].get("id") or ""
             if doc_id:
                 print(f"  Notebook already has document: {doc_id} — skipping ingest")
@@ -144,7 +145,7 @@ def _get_existing_doc_id(notebook_id: str) -> str:
 
 
 def _ingest_pdf(notebook_id: str) -> str:
-    print(f"  Uploading PDF — this may take 30-120 seconds...")
+    print("  Uploading PDF — this may take 30-120 seconds...")
     result = _upload_pdf(notebook_id, FILING_PDF)
     doc_id = result.get("document_id") or ""
     if not doc_id:
@@ -155,11 +156,16 @@ def _ingest_pdf(notebook_id: str) -> str:
 
 
 def _generate_and_write_wiki(notebook_id: str) -> None:
-    print(f"  Starting wiki generation...")
+    print("  Starting wiki generation...")
     job = _api_post_empty(f"/notebooks/{notebook_id}/wiki/generate")
     job_id = job["job_id"]
     print(f"  Wiki job: {job_id}")
+    max_polls = 240  # 20 min at 5s/poll
     while True:
+        max_polls -= 1
+        if max_polls <= 0:
+            print("ERROR: Wiki generation timed out after 20 minutes", file=sys.stderr)
+            sys.exit(1)
         status = _api_get(f"/notebooks/{notebook_id}/wiki/jobs/{job_id}")
         state = status.get("status", "unknown")
         pages_done = status.get("pages_done", 0)
@@ -193,7 +199,7 @@ def _generate_and_write_wiki(notebook_id: str) -> None:
         if transformed_sections and transformed_sections[0]["pages"]
         else None
     )
-    first_page_content = pages_content_by_slug.get(first_slug, "") if first_slug else ""
+    first_page_content = (pages_content_by_slug.get(first_slug) or "") if first_slug else ""
     snapshot = {
         "title": structure.get("title", "Demo Wiki"),
         "sections": transformed_sections,
@@ -207,7 +213,7 @@ def _generate_and_write_wiki(notebook_id: str) -> None:
 
 
 def _write_qa_snapshot(notebook_id: str) -> None:
-    print(f"  Asking demo question...")
+    print("  Asking demo question...")
     result = _api_post_json("/ask", {"question": DEMO_QUESTION, "notebook_id": notebook_id})
     QA_JSON.parent.mkdir(parents=True, exist_ok=True)
     QA_JSON.write_text(
@@ -224,7 +230,7 @@ def _copy_figure_snapshot(doc_id: str) -> None:
     with open(figures_json) as f:
         figures = json.load(f)
     if not figures:
-        print(f"  WARNING: figures.json is empty — placeholder PNG retained")
+        print("  WARNING: figures.json is empty — placeholder PNG retained")
         return
     src = Path(figures[0]["asset_path"])
     if not src.exists():
@@ -253,22 +259,13 @@ def main() -> None:
     doc_id = _get_existing_doc_id(notebook_id) or _ingest_pdf(notebook_id)
 
     print("\nStep 4: Generate wiki")
-    if WIKI_JSON.exists():
-        print("  wiki_structure.json exists — skipping wiki generation")
-    else:
-        _generate_and_write_wiki(notebook_id)
+    _generate_and_write_wiki(notebook_id)
 
     print("\nStep 5: Capture example Q&A")
-    if QA_JSON.exists():
-        print("  example_qa.json exists — skipping")
-    else:
-        _write_qa_snapshot(notebook_id)
+    _write_qa_snapshot(notebook_id)
 
     print("\nStep 6: Copy first figure")
-    if _figure_is_real():
-        print("  example_figure.png already looks real — skipping")
-    else:
-        _copy_figure_snapshot(doc_id)
+    _copy_figure_snapshot(doc_id)
 
     print(f"\n=== Done ===\n")
     print(f"DEMO_NOTEBOOK_ID={notebook_id}")
