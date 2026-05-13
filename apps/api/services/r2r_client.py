@@ -31,7 +31,14 @@ load_dotenv()
 
 _BASE_URL = os.getenv("R2R_BASE_URL", "http://localhost:7272")
 DEFAULT_SEARCH_SETTINGS: dict[str, Any] = {
-    "limit": 5,
+    "limit": 15,
+    "use_hybrid_search": True,
+    "hybrid_settings": {
+        "full_text_weight": 1.0,
+        "semantic_weight": 5.0,
+        "full_text_limit": 200,
+        "rrf_k": 50,
+    },
     "graph_settings": {"enabled": False},
 }
 
@@ -64,14 +71,18 @@ def rag_query(
     query: str,
     document_ids: list[str] | None = None,
     collection_id: str | None = None,
+    search_strategy: str = "vanilla",
 ) -> dict[str, Any]:
     """Ask a RAG question. Returns structured dict for the /ask route.
 
     When collection_id is provided, filters retrieval to that collection using $overlap.
     When document_ids is provided and collection_id is None, filters by document IDs.
     collection_id takes precedence over document_ids when both are set.
+    search_strategy: "vanilla" (default), "hyde" (good for conceptual queries), or "rag_fusion".
     """
     search_settings = dict(DEFAULT_SEARCH_SETTINGS)
+    if search_strategy != "vanilla":
+        search_settings["search_strategy"] = search_strategy
     if collection_id:
         search_settings["filters"] = {"collection_ids": {"$overlap": [collection_id]}}
     elif document_ids:

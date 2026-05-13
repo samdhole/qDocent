@@ -52,6 +52,7 @@ def _generate_page_content(
             query=f"Explain: {page.title}. {page.description}",
             document_ids=page.source_doc_ids if page.source_doc_ids else None,
             collection_id=r2r_collection_id if not page.source_doc_ids else None,
+            search_strategy="hyde",
         )
         chunk_texts = [ctx.get("text", "") for ctx in retrieval_result.get("retrieved_contexts", [])]
         chunk_context = "\n\n".join(chunk_texts) if chunk_texts else "(No source material retrieved)"
