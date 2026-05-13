@@ -1,5 +1,6 @@
 import { WikiPreviewPanel } from "./WikiPreviewPanel";
 import { QAShowcasePanel } from "./QAShowcasePanel";
+import { DemoAskBox } from "./DemoAskBox";
 
 export default function DemoPage() {
   return (
@@ -50,9 +51,7 @@ export default function DemoPage() {
         <h2 id="ask-heading" className="text-lg font-semibold mb-3">
           Try It Live
         </h2>
-        <div className="border rounded-lg p-4 bg-muted text-sm text-muted-foreground">
-          Live ask box (implemented in Phase 3)
-        </div>
+        <DemoAskBox />
       </section>
     </main>
   );
