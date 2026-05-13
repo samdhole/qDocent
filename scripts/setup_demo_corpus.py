@@ -267,7 +267,7 @@ def main() -> None:
     print("\nStep 6: Copy first figure")
     _copy_figure_snapshot(doc_id)
 
-    print(f"\n=== Done ===\n")
+    print("\n=== Done ===\n")
     print(f"DEMO_NOTEBOOK_ID={notebook_id}")
 
 
