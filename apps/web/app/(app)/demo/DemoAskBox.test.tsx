@@ -38,7 +38,7 @@ vi.mock("./data/example_qa.json", () => ({
 }));
 
 describe("DemoAskBox", () => {
-  const mockFetch = vi.fn<Parameters<typeof fetch>, ReturnType<typeof fetch>>();
+  const mockFetch = vi.fn<typeof fetch>();
 
   beforeEach(() => {
     vi.clearAllMocks();
