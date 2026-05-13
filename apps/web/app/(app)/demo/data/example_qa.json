@@ -1,0 +1,9 @@
+{
+  "question": "What is this company's revenue?",
+  "answer": "Placeholder answer for the demo.",
+  "citations": [],
+  "retrieved_contexts": [],
+  "figures": [],
+  "confidence_label": "high",
+  "needs_human_review": false
+}
