@@ -41,7 +41,7 @@ concurrent_request_limit = 32
 [ingestion]
   [ingestion.chunk_enrichment_settings]
   enable_chunk_enrichment = true
-  strategies = ["neighborhood"]
+  strategies = ["neighborhood", "semantic"]
   forward_chunks = 3
   backward_chunks = 3
   generation_config = { model = "gemini/gemini-3-flash-preview" }

@@ -26,8 +26,12 @@ data/conversations.db
 # Reports with sensitive content
 reports/private/
 
-# Temporary ingestion artifacts
+# Temporary and runtime ingestion artifacts
 reports/ingestion/tmp*
+reports/ingestion/docs_*.json
+reports/ingestion/docs_*.md
+reports/ingestion/example.*
+reports/ingestion/test.*
 
 # R2R upstream clone
 external/
