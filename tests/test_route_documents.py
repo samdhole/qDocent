@@ -213,7 +213,8 @@ def test_get_document_chunks_returns_empty_for_corrupt_manifest(
 
 @mock.patch("apps.api.routes.documents.generate_questions", return_value=["What is the policy?"])
 @mock.patch("apps.api.routes.documents.load_chunks_manifest")
-def test_get_document_questions_success(mock_chunks, mock_generate, client: TestClient):
+@mock.patch("apps.api.routes.documents.load_questions_cache", return_value=None)
+def test_get_document_questions_success(mock_cache, mock_chunks, mock_generate, client: TestClient):
     mock_chunks.return_value = [{"text_preview": "Policy content here.", "chunk_index": 0}]
 
     response = client.get("/documents/test-doc-id/questions")
