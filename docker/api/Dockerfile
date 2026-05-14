@@ -116,10 +116,10 @@ COPY --from=builder /opt/venv /opt/venv
 COPY --from=builder /root/.cache/ms-playwright /root/.cache/ms-playwright
 COPY --from=builder /opt/docling-models /opt/docling-models
 
+# Playwright uses /root/.cache by default; this ensures it finds the binary
 ENV VIRTUAL_ENV=/opt/venv \
     PATH="/opt/venv/bin:$PATH" \
     DOCLING_SERVE_ARTIFACTS_PATH=/opt/docling-models \
-    # Playwright uses /root/.cache by default; this ensures it finds the binary
     PLAYWRIGHT_BROWSERS_PATH=/root/.cache/ms-playwright
 
 WORKDIR /app
