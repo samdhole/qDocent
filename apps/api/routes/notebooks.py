@@ -238,7 +238,7 @@ def ingest_notebook_document(notebook_id: str, file: UploadFile = File(...)) -> 
 def ingest_notebook_url(notebook_id: str, body: UrlIngestBody) -> dict:
     """Ingest a web page URL into a notebook.
 
-    The URL is fetched and converted to markdown via crawl4ai, then chunked.
+    The URL is fetched and converted to text via trafilatura, then chunked.
     The document is scoped to the notebook's R2R collection during ingestion.
     Membership is recorded in SQLite.
 
