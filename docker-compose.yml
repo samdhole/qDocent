@@ -60,6 +60,7 @@ services:
       APP_ENV: ${APP_ENV:-production}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+      HOME: /tmp
     volumes:
       - ./data:/app/data
     ports:
