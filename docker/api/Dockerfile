@@ -14,7 +14,7 @@ ENV UV_COMPILE_BYTECODE=1 \
 #   tesseract-ocr + tesseract-ocr-eng → pytesseract
 #   ghostscript → camelot-py ghostscript backend
 #   poppler-utils → camelot-py stream mode
-#   libglib2.0-0 + libX* libs → Playwright/Chromium runtime
+#   libglib2.0-0 → base GNOME lib (glib/gthread, needed by pdfplumber/poppler)
 #   build-essential → compile native extensions during pip install
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
@@ -23,26 +23,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ghostscript \
     poppler-utils \
     libglib2.0-0 \
-    libnss3 \
-    libnspr4 \
-    libatk1.0-0 \
-    libatk-bridge2.0-0 \
-    libcups2 \
-    libdrm2 \
-    libdbus-1-3 \
-    libxcb1 \
-    libxkbcommon0 \
-    libx11-6 \
-    libxcomposite1 \
-    libxdamage1 \
-    libxext6 \
-    libxfixes3 \
-    libxrandr2 \
-    libgbm1 \
-    libpango-1.0-0 \
-    libcairo2 \
-    libasound2 \
-    libatspi2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -61,16 +41,6 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     -r requirements-lock.txt \
     opencv-python-headless
 
-# Verify post-install CLI entry points exist before running them
-RUN which crawl4ai-setup docling-tools
-
-# Set Playwright cache to /opt/ms-playwright so it's accessible from runtime stage
-# (Default /root/.cache is mode 700 and inaccessible by non-root users in runtime)
-ENV PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright
-
-# Install Playwright Chromium browser for crawl4ai URL ingestion
-RUN crawl4ai-setup && playwright install --with-deps chromium
-
 # Pre-download docling layout models so first ingest request isn't slow
 RUN docling-tools models download --all -o /opt/docling-models
 
@@ -86,38 +56,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ghostscript \
     poppler-utils \
     libglib2.0-0 \
-    libnss3 \
-    libnspr4 \
-    libatk1.0-0 \
-    libatk-bridge2.0-0 \
-    libcups2 \
-    libdrm2 \
-    libdbus-1-3 \
-    libxcb1 \
-    libxkbcommon0 \
-    libx11-6 \
-    libxcomposite1 \
-    libxdamage1 \
-    libxext6 \
-    libxfixes3 \
-    libxrandr2 \
-    libgbm1 \
-    libpango-1.0-0 \
-    libcairo2 \
-    libasound2 \
-    libatspi2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy venv, Playwright Chromium binary, and docling models from builder
+# Copy venv and docling models from builder
 COPY --from=builder /opt/venv /opt/venv
-COPY --from=builder /opt/ms-playwright /opt/ms-playwright
 COPY --from=builder /opt/docling-models /opt/docling-models
 
-# Playwright cache relocated to /opt/ms-playwright (accessible by appuser uid 1001)
 ENV VIRTUAL_ENV=/opt/venv \
     PATH="/opt/venv/bin:$PATH" \
-    DOCLING_SERVE_ARTIFACTS_PATH=/opt/docling-models \
-    PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright
+    DOCLING_SERVE_ARTIFACTS_PATH=/opt/docling-models
 
 WORKDIR /app
 
@@ -128,7 +75,7 @@ COPY packages/ packages/
 # Create non-root user and set proper file ownership
 RUN addgroup --system --gid 1001 appgroup && \
     adduser --system --uid 1001 appuser && \
-    chown -R appuser:appgroup /opt/venv /opt/docling-models /opt/ms-playwright /app
+    chown -R appuser:appgroup /opt/venv /opt/docling-models /app
 
 USER appuser
 
