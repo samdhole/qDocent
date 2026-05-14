@@ -67,6 +67,7 @@ HANDOFF.md
 docs/*
 !docs/licensing.md
 !docs/design-plans/
+!docs/test-plans/
 **/CONTEXT.md
 
 # Local config
