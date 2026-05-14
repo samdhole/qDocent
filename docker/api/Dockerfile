@@ -53,18 +53,11 @@ ENV VIRTUAL_ENV=/opt/venv \
     PATH="/opt/venv/bin:$PATH"
 
 # Install Python deps from lock file.
-# --extra-index-url ensures docling's PyTorch dep installs CPU-only wheels
-# (without this, Docker pulls CUDA wheels → image grows from ~2 GB to ~9 GB).
-# opencv-python-headless overrides camelot-py's opencv-python dep which
-# requires OpenGL/UI libs absent in headless containers.
-#
-# NOTE: requirements-lock.txt may have a UTF-8 BOM (EF BB BF) from its origin.
-# Strip it before this stage to prevent pip parse errors on the first dependency line.
-# Do this on the host before building (Step 1 below covers this).
+# opencv-python-headless overrides camelot-py's opencv-python transitive dep,
+# which requires OpenGL/UI libs absent in headless containers.
 COPY requirements-lock.txt requirements.txt ./
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv pip install \
-    --extra-index-url https://download.pytorch.org/whl/cpu \
     -r requirements-lock.txt \
     opencv-python-headless
 
