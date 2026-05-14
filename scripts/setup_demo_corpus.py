@@ -98,6 +98,24 @@ def _figure_is_real() -> bool:
         return False
 
 
+def _wiki_is_real() -> bool:
+    # Real wikis have multiple sections; the placeholder has exactly 1 section titled "Overview".
+    try:
+        data = json.loads(WIKI_JSON.read_text(encoding="utf-8"))
+        return len(data.get("sections", [])) > 1
+    except Exception:
+        return False
+
+
+def _qa_is_real() -> bool:
+    # Generated QA uses DEMO_QUESTION; placeholder has a different hand-authored question.
+    try:
+        data = json.loads(QA_JSON.read_text(encoding="utf-8"))
+        return data.get("question") == DEMO_QUESTION and len(data.get("citations", [])) > 0
+    except Exception:
+        return False
+
+
 def _get_or_create_notebook() -> str:
     notebooks = _api_get("/notebooks")
     existing = next(
@@ -247,8 +265,8 @@ def main() -> None:
     print("Step 1: Demo notebook")
     notebook_id = _get_or_create_notebook()
 
-    if WIKI_JSON.exists() and QA_JSON.exists() and _figure_is_real():
-        print("\nAll output files already exist — nothing to regenerate.")
+    if _wiki_is_real() and _qa_is_real() and _figure_is_real():
+        print("\nAll output files already contain real content — nothing to regenerate.")
         print(f"\nDEMO_NOTEBOOK_ID={notebook_id}")
         return
 
@@ -259,13 +277,22 @@ def main() -> None:
     doc_id = _get_existing_doc_id(notebook_id) or _ingest_pdf(notebook_id)
 
     print("\nStep 4: Generate wiki")
-    _generate_and_write_wiki(notebook_id)
+    if _wiki_is_real():
+        print("  wiki_structure.json contains real content — skipping wiki generation")
+    else:
+        _generate_and_write_wiki(notebook_id)
 
     print("\nStep 5: Capture example Q&A")
-    _write_qa_snapshot(notebook_id)
+    if _qa_is_real():
+        print("  example_qa.json contains real content — skipping")
+    else:
+        _write_qa_snapshot(notebook_id)
 
     print("\nStep 6: Copy first figure")
-    _copy_figure_snapshot(doc_id)
+    if _figure_is_real():
+        print("  example_figure.png looks real — skipping figure copy")
+    else:
+        _copy_figure_snapshot(doc_id)
 
     print("\n=== Done ===\n")
     print(f"DEMO_NOTEBOOK_ID={notebook_id}")

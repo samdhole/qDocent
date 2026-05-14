@@ -7,7 +7,7 @@ import wikiData from "./data/wiki_structure.json";
 // this fails the compile. No 'as' cast here (that would defeat the check).
 const structure: WikiStructure = wikiData;
 const firstPage = structure.sections[0]?.pages[0];
-const firstPageContent: string = (wikiData as { first_page_content?: string }).first_page_content ?? "";
+const firstPageContent: string = wikiData.first_page_content ?? "";
 
 export function WikiPreviewPanel() {
   const notebookId = process.env.NEXT_PUBLIC_DEMO_NOTEBOOK_ID ?? "demo";
