@@ -41,9 +41,6 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     -r requirements-lock.txt \
     opencv-python-headless
 
-# Pre-download docling layout models so first ingest request isn't slow
-RUN docling-tools models download --all -o /opt/docling-models
-
 # ── Runtime ────────────────────────────────────────────────────────────────────
 FROM python:3.11-slim-bookworm
 
@@ -58,13 +55,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy venv and docling models from builder
+# Copy venv from builder
 COPY --from=builder /opt/venv /opt/venv
-COPY --from=builder /opt/docling-models /opt/docling-models
 
 ENV VIRTUAL_ENV=/opt/venv \
-    PATH="/opt/venv/bin:$PATH" \
-    DOCLING_SERVE_ARTIFACTS_PATH=/opt/docling-models
+    PATH="/opt/venv/bin:$PATH"
 
 WORKDIR /app
 
@@ -75,7 +70,7 @@ COPY packages/ packages/
 # Create non-root user and set proper file ownership
 RUN addgroup --system --gid 1001 appgroup && \
     adduser --system --uid 1001 appuser && \
-    chown -R appuser:appgroup /opt/venv /opt/docling-models /app
+    chown -R appuser:appgroup /opt/venv /app
 
 USER appuser
 
