@@ -63,3 +63,17 @@ services:
     ipc: host
     depends_on:
       - r2r
+
+  web:
+    build:
+      context: .
+      dockerfile: docker/web/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+        NEXT_PUBLIC_DEMO_NOTEBOOK_ID: ${NEXT_PUBLIC_DEMO_NOTEBOOK_ID:-}
+    ports:
+      - "3000:3000"
+    networks:
+      - qdocent
+    depends_on:
+      - api
