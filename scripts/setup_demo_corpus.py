@@ -148,7 +148,10 @@ def _download_filing() -> None:
 
 
 def _get_existing_doc_id(notebook_id: str) -> str:
-    """Return the first document_id already in the notebook, or '' if none."""
+    """Return the first document_id already in the notebook, or '' if none.
+
+    Assumes all list entries are dicts with document_id/id keys; non-dict entries are ignored by the exception handler.
+    """
     try:
         docs = _api_get(f"/notebooks/{notebook_id}/documents")
         if docs and isinstance(docs, list):

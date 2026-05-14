@@ -1,4 +1,3 @@
-// pattern: Imperative Shell
 "use client";
 
 import { useEffect, useState } from "react";

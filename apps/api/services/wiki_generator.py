@@ -62,6 +62,7 @@ def _generate_page_content(
         llm = _make_llm()
         response = llm.invoke(prompt)
         raw_content = response.content if hasattr(response, "content") else str(response)
+        # gemini-3-flash-preview may return content as a list of parts (strings or {text: ...} dicts) — flatten to a single string
         content = (
             "".join(p if isinstance(p, str) else (p.get("text", "") if isinstance(p, dict) else str(p)) for p in raw_content)
             if isinstance(raw_content, list)
@@ -105,6 +106,7 @@ def generate_wiki(notebook_id: str, r2r_collection_id: str, job_id: str) -> None
         llm = _make_llm()
         structure_response = llm.invoke(prompt)
         raw_content = structure_response.content if hasattr(structure_response, "content") else str(structure_response)
+        # gemini-3-flash-preview may return content as a list of parts (strings or {text: ...} dicts) — flatten to a single string
         raw_xml = (
             "".join(p if isinstance(p, str) else (p.get("text", "") if isinstance(p, dict) else str(p)) for p in raw_content)
             if isinstance(raw_content, list)
