@@ -1,5 +1,5 @@
 # pattern: Imperative Shell
-"""Convert DOCX and PPTX files to page dicts using Docling.
+"""Convert DOCX and PPTX files to page dicts using docling-slim (torch-free).
 
 Page dicts match the shape produced by parse_pdf.py so all downstream
 chunking (chunk_templates.py) works without modification.
