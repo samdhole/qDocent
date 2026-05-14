@@ -256,7 +256,7 @@ def _copy_figure_snapshot(doc_id: str) -> None:
         return
     FIGURE_PNG.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(src, FIGURE_PNG)
-    print(f"  Copied: {src} → {FIGURE_PNG}")
+    print(f"  Copied: {src} -> {FIGURE_PNG}")
 
 
 def main() -> None:

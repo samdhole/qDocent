@@ -1,20 +1,221 @@
 {
-  "question": "What is this company's annual revenue?",
-  "answer": "The company reported total revenue of [1] $1.82 billion for fiscal year 2023, representing growth compared to the prior year.",
+  "question": "What are this company's main revenue sources and key financial results for the most recent fiscal year?",
+  "answer": "For the fiscal year ended December 31, 2023, the company's main revenue sources and key financial results are as follows:\n\n### **Main Revenue Sources**\nThe company generates revenue through three primary categories [1], [2]:\n\n*   **Transaction-Based Revenues ($785 million):** This is the largest component of revenue, though it decreased by 4% compared to 2022 [3]. Key drivers include:\n    *   **Options:** $505 million (representing 27% of total net revenues) [1], [3].\n    *   **Cryptocurrencies:** $135 million (representing 7% of total net revenues) [1], [3].\n    *   **Equities:** $104 million [1].\n*   **Net Interest Revenues ($929 million):** This segment saw significant growth of 119% year-over-year [4]. Major contributors include:\n    *   **Interest on corporate cash and investments:** $288 million [5].\n    *   **Margin interest:** $256 million [5].\n*   **Other Revenues ($151 million):** This includes various other income streams [6], [7].\n\n### **Key Financial Results (FY 2023)**\n*   **Total Net Revenues:** $1,865 million (calculated as the sum of $785M transaction-based, $929M net interest, and $151M other revenues) [2], [6].\n*   **Operating Expenses:**\n    *   **Operations:** $159 million [8].\n    *   **Marketing:** $122 million [9].\n    *   **Technology and Development:** $805 million [8].\n*   **Net Loss:** The company reported a net loss for the year, continuing a trend from previous years, though specific 2023 totals for net loss were partially obscured in the provided snippets [10].",
   "citations": [
     {
       "document": "HOOD_10K_2023.pdf",
-      "page": 42,
-      "section": "Financial Statements"
+      "page": 137,
+      "page_end": 137,
+      "section": "Clause 1",
+      "document_id": "tmpqt3xdts1",
+      "chunk_id": "933fda82-3c35-5f28-ad5c-dc85c739d3e2",
+      "chunk_index": 750
+    },
+    {
+      "document": "HOOD_10K_2023.pdf",
+      "page": 112,
+      "page_end": 112,
+      "section": "Clause 1",
+      "document_id": "tmpqt3xdts1",
+      "chunk_id": "6836be21-8ce6-5b8c-a39a-0bd97bc953ab",
+      "chunk_index": 589
+    },
+    {
+      "document": "HOOD_10K_2023.pdf",
+      "page": 93,
+      "page_end": 93,
+      "section": "Clause 1",
+      "document_id": "tmpqt3xdts1",
+      "chunk_id": "f2c73c3a-e196-549c-b272-e4053366a0bc",
+      "chunk_index": 451
+    },
+    {
+      "document": "HOOD_10K_2023.pdf",
+      "page": 94,
+      "page_end": 94,
+      "section": "Clause 1",
+      "document_id": "tmpqt3xdts1",
+      "chunk_id": "1d995b90-56cd-5adc-95d5-5302a90712b6",
+      "chunk_index": 456
+    },
+    {
+      "document": "HOOD_10K_2023.pdf",
+      "page": 137,
+      "page_end": 137,
+      "section": "Clause 1",
+      "document_id": "tmpqt3xdts1",
+      "chunk_id": "20d34c0a-793c-54b2-9e6c-c2a6d85f9dd9",
+      "chunk_index": 752
+    },
+    {
+      "document": "HOOD_10K_2023.pdf",
+      "page": 137,
+      "page_end": 137,
+      "section": "Clause 1",
+      "document_id": "tmpqt3xdts1",
+      "chunk_id": "927f1ae8-caaf-5bb8-8002-a2626416f363",
+      "chunk_index": 755
+    },
+    {
+      "document": "HOOD_10K_2023.pdf",
+      "page": 91,
+      "page_end": 91,
+      "section": "Clause 1",
+      "document_id": "tmpqt3xdts1",
+      "chunk_id": "fa04fba0-f4ec-5b23-a417-2f22d2a620a6",
+      "chunk_index": 436
+    },
+    {
+      "document": "HOOD_10K_2023.pdf",
+      "page": 112,
+      "page_end": 112,
+      "section": "Clause 1",
+      "document_id": "tmpqt3xdts1",
+      "chunk_id": "34d61fa3-653b-5d55-8c87-f38b82a512d9",
+      "chunk_index": 592
+    },
+    {
+      "document": "HOOD_10K_2023.pdf",
+      "page": 91,
+      "page_end": 91,
+      "section": "Clause 1",
+      "document_id": "tmpqt3xdts1",
+      "chunk_id": "ffbe9bee-d423-5f31-81be-99de3eb853da",
+      "chunk_index": 439
+    },
+    {
+      "document": "HOOD_10K_2023.pdf",
+      "page": 91,
+      "page_end": 91,
+      "section": "Clause 1",
+      "document_id": "tmpqt3xdts1",
+      "chunk_id": "ab3e0d1f-b5c2-5861-9819-dad117889b7d",
+      "chunk_index": 442
+    },
+    {
+      "document": "HOOD_10K_2023.pdf",
+      "page": 112,
+      "page_end": 112,
+      "section": "Clause 1",
+      "document_id": "tmpqt3xdts1",
+      "chunk_id": "620c20ca-d791-5156-87ff-56b047e524dc",
+      "chunk_index": 590
+    },
+    {
+      "document": "HOOD_10K_2023.pdf",
+      "page": 93,
+      "page_end": 93,
+      "section": "Clause 1",
+      "document_id": "tmpqt3xdts1",
+      "chunk_id": "1fa5dfd3-8896-5afc-8821-bfaf4d332d44",
+      "chunk_index": 449
+    },
+    {
+      "document": "HOOD_10K_2023.pdf",
+      "page": 117,
+      "page_end": 117,
+      "section": "Clause 1",
+      "document_id": "tmpqt3xdts1",
+      "chunk_id": "1ea91db1-2577-5dd1-a192-2af4e7fd7b0e",
+      "chunk_index": 649
+    },
+    {
+      "document": "HOOD_10K_2023.pdf",
+      "page": 91,
+      "page_end": 91,
+      "section": "Clause 1",
+      "document_id": "tmpqt3xdts1",
+      "chunk_id": "44184096-cfe1-5e60-ad4d-5897c79fb0bc",
+      "chunk_index": 435
+    },
+    {
+      "document": "HOOD_10K_2023.pdf",
+      "page": 114,
+      "page_end": 114,
+      "section": "Clause 1",
+      "document_id": "tmpqt3xdts1",
+      "chunk_id": "0e6bb563-7e0e-5a87-8712-61eed20eaf0d",
+      "chunk_index": 619
     }
   ],
   "retrieved_contexts": [
     {
-      "text": "Total revenue was $1.82 billion for the fiscal year ended December 31, 2023.",
-      "score": 0.92
+      "chunk_id": "933fda82-3c35-5f28-ad5c-dc85c739d3e2",
+      "text": "NOTE 5: REVENUES\nDisaggregation of Revenues\nThe following table presents our revenues disaggregated by revenue source:\nYear Ended December 31,\n(in millions) 2021 2022 2023\nTransaction-based revenues:\nOptions(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid",
+      "score": 0.0158
+    },
+    {
+      "chunk_id": "6836be21-8ce6-5b8c-a39a-0bd97bc953ab",
+      "text": "ROBINHOOD MARKETS, INC.\nCONSOLIDATED STATEMENTS OF OPERATIONS\nYear Ended December 31,\n(in millions, except share and per share data) 2021 2022 2023\nRevenues:\nTransaction-based revenues(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2",
+      "score": 0.015
+    },
+    {
+      "chunk_id": "f2c73c3a-e196-549c-b272-e4053366a0bc",
+      "text": "(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2) 5 7 41 40 % 486 %\nTotal transaction-based revenues(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)$ 1,402 $ 814 $ 785 (42)% (4)%\nTransaction-based revenues as a % of\ntotal net revenues:\nOptions(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(c",
+      "score": 0.0148
+    },
+    {
+      "chunk_id": "1d995b90-56cd-5adc-95d5-5302a90712b6",
+      "text": "redit facilities(cid:2)(cid:2) (20) (24) (23) 20 % (4)%\nTotal net interest revenues(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)$ 256 $ 424 $ 929 66 % 119 %\nNet interest revenues as a % of total net\nrevenues:\nInterest on corporate cash and investments\n(cid:2)(cid:2)(cid:2)(cid",
+      "score": 0.0139
+    },
+    {
+      "chunk_id": "20d34c0a-793c-54b2-9e6c-c2a6d85f9dd9",
+      "text": ")(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2) 5 7 41\nTotal transaction-based revenues(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(c",
+      "score": 0.0155
+    },
+    {
+      "chunk_id": "927f1ae8-caaf-5bb8-8002-a2626416f363",
+      "text": "nues(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2) 256 424 929\nOther revenues(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:",
+      "score": 0.017
+    },
+    {
+      "chunk_id": "fa04fba0-f4ec-5b23-a417-2f22d2a620a6",
+      "text": "d:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2) 256 424 92",
+      "score": 0.0167
+    },
+    {
+      "chunk_id": "34d61fa3-653b-5d55-8c87-f38b82a512d9",
+      "text": ")(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)",
+      "score": 0.0141
+    },
+    {
+      "chunk_id": "ffbe9bee-d423-5f31-81be-99de3eb853da",
+      "text": ":2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2) 368 285 159\nMarketing(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid",
+      "score": 0.0153
+    },
+    {
+      "chunk_id": "ab3e0d1f-b5c2-5861-9819-dad117889b7d",
+      "text": "(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(",
+      "score": 0.0137
+    },
+    {
+      "chunk_id": "620c20ca-d791-5156-87ff-56b047e524dc",
+      "text": "cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2) 256 424 929\nOther revenues(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(ci",
+      "score": 0.0164
+    },
+    {
+      "chunk_id": "1fa5dfd3-8896-5afc-8821-bfaf4d332d44",
+      "text": "Comparison of the Years Ended December 31, 2023 and 2022\nA discussion of our results for fiscal year 2022 compared to fiscal year 2021 can be found in\n“Management's Discussion and Analysis of Financial Condition and Results of Operations —Comparison\nof the Years Ended December 31, 2022 and 2021” in Part II, Item 7 of our Annual Report on Form 10-K\nfor the year ended December 31, 2022, filed with t",
+      "score": 0.0161
+    },
+    {
+      "chunk_id": "1ea91db1-2577-5dd1-a192-2af4e7fd7b0e",
+      "text": ")(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)",
+      "score": 0.0146
+    },
+    {
+      "chunk_id": "44184096-cfe1-5e60-ad4d-5897c79fb0bc",
+      "text": "General and administrative costs also include settlements and\npenalties, legal expenses, other professional fees, and real estate charges including impairments on our\noperating leases or lease improvements and lease terminations.\nResults of Operations\nThe following table summarizes our consolidated statements of operations data:\nYear Ended December 31,\n(in millions) 2021 2022 2023\nRevenues:\nTransa",
+      "score": 0.0143
+    },
+    {
+      "chunk_id": "0e6bb563-7e0e-5a87-8712-61eed20eaf0d",
+      "text": ")(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)(cid:2)",
+      "score": 0.0135
     }
   ],
   "figures": [],
-  "confidence_label": "high",
-  "needs_human_review": false
+  "confidence_label": "low",
+  "needs_human_review": true
 }

@@ -1,15 +1,45 @@
 {
-  "title": "Demo Wiki",
+  "title": "Robinhood Markets, Inc. 2023 Annual Report Wiki",
   "sections": [
     {
-      "title": "Overview",
+      "title": "Corporate Profile & Strategy",
       "pages": [
         {
-          "slug": "overview",
-          "title": "Overview"
+          "slug": "business-overview",
+          "title": "Business Overview and Strategy"
+        },
+        {
+          "slug": "product-offerings",
+          "title": "Products, Services, and Innovation"
+        }
+      ]
+    },
+    {
+      "title": "Financial Analysis",
+      "pages": [
+        {
+          "slug": "financial-performance",
+          "title": "Financial Results and Key Metrics"
+        },
+        {
+          "slug": "mda-analysis",
+          "title": "Management's Discussion and Analysis (MD&A)"
+        }
+      ]
+    },
+    {
+      "title": "Risk & Compliance",
+      "pages": [
+        {
+          "slug": "risk-factors",
+          "title": "Risk Factors and Market Volatility"
+        },
+        {
+          "slug": "regulatory-legal",
+          "title": "Regulatory Framework and Legal Proceedings"
         }
       ]
     }
   ],
-  "first_page_content": "# Overview\n\nThis is placeholder content. Run `make demo-setup` to populate with real 10-K content from the demo corpus."
+  "first_page_content": "# Business Overview and Strategy\n\n## Mission and Core Philosophy\n\nRobinhood was founded in 2013 with the core belief that the financial system should be accessible to everyone, regardless of wealth, income, or background. The company’s central mission is to **democratize finance for all**. \n\nBy leveraging a mobile-first technology platform, Robinhood aims to provide an elegant and intuitive interface that reduces the barriers to entry for retail investors. The company focuses on making investing culturally relevant and understandable, transitioning customers from new participants into informed, long-term investors.\n\n### Core Values\nRobinhood operates under four primary guiding principles:\n*   **Safety First:** Prioritizing the security of the platform and customer assets.\n*   **Participation is Power:** Striving to make the financial industry more inclusive and treating all people fairly.\n*   **First-Principles Thinking:** Using data and experiments to challenge the status quo and seek creative solutions.\n*   **One Robinhood:** Maintaining an honest, inclusive, and transparent internal culture focused on a singular mission.\n\n## Business Model and Product Ecosystem\n\nRobinhood’s business model centers on creating a comprehensive ecosystem of financial products. While the platform began with commission-free equity trading, it has expanded into a multi-vertical service provider covering investing, spending, and saving.\n\n### Product Offerings\n| Category | Key Features and Services |\n| :--- | :--- |\n| **Investing** | Equities, Options trading, Advanced Charts, and Cryptocurrency. |\n| **Spending & Saving** | Robinhood Cash Card (prepaid), Spending Accounts, and Credit Cards. |\n| **Subscription** | Robinhood Gold (premium features and benefits). |\n| **Education** | Robinhood Snacks (news), Robinhood Learn, and Crypto Learn and Earn. |\n\n### The Robinhood Ecosystem\nThe following diagram illustrates how Robinhood integrates various financial services to create a unified customer experience:\n\n```mermaid\ngraph TD\n    A[Robinhood Platform] --> B[Investing Services]\n    A --> C[Spending & Saving]\n    A --> D[Education & News]\n    B --> B1[Equities & Options]\n    B --> B2[Crypto Trading]\n    C --> C1[Robinhood Gold]\n    C --> C2[Cash Card & Credit]\n    D --> D1[Robinhood Snacks]\n    D --> D2[In-App Education]\n```\n\n## Long-Term Growth Strategy\n\nRobinhood’s strategy for long-term value creation focuses on deepening customer relationships and expanding the platform's geographic and functional reach.\n\n### Customer Acquisition and Retention\nHistorically, Robinhood has relied on organic growth and its Referral Program. Since 2023, the company has increased its investment in paid marketing to complement these organic channels. The strategy focuses on:\n*   **Deepening Relationships:** Moving beyond trading to become a customer's primary financial hub.\n*   **Increasing Net Deposits:** Encouraging customers to bring more of their financial life onto the platform.\n*   **Gold Membership Growth:** Driving recurring revenue through the Robinhood Gold subscription tier.\n\n### International Expansion\nRobinhood is pursuing a disciplined approach to global growth. This includes:\n1.  **Market Selection:** Evaluating potential new markets based on population demographics, legal/regulatory environments, and local investing attitudes.\n2.  **UK and EU Presence:** The company has launched equity brokerage services in the United Kingdom and a dedicated Robinhood Crypto app for eligible customers in select European Union jurisdictions.\n\n### Educational Empowerment\nA key pillar of the growth strategy is \"Learn and Earn.\" By providing in-app educational resources—such as modules on investing fundamentals and cryptocurrency—Robinhood empowers customers to take greater control of their finances, which in turn fosters platform loyalty and long-term participation.\n\n## Summary\nRobinhood is evolving from a mobile-first brokerage into a comprehensive financial services ecosystem. By adhering to its mission of democratizing finance, the company focuses on product innovation, international expansion into the UK and EU, and deepening customer engagement through subscription models like Robinhood Gold and educational initiatives. Their strategy relies on a blend of organic referral-based growth and disciplined expansion into new financial verticals and geographic markets."
 }

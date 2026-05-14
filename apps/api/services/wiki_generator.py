@@ -61,7 +61,12 @@ def _generate_page_content(
         prompt = build_page_prompt(page, chunk_context)
         llm = _make_llm()
         response = llm.invoke(prompt)
-        content = response.content if hasattr(response, "content") else str(response)
+        raw_content = response.content if hasattr(response, "content") else str(response)
+        content = (
+            "".join(p if isinstance(p, str) else (p.get("text", "") if isinstance(p, dict) else str(p)) for p in raw_content)
+            if isinstance(raw_content, list)
+            else raw_content
+        )
 
         # Store the generated content
         wiki_store.update_page_content(notebook_id, page.slug, content)
@@ -99,7 +104,12 @@ def generate_wiki(notebook_id: str, r2r_collection_id: str, job_id: str) -> None
         prompt = build_structure_prompt(doc_manifest)
         llm = _make_llm()
         structure_response = llm.invoke(prompt)
-        raw_xml = structure_response.content if hasattr(structure_response, "content") else str(structure_response)
+        raw_content = structure_response.content if hasattr(structure_response, "content") else str(structure_response)
+        raw_xml = (
+            "".join(p if isinstance(p, str) else (p.get("text", "") if isinstance(p, dict) else str(p)) for p in raw_content)
+            if isinstance(raw_content, list)
+            else raw_content
+        )
 
         structure: WikiStructure = parse_wiki_structure_xml(raw_xml)
 
