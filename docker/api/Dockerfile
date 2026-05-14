@@ -128,4 +128,11 @@ WORKDIR /app
 COPY apps/ apps/
 COPY packages/ packages/
 
+# Create non-root user and set proper file ownership
+RUN addgroup --system --gid 1001 appgroup && \
+    adduser --system --uid 1001 appuser && \
+    chown -R appuser:appgroup /opt/venv /opt/docling-models /root/.cache/ms-playwright /app
+
+USER appuser
+
 CMD ["uvicorn", "apps.api.main:app", "--host", "0.0.0.0", "--port", "8000"]

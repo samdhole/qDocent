@@ -224,7 +224,10 @@ Ensure ports 3000 and 8000 are accessible from the internet (your server's firew
 
 ## Key Handoff (API Key Transfer)
 
-When transferring the project to a new owner:
+When transferring the project to a new owner, follow this order to prevent service disruption:
+
+1. **New owner generates and verifies their key first** — this ensures a working key is ready before the old key is removed.
+2. **Old owner then rotates/deletes the original key** — only after confirming the new key is in place and working.
 
 ### The new owner does:
 
