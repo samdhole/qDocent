@@ -1,0 +1,72 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Python
+.venv
+venv
+__pycache__
+.pytest_cache
+*.pyc
+*.pyo
+*.egg-info
+.eggs
+dist
+build
+
+# Node.js
+node_modules
+**/node_modules
+npm-debug.log
+yarn-error.log
+
+# Next.js
+apps/web/.next
+**/.next
+.next
+
+# Data and SQLite stores
+data/
+*.db
+
+# External dependencies
+external/
+
+# Reports and evaluation artifacts
+reports/
+
+# Tests
+tests/
+.pytest_cache
+
+# Documentation
+docs/
+
+# IDE and editor
+.vscode
+.idea
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Docker
+docker/.dockerignore
+Dockerfile
+docker-compose*.yml
+
+# GitHub
+.github/
+
+# Misc
+.editorconfig
+.prettierignore
+.eslintignore
+.husky
+node_modules/
