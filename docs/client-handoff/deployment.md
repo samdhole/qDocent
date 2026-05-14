@@ -81,6 +81,28 @@ default_admin_password = "CHANGE_ME"   # ← replace CHANGE_ME with a real passw
 
 > **⚠️ Required:** Replace `CHANGE_ME` with a strong password before starting. Leaving the default is a security risk.
 
+### 4. Pre-create the data directory
+
+The Docker containers need to store notebooks, ingestion jobs, conversations, and other runtime data in a `./data` directory on your machine. This directory must be owned by the container's app user (uid 1001) for write permissions to work.
+
+**On Windows (Docker Desktop with WSL2):**
+
+```powershell
+wsl mkdir -p data
+wsl sudo chown -R 1001:1001 data
+```
+
+**On Linux:**
+
+```bash
+mkdir -p data
+sudo chown -R 1001:1001 data
+```
+
+If you skip this step, the containers will start successfully, but API operations that write to the database (ingestion, creating notebooks, storing conversations) will fail with permission errors.
+
+> **Note:** This step is only needed once on a fresh clone. Existing `data` directories created by previous runs should already have the correct permissions.
+
 ---
 
 ## Starting the Application
@@ -288,6 +310,46 @@ docker compose up -d
 
 ### "port is already allocated" error
 Another process is using port 3000, 7272, or 8000. Find and stop it, or change the host port mapping in `docker-compose.yml` (left side of the colon, e.g., `"3001:3000"`).
+
+### API starts but all operations fail with permission errors
+
+The API container can start but any attempt to upload documents, create notebooks, or ingest files fails with `PermissionError` or "Permission denied" messages.
+
+**Root cause:** The `./data` directory on your host machine is not owned by the container's app user (uid 1001). Docker bind mounts preserve host file ownership, so when the container tries to write to `data/notebooks.db` or other files, it gets permission denied.
+
+**Fix:**
+
+On **Windows (Docker Desktop with WSL2):**
+
+```powershell
+wsl sudo chown -R 1001:1001 data
+```
+
+On **Linux:**
+
+```bash
+sudo chown -R 1001:1001 data
+```
+
+After running the command, restart the API container:
+
+```powershell
+docker compose restart api
+```
+
+Then try uploading a document again. If the error persists, verify the permissions with:
+
+On **Windows (WSL2):**
+```powershell
+wsl ls -la data/
+```
+
+On **Linux:**
+```bash
+ls -la data/
+```
+
+The output should show `appuser` (or uid `1001`) as the owner.
 
 ### Services keep restarting
 Check logs for the failing service:

@@ -71,6 +71,10 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # Verify post-install CLI entry points exist before running them
 RUN which crawl4ai-setup docling-tools
 
+# Set Playwright cache to /opt/ms-playwright so it's accessible from runtime stage
+# (Default /root/.cache is mode 700 and inaccessible by non-root users in runtime)
+ENV PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright
+
 # Install Playwright Chromium browser for crawl4ai URL ingestion
 RUN crawl4ai-setup && playwright install --with-deps chromium
 
@@ -113,14 +117,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Copy venv, Playwright Chromium binary, and docling models from builder
 COPY --from=builder /opt/venv /opt/venv
-COPY --from=builder /root/.cache/ms-playwright /root/.cache/ms-playwright
+COPY --from=builder /opt/ms-playwright /opt/ms-playwright
 COPY --from=builder /opt/docling-models /opt/docling-models
 
-# Playwright uses /root/.cache by default; this ensures it finds the binary
+# Playwright cache relocated to /opt/ms-playwright (accessible by appuser uid 1001)
 ENV VIRTUAL_ENV=/opt/venv \
     PATH="/opt/venv/bin:$PATH" \
     DOCLING_SERVE_ARTIFACTS_PATH=/opt/docling-models \
-    PLAYWRIGHT_BROWSERS_PATH=/root/.cache/ms-playwright
+    PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright
 
 WORKDIR /app
 
@@ -131,7 +135,7 @@ COPY packages/ packages/
 # Create non-root user and set proper file ownership
 RUN addgroup --system --gid 1001 appgroup && \
     adduser --system --uid 1001 appuser && \
-    chown -R appuser:appgroup /opt/venv /opt/docling-models /root/.cache/ms-playwright /app
+    chown -R appuser:appgroup /opt/venv /opt/docling-models /opt/ms-playwright /app
 
 USER appuser
 
