@@ -43,3 +43,23 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/api/Dockerfile
+    environment:
+      R2R_BASE_URL: http://r2r:7272
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY}
+      APP_ENV: ${APP_ENV:-production}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+    volumes:
+      - ./data:/app/data
+    ports:
+      - "8000:8000"
+    networks:
+      - qdocent
+    ipc: host
+    depends_on:
+      - r2r
