@@ -1,0 +1,8 @@
+# Enforce LF line endings for all files tracked by git.
+# This prevents CRLF corruption of Dockerfiles and shell scripts
+# when the repo is cloned on Windows.
+* text=auto eol=lf
+
+# Windows batch/cmd files must use CRLF — override the global rule.
+*.bat text eol=crlf
+*.cmd text eol=crlf
