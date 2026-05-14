@@ -17,8 +17,8 @@ python-multipart>=0.0.9
 
 # Ingestion parsers
 pdfplumber>=0.11.9
-docling>=2.0
-crawl4ai>=0.6
+docling-slim[format-office,convert-core]
+trafilatura
 defusedxml>=0.7
 pytesseract>=0.3.13
 Pillow>=10.0.0
