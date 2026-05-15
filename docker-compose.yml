@@ -86,6 +86,8 @@ services:
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
         NEXT_PUBLIC_DEMO_NOTEBOOK_ID: ${NEXT_PUBLIC_DEMO_NOTEBOOK_ID:-}
+    environment:
+      API_INTERNAL_URL: http://api:8000
     ports:
       - "3000:3000"
     networks:

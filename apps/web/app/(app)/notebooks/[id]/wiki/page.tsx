@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import WikiGenerateButton from "@/components/WikiGenerateButton";
 import WikiTreeNav, { WikiStructure } from "@/components/WikiTreeNav";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+const API_BASE = process.env.API_INTERNAL_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 interface Props {
   params: Promise<{ id: string }>;
