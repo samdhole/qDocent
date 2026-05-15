@@ -94,9 +94,11 @@ if [ "${overwrite_needed}" = "true" ]; then
     esac
 fi
 
-# Write .env: copy example, substitute GOOGLE_API_KEY
+# Write .env: copy example, substitute GOOGLE_API_KEY and R2R admin credentials
 cp "${REPO_ROOT}/.env.example.client" "${ENV_FILE}"
 sed -i "s|^GOOGLE_API_KEY=.*|GOOGLE_API_KEY=${google_api_key}|" "${ENV_FILE}"
+sed -i "s|^R2R_ADMIN_EMAIL=.*|R2R_ADMIN_EMAIL=${admin_email}|" "${ENV_FILE}"
+sed -i "s|^R2R_ADMIN_PASSWORD=.*|R2R_ADMIN_PASSWORD=${admin_password}|" "${ENV_FILE}"
 echo "Written: .env"
 
 # Write r2r_gemini.toml: copy example, substitute email and password

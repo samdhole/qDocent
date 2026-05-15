@@ -105,11 +105,14 @@ if ($overwriteNeeded) {
     }
 }
 
-# Write .env: copy example, substitute GOOGLE_API_KEY
+# Write .env: copy example, substitute GOOGLE_API_KEY and R2R admin credentials
 $envExample = Join-Path $repoRoot '.env.example.client'
 $envContent = Get-Content $envExample -Raw
 $envContent = ($envContent -split "`n" | ForEach-Object {
-    if ($_ -match '^GOOGLE_API_KEY=') { "GOOGLE_API_KEY=$apiKey" } else { $_ }
+    if ($_ -match '^GOOGLE_API_KEY=') { "GOOGLE_API_KEY=$apiKey" }
+    elseif ($_ -match '^R2R_ADMIN_EMAIL=') { "R2R_ADMIN_EMAIL=$adminEmail" }
+    elseif ($_ -match '^R2R_ADMIN_PASSWORD=') { "R2R_ADMIN_PASSWORD=$adminPassword" }
+    else { $_ }
 }) -join "`n"
 [System.IO.File]::WriteAllText($envFile, $envContent, [System.Text.UTF8Encoding]::new($false))
 Write-Host 'Written: .env'

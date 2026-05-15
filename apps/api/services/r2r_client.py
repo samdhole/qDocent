@@ -32,6 +32,8 @@ from packages.ingestion.pipeline import run_pipeline
 load_dotenv()
 
 _BASE_URL = os.getenv("R2R_BASE_URL", "http://localhost:7272")
+_ADMIN_EMAIL = os.getenv("R2R_ADMIN_EMAIL", "admin@example.com")
+_ADMIN_PASSWORD = os.getenv("R2R_ADMIN_PASSWORD", "")
 DEFAULT_SEARCH_SETTINGS: dict[str, Any] = {
     "limit": 15,
     "use_hybrid_search": True,
@@ -47,12 +49,18 @@ DEFAULT_SEARCH_SETTINGS: dict[str, Any] = {
 
 def get_client() -> R2RClient:
     """Public factory for the R2R SDK client. Use from other service modules."""
-    return R2RClient(base_url=_BASE_URL)
+    client = R2RClient(base_url=_BASE_URL)
+    if _ADMIN_PASSWORD:
+        client.users.login(email=_ADMIN_EMAIL, password=_ADMIN_PASSWORD)
+    return client
 
 
-def get_async_client() -> R2RAsyncClient:
+async def get_async_client() -> R2RAsyncClient:
     """Async variant of get_client() for async streaming endpoints."""
-    return R2RAsyncClient(base_url=_BASE_URL)
+    client = R2RAsyncClient(base_url=_BASE_URL)
+    if _ADMIN_PASSWORD:
+        await client.users.login(email=_ADMIN_EMAIL, password=_ADMIN_PASSWORD)
+    return client
 
 
 def create_r2r_collection(name: str) -> str:
