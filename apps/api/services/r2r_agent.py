@@ -298,47 +298,6 @@ def _adapt_agent_response(
     return _assemble_from_chunks(question, answer, chunk_results, conversation_id)
 
 
-def _adapt_rag_response(question: str, response: Any, conversation_id: str | None) -> dict[str, Any]:
-    """Map a non-streaming retrieval/rag response to the standard response dict.
-
-    RAG response shape (R2R 3.6.x):
-        results.completion          → answer string (not an object with .choices)
-        results.search_results.chunk_search_results → list of retrieved chunks
-    """
-    inner = (
-        getattr(response, "results", None)
-        or (response.get("results") if isinstance(response, dict) else None)
-        or response
-    )
-
-    # completion is a plain string in the RAG response
-    answer = (
-        getattr(inner, "completion", None)
-        or (inner.get("completion") if isinstance(inner, dict) else None)
-        or ""
-    )
-    if not isinstance(answer, str):
-        # Defensive: handle object shape if R2R version differs
-        answer = str(answer)
-
-    search_results = (
-        getattr(inner, "search_results", None)
-        or (inner.get("search_results") if isinstance(inner, dict) else None)
-        or {}
-    )
-    if hasattr(search_results, "__dict__") or hasattr(search_results, "model_dump"):
-        search_results = (
-            search_results.model_dump() if hasattr(search_results, "model_dump")
-            else vars(search_results)
-        )
-    chunk_results = (
-        (search_results.get("chunk_search_results") if isinstance(search_results, dict) else None)
-        or []
-    )
-
-    return _assemble_from_chunks(question, answer, chunk_results, conversation_id)
-
-
 
 async def agent_stream(
     message: str,
