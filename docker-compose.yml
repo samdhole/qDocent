@@ -37,14 +37,14 @@ services:
     volumes:
       - ./r2r_gemini.toml:/app/r2r_gemini.toml:ro
     ports:
-      - "7272:7272"
+      - "7272:8000"
     networks:
       - qdocent
     depends_on:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:7272/v3/health || exit 1"]
+      test: ["CMD-SHELL", "curl -sf http://localhost:8000/v3/health > /dev/null || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 10
@@ -55,7 +55,7 @@ services:
       context: .
       dockerfile: docker/api/Dockerfile
     environment:
-      R2R_BASE_URL: http://r2r:7272
+      R2R_BASE_URL: http://r2r:8000
       GOOGLE_API_KEY: ${GOOGLE_API_KEY}
       APP_ENV: ${APP_ENV:-production}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
