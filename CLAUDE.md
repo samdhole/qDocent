@@ -24,6 +24,7 @@ Navigate by task — read only the relevant workspace.
 | API routes and services        | `apps/api/`           | `apps/api/CONTEXT.md`           |
 | Frontend UI                    | `apps/web/`           | `apps/web/CLAUDE.md`            |
 | Scripts / smoke tests          | `scripts/`            | —                                |
+| First-run install / launchers  | `install/`            | `install/README.md`              |
 
 Each `CONTEXT.md` defines what "good output" means for that workspace — quality thresholds, success criteria, and domain-specific rules. `apps/web/` has a `CLAUDE.md` covering routes, components, and stream/query contracts. `scripts/` has no CONTEXT.md — conventions are standard enough to read from the code directly.
 
@@ -156,6 +157,16 @@ docker compose up -d --build
 - `.dockerignore` excludes `.venv/`, `data/`, `external/`, `.env*`, `node_modules/`, and `reports/` from build contexts. Add new local-state directories there if they appear at the repo root.
 - Deployment guide: `docs/client-handoff/deployment.md` (gitignored per `docs/` rule; regenerated from `docs/design-plans/`).
 - `.env.example.client` is the trimmed handoff env file — keep it in sync with `.env.example` when adding required vars.
+
+## First-Run Install / Launcher Scripts
+
+The `install/` directory ships first-run setup and daily-launch wrappers for client handoff on Windows and Linux. They are thin orchestrators over `docker compose` — no business logic lives here.
+
+- `install/setup.ps1` / `install/setup.sh` — first-run wizard. Prompts for `GOOGLE_API_KEY` and (on setup.sh) admin password, writes `.env` from `.env.example.client`, runs `docker compose up -d --build`, waits for `api` health, opens the browser to `http://localhost:3000`.
+- `install/start.ps1` / `install/start.sh` — daily launcher. Verifies Docker is running, runs `docker compose up -d` if any service is down, opens the browser. Does not rebuild.
+- `install/README.md` — user-facing quickstart (Windows + Linux). The only doc in `install/` aimed at non-developers; keep it short.
+- Tests in `tests/test_install_scripts.py` assert structural invariants only (script existence, required commands referenced, no hard-coded secrets) — they do not execute the scripts. Update them when adding/renaming scripts or required commands.
+- Scripts target the project-owned root `docker-compose.yml` (see Full-Stack Docker Deployment), never the upstream R2R compose file.
 
 ## Tests
 
