@@ -23,40 +23,10 @@ from sdk.asnyc_methods.retrieval import parse_retrieval_event
 
 from apps.api.services.r2r_client import DEFAULT_SEARCH_SETTINGS, get_async_client, get_client
 from apps.api.services.r2r_client_helpers import _label_from_score
-from apps.api.services import conversation_store
 
 log = logging.getLogger(__name__)
 
 _DOC_ONLY_NOT_FOUND = "I couldn't find this in your documents."
-
-_HISTORY_LIMIT = 40       # messages to load (20 Q+A pairs)
-_ANSWER_SNIPPET_CHARS = 2000  # truncate long assistant answers in history to save tokens
-
-
-def _build_task_prompt(conversation_id: str) -> str | None:
-    """Load prior messages for this conversation and format as a history block.
-
-    Returns None when there are no prior messages (first turn).
-    The block is injected via RAG's task_prompt so the LLM has context for
-    follow-up questions even though /retrieval/rag is stateless.
-
-    Long assistant answers are truncated to _ANSWER_SNIPPET_CHARS so the
-    history block stays within a reasonable token budget even for long sessions.
-    """
-    messages = conversation_store.get_messages(conversation_id, limit=_HISTORY_LIMIT)
-    if not messages:
-        return None
-    lines = ["Prior conversation (use this context to answer follow-up questions):"]
-    for msg in messages:
-        if msg["role"] == "user":
-            lines.append(f"User: {msg['content']}")
-        else:
-            content = msg["content"]
-            if len(content) > _ANSWER_SNIPPET_CHARS:
-                content = content[:_ANSWER_SNIPPET_CHARS] + "…"
-            lines.append(f"Assistant: {content}")
-    lines.append("\nCurrent question:")
-    return "\n".join(lines)
 
 
 def _apply_doc_only_check(result: dict[str, Any], doc_only: bool) -> dict[str, Any]:
