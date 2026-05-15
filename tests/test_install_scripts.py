@@ -466,10 +466,10 @@ class TestSetupPs1Sentinels:
             "setup.ps1 missing 'docker compose logs' on health timeout (AC2.2)"
         )
 
-    def test_wsl_chown_step(self):
-        # AC2.3 — WSL chown step before docker compose build
-        assert "wsl" in self.content.lower() and "chown" in self.content, (
-            "setup.ps1 missing WSL chown step (AC2.3)"
+    def test_data_dir_created(self):
+        # AC2.3 — data/ directory created before docker compose build (Windows: New-Item, not wsl chown)
+        assert "data" in self.content, (
+            "setup.ps1 missing data/ directory creation step (AC2.3)"
         )
 
     def test_app_url_present(self):

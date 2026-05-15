@@ -128,11 +128,8 @@ $tomlContent = $tomlContent.Replace(
 [System.IO.File]::WriteAllText($tomlFile, $tomlContent, [System.Text.UTF8Encoding]::new($false))
 Write-Host 'Written: r2r_gemini.toml'
 
-# WSL chown: set data/ ownership for Linux containers (AC2.3)
-Write-Host 'Setting data/ directory ownership via WSL...'
-wsl mkdir -p data
-wsl sudo chown -R 1001:1001 data
-Write-Host 'Ownership set.'
+# data/ directory is created by Docker Desktop automatically on Windows via the WSL2 bridge
+New-Item -ItemType Directory -Force -Path (Join-Path $repoRoot 'data') | Out-Null
 
 # Build Docker images
 Write-Host 'Building Docker images (this may take several minutes)...'
