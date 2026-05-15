@@ -45,7 +45,7 @@ concurrent_request_limit = 32
   strategies = ["neighborhood", "semantic"]
   forward_chunks = 3
   backward_chunks = 3
-  generation_config = { model = "gemini/gemini-2.0-flash" }
+  generation_config = { model = "gemini/gemini-2.5-flash" }
 
 [agent]
 rag_agent_static_prompt = "static_rag_agent"
