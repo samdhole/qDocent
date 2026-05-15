@@ -96,7 +96,7 @@ def rag_query(
 ) -> dict[str, Any]:
     """Ask a RAG question. Returns structured dict for the /ask route.
 
-    When collection_id is provided, filters retrieval to that collection using $overlap.
+    When collection_id is provided, filters retrieval to that collection via selected_collection_ids.
     When document_ids is provided and collection_id is None, filters by document IDs.
     collection_id takes precedence over document_ids when both are set.
     search_strategy: "vanilla" (default), "hyde" (good for conceptual queries), or "rag_fusion".
@@ -105,7 +105,7 @@ def rag_query(
     if search_strategy != "vanilla":
         search_settings["search_strategy"] = search_strategy
     if collection_id:
-        search_settings["filters"] = {"collection_ids": {"$overlap": [collection_id]}}
+        search_settings["selected_collection_ids"] = [collection_id]
     elif document_ids:
         combined_r2r_ids: list[str] = []
         for doc_id in document_ids:

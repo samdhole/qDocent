@@ -94,13 +94,14 @@ def _build_search_settings(
 ) -> dict[str, Any]:
     """Return search settings with optional collection or document-level filter.
 
-    collection_id takes priority: when set, filters by R2R collection using
-    $overlap (R2R 3.6.x array operator). document_ids filter is only applied
+    collection_id takes priority: when set, uses selected_collection_ids (not
+    $overlap which breaks streaming RAG). document_ids filter only applied
     when no collection_id is given.
     """
     settings = dict(DEFAULT_SEARCH_SETTINGS)
     if collection_id:
-        settings["filters"] = {"collection_ids": {"$overlap": [collection_id]}}
+        # Use selected_collection_ids — $overlap on collection_ids breaks streaming RAG
+        settings["selected_collection_ids"] = [collection_id]
         return settings
     if not document_ids:
         return settings
@@ -349,7 +350,7 @@ async def agent_stream(
             "POST", "retrieval/rag", json=_rag_data, version="v3"
         ):
             if not isinstance(raw_event, str):
-                # Already a parsed dict — pass through directly
+                # Already a parsed dict (shouldn't happen with current SDK, but handle defensively)
                 pass
             else:
                 line = raw_event.strip()
@@ -371,7 +372,10 @@ async def agent_stream(
             event_type = type(event).__name__
             if event_type == "SearchResultsEvent":
                 payload = _event_payload(event)
-                last_search_results = payload.get("data", payload) or {}
+                # SearchResultsEvent.model_dump() → {event, data: {id, object, data: {chunk_search_results,...}}}
+                # Drill through the two levels of "data" to get chunk_search_results at the top level.
+                outer = payload.get("data") or {}
+                last_search_results = outer.get("data", outer) or {}
                 yield _sse({"type": "status", "phase": "found_results"})
             elif event_type == "MessageEvent":
                 payload = _event_payload(event)
@@ -420,7 +424,7 @@ async def agent_stream(
 
 def _sse(data: dict) -> str:
     """Format a dict as an SSE data frame."""
-    return f"data: {json.dumps(data)}\n\n"
+    return f"data: {json.dumps(data, default=str)}\n\n"
 
 
 def _event_payload(event: Any) -> dict[str, Any]:
