@@ -1,4 +1,7 @@
+import sqlite3
+
 import pytest
+
 from apps.api.services import conversation_store
 
 
@@ -74,3 +77,34 @@ class TestListConversations:
         results = conversation_store.list_conversations()
         # SQLite ISO timestamps sort lexicographically; newest inserted last = larger timestamp
         assert results[0]["r2r_conv_id"] == "conv-b"
+
+
+class TestEnsureTable:
+    """AC5.1: Verify _ensure_table creates only the conversations table."""
+
+    def test_ensure_table_creates_only_conversations(self, tmp_path):
+        """Verify _ensure_table does NOT create a 'conversation_messages' table."""
+        db_path = tmp_path / "test.db"
+        conn = sqlite3.connect(str(db_path))
+        try:
+            # Call _ensure_table
+            conversation_store._ensure_table(conn)
+
+            # Query sqlite_master for all tables
+            cursor = conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
+            )
+            table_names = [row[0] for row in cursor.fetchall()]
+
+            # Assert conversations table exists
+            assert "conversations" in table_names, "conversations table must exist"
+
+            # Assert conversation_messages table does NOT exist
+            assert (
+                "conversation_messages" not in table_names
+            ), "conversation_messages table must not be created by _ensure_table"
+
+            # Assert no other unexpected tables
+            assert table_names == ["conversations"], f"Expected only ['conversations'], got {table_names}"
+        finally:
+            conn.close()
