@@ -35,8 +35,8 @@ Figures embedded in PDFs are extracted, stored, and matched to answers — eithe
 | Frontend | Next.js 16 (App Router) |
 | Workflows | LangGraph ≥ 1.1.10 |
 | PDF parsing | pdfplumber · camelot-py · PyMuPDF · pytesseract |
-| DOCX / PPTX | Docling |
-| URL ingestion | crawl4ai |
+| DOCX / PPTX | docling-slim |
+| URL ingestion | trafilatura |
 | PDF viewer | react-pdf (PDF.js) |
 | LLM / embeddings | Google Gemini (`gemini-3-flash-preview`, `gemini-embedding-2`) |
 
@@ -101,7 +101,7 @@ packages/ingestion/
   classify → parse → normalise tables → chunk → extract figures → quality report
   PDFs:           pdfplumber / camelot / PyMuPDF / Tesseract OCR
   DOCX / PPTX:    Docling
-  URLs:           crawl4ai (SSRF-protected)
+  URLs:           trafilatura (SSRF-protected)
      │
      ▼
 R2R :7272          vector store · pre-chunked ingest · RAG retrieval
@@ -250,7 +250,7 @@ docquery/
 │       │                      NotebookGrid · WikiPage · WikiTreeNav · SuggestedQuestions
 │       └── lib/               types · bboxConversion · remarkCitationBadges · useConversationStream
 ├── packages/
-│   ├── ingestion/             6-stage PDF pipeline + Docling (DOCX/PPTX) + crawl4ai (URL)
+│   ├── ingestion/             6-stage PDF pipeline + docling-slim (DOCX/PPTX) + trafilatura (URL)
 │   ├── evals/                 RAGAS harness (eval_dataset.yaml + run_ragas.py)
 │   └── workflows/             LangGraph support-triage + email-draft graphs
 ├── scripts/                   CLI utilities (ask · ingest · eval · demo-check · reset)
