@@ -19,6 +19,8 @@ from apps.api.services.citation_marker_rewriter import rewrite_brackets
 from apps.api.services.document_store import load_document_manifest
 from apps.api.services.figure_store import figures_for_response
 from apps.api.services.r2r_chunk_adapter import citation_from_retrieved_text
+from sdk.asnyc_methods.retrieval import parse_retrieval_event
+
 from apps.api.services.r2r_client import DEFAULT_SEARCH_SETTINGS, get_async_client, get_client
 from apps.api.services.r2r_client_helpers import _label_from_score
 
@@ -331,16 +333,20 @@ async def agent_stream(
             yield _sse({"type": "final", "result": _make_not_found_result(message, conversation_id)})
             return
 
-    try:
-        stream = get_async_client().retrieval.agent(
-            message={"role": "user", "content": message},
-            conversation_id=conversation_id,
-            search_settings=search_settings,
-            rag_generation_config={"stream": True},
-        )
-    except (httpx.HTTPError, R2RException) as exc:
-        yield _sse({"type": "error", "detail": f"R2R unavailable: {exc}"})
-        return
+    # R2R 3.6.x SDK bug: AsyncRetrievalMethods.agent() does `await _make_streaming_request()`
+    # but _make_streaming_request is an async generator — awaiting it raises TypeError.
+    # Bypass agent() and call _make_streaming_request directly with async for.
+    _client = get_async_client()
+    _agent_data: dict[str, Any] = {
+        "rag_generation_config": {"stream": True},
+        "search_settings": search_settings,
+        "include_title_if_available": True,
+        "conversation_id": str(conversation_id) if conversation_id else None,
+        "use_system_context": True,
+        "mode": "rag",
+        "search_mode": "custom",
+        "message": {"role": "user", "content": message},
+    }
 
     yield _sse({"type": "status", "phase": "searching"})
 
@@ -349,7 +355,10 @@ async def agent_stream(
     generation_started = False
 
     try:
-        async for event in stream:
+        async for raw_event in _client._make_streaming_request(
+            "POST", "retrieval/agent", json=_agent_data, version="v3"
+        ):
+            event = parse_retrieval_event(raw_event)
             event_type = type(event).__name__
             if event_type == "SearchResultsEvent":
                 payload = _event_payload(event)
