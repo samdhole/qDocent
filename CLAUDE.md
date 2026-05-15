@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-Last verified: 2026-05-14
+Last verified: 2026-05-15
 
 **Evaluated AI Knowledge & Workflow Assistant** — a local-first RAG portfolio project and reusable client starter kit. The system ingests business documents (PDF, DOCX, PPTX, and web URLs), answers questions with citations, and produces reliability scores. Stack: **R2R** (retrieval) + **RAGAS** (eval) + **FastAPI** (API) + **Next.js/React** (UI) + optional **LangGraph** (workflows).
 
@@ -71,7 +71,7 @@ Business docs (PDF / DOCX / PPTX / URL)
      ↓
 packages/ingestion/   (classify → parse → normalize → chunk → cite)
                       PDFs: full 6-stage pipeline via run_pipeline()
-                      DOCX/PPTX/URL: Docling/crawl4ai → chunk via run_pipeline_for_source()
+                      DOCX/PPTX/URL: docling-slim/trafilatura → chunk via run_pipeline_for_source()
      ↓
 R2R :7272             (retrieval, vector store, RAG responses)
      ↓
