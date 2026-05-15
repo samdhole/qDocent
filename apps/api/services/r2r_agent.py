@@ -23,10 +23,31 @@ from sdk.asnyc_methods.retrieval import parse_retrieval_event
 
 from apps.api.services.r2r_client import DEFAULT_SEARCH_SETTINGS, get_async_client, get_client
 from apps.api.services.r2r_client_helpers import _label_from_score
+from apps.api.services import conversation_store
 
 log = logging.getLogger(__name__)
 
 _DOC_ONLY_NOT_FOUND = "I couldn't find this in your documents."
+
+_HISTORY_TURNS = 6  # prior turns to inject (3 Q+A pairs)
+
+
+def _build_task_prompt(conversation_id: str) -> str | None:
+    """Load prior messages for this conversation and format as a history block.
+
+    Returns None when there are no prior messages (first turn).
+    The block is injected via RAG's task_prompt so the LLM has context for
+    follow-up questions even though /retrieval/rag is stateless.
+    """
+    messages = conversation_store.get_messages(conversation_id, limit=_HISTORY_TURNS * 2)
+    if not messages:
+        return None
+    lines = ["Prior conversation (use this context to answer follow-up questions):"]
+    for msg in messages:
+        prefix = "User" if msg["role"] == "user" else "Assistant"
+        lines.append(f"{prefix}: {msg['content']}")
+    lines.append("\nCurrent question:")
+    return "\n".join(lines)
 
 
 def _apply_doc_only_check(result: dict[str, Any], doc_only: bool) -> dict[str, Any]:
@@ -157,16 +178,24 @@ def agent_query(
         if needs_review:  # score < 0.50 → low confidence → skip agent
             return _make_not_found_result(message, conversation_id)
 
+    task_prompt = _build_task_prompt(conversation_id)
     try:
-        response = get_client().retrieval.rag(
+        rag_kwargs: dict[str, Any] = dict(
             query=message,
             search_settings=search_settings,
             rag_generation_config={"stream": False},
         )
+        if task_prompt:
+            rag_kwargs["task_prompt"] = task_prompt
+        response = get_client().retrieval.rag(**rag_kwargs)
     except (httpx.HTTPError, R2RException) as exc:
         raise RuntimeError(f"R2R unavailable: {exc}") from exc
     result = _adapt_rag_response(message, response, conversation_id)
-    return _apply_doc_only_check(result, doc_only)
+    result = _apply_doc_only_check(result, doc_only)
+    if conversation_id:
+        conversation_store.add_message(conversation_id, "user", message)
+        conversation_store.add_message(conversation_id, "assistant", result.get("answer", ""))
+    return result
 
 
 def _assemble_from_chunks(
@@ -326,6 +355,7 @@ async def agent_stream(
     #    that error but doesn't invoke search tools. /retrieval/rag bypasses tool calls
     #    entirely — it does search via search_settings then generates in one shot.
     _client = get_async_client()
+    task_prompt = _build_task_prompt(conversation_id)
     _rag_data: dict[str, Any] = {
         "query": message,
         "rag_generation_config": {"stream": True},
@@ -333,6 +363,8 @@ async def agent_stream(
         "search_mode": "custom",
         "include_title_if_available": True,
     }
+    if task_prompt:
+        _rag_data["task_prompt"] = task_prompt
 
     yield _sse({"type": "status", "phase": "searching"})
 
@@ -399,6 +431,9 @@ async def agent_stream(
                     conversation_id=conversation_id,
                 )
                 adapted = _apply_doc_only_check(adapted, doc_only)
+                if conversation_id:
+                    conversation_store.add_message(conversation_id, "user", message)
+                    conversation_store.add_message(conversation_id, "assistant", adapted.get("answer", ""))
                 yield _sse({"type": "final", "result": adapted})
                 return
     except (httpx.HTTPError, R2RException) as exc:
@@ -419,6 +454,9 @@ async def agent_stream(
         conversation_id=conversation_id,
     )
     adapted = _apply_doc_only_check(adapted, doc_only)
+    if conversation_id:
+        conversation_store.add_message(conversation_id, "user", message)
+        conversation_store.add_message(conversation_id, "assistant", adapted.get("answer", ""))
     yield _sse({"type": "final", "result": adapted})
 
 

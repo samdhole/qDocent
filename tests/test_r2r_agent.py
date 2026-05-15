@@ -798,10 +798,11 @@ class TestBuildSearchSettingsCollectionId:
     """Test _build_search_settings with collection_id parameter."""
 
     def test_collection_id_applies_overlap_filter(self):
-        """collection_id applies $overlap filter (R2R collection-level scope)."""
+        """collection_id uses selected_collection_ids (not $overlap which breaks streaming RAG)."""
         with mock.patch("apps.api.services.r2r_agent.get_client") as mock_get, \
              mock.patch("apps.api.services.r2r_agent.figures_for_response", return_value=[]), \
-             mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
+             mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)), \
+             mock.patch("apps.api.services.r2r_agent.conversation_store"):
             mock_get.return_value.retrieval.rag.return_value = _rag_response("answer")
 
             from apps.api.services.r2r_agent import agent_query
@@ -815,8 +816,8 @@ class TestBuildSearchSettingsCollectionId:
             )
 
             call_kwargs = mock_get.return_value.retrieval.rag.call_args.kwargs
-            filters = call_kwargs["search_settings"]["filters"]
-            assert filters == {"collection_ids": {"$overlap": ["col-abc"]}}
+            assert call_kwargs["search_settings"]["selected_collection_ids"] == ["col-abc"]
+            assert "filters" not in call_kwargs["search_settings"]
 
     def test_no_collection_id_uses_document_filter(self):
         """When collection_id=None, document_ids filter is applied."""
@@ -866,7 +867,8 @@ class TestBuildSearchSettingsCollectionId:
         with mock.patch("apps.api.services.r2r_agent.get_client") as mock_get, \
              mock.patch("apps.api.services.r2r_agent.load_document_manifest") as mock_manifest, \
              mock.patch("apps.api.services.r2r_agent.figures_for_response", return_value=[]), \
-             mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
+             mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)), \
+             mock.patch("apps.api.services.r2r_agent.conversation_store"):
             mock_manifest.return_value = {"r2r_document_ids": ["r2r-001"]}
             mock_get.return_value.retrieval.rag.return_value = _rag_response("answer")
 
@@ -881,16 +883,17 @@ class TestBuildSearchSettingsCollectionId:
             )
 
             call_kwargs = mock_get.return_value.retrieval.rag.call_args.kwargs
-            filters = call_kwargs["search_settings"]["filters"]
-            assert filters == {"collection_ids": {"$overlap": ["col-xyz"]}}
+            assert call_kwargs["search_settings"]["selected_collection_ids"] == ["col-xyz"]
+            assert "filters" not in call_kwargs["search_settings"]
             mock_manifest.assert_not_called()
 
     def test_agent_stream_with_collection_id(self):
-        """agent_stream() also accepts collection_id and applies $overlap filter."""
+        """agent_stream() also accepts collection_id and uses selected_collection_ids."""
         with mock.patch("apps.api.services.r2r_agent.get_async_client") as mock_get, \
              mock.patch("apps.api.services.r2r_agent.parse_retrieval_event", side_effect=lambda x: x), \
              mock.patch("apps.api.services.r2r_agent.figures_for_response", return_value=[]), \
-             mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
+             mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)), \
+             mock.patch("apps.api.services.r2r_agent.conversation_store"):
             events = [
                 MessageEvent("answer"),
                 FinalAnswerEvent("answer", "conv-1"),
@@ -908,5 +911,6 @@ class TestBuildSearchSettingsCollectionId:
             )))
 
             call_kwargs = mock_get.return_value._make_streaming_request.call_args.kwargs
-            filters = call_kwargs["json"]["search_settings"]["filters"]
-            assert filters == {"collection_ids": {"$overlap": ["col-abc"]}}
+            ss = call_kwargs["json"]["search_settings"]
+            assert ss["selected_collection_ids"] == ["col-abc"]
+            assert "filters" not in ss

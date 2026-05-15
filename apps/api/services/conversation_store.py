@@ -24,6 +24,17 @@ def _ensure_table(conn: sqlite3.Connection) -> None:
         )
         """
     )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS conversation_messages (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            r2r_conv_id TEXT NOT NULL,
+            role        TEXT NOT NULL,
+            content     TEXT NOT NULL,
+            created_at  TEXT NOT NULL
+        )
+        """
+    )
     conn.commit()
 
 
@@ -54,6 +65,42 @@ def create_conversation(
         "title": title,
         "created_at": created_at,
     }
+
+
+def add_message(r2r_conv_id: str, role: str, content: str) -> None:
+    """Append a message (role: 'user' or 'assistant') to conversation history."""
+    created_at = datetime.now(timezone.utc).isoformat()
+    with _LOCK:
+        conn = _connect()
+        try:
+            _ensure_table(conn)
+            conn.execute(
+                "INSERT INTO conversation_messages (r2r_conv_id, role, content, created_at)"
+                " VALUES (?, ?, ?, ?)",
+                (r2r_conv_id, role, content, created_at),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+
+def get_messages(r2r_conv_id: str, limit: int = 10) -> list[dict]:
+    """Return the last `limit` messages for a conversation, oldest-first."""
+    with _LOCK:
+        conn = _connect()
+        try:
+            _ensure_table(conn)
+            conn.row_factory = sqlite3.Row
+            cursor = conn.execute(
+                "SELECT role, content FROM conversation_messages"
+                " WHERE r2r_conv_id = ?"
+                " ORDER BY id DESC LIMIT ?",
+                (r2r_conv_id, limit),
+            )
+            rows = cursor.fetchall()
+            return [dict(r) for r in reversed(rows)]
+        finally:
+            conn.close()
 
 
 def list_conversations(notebook_id: str | None = None) -> list[dict]:
