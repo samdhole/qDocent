@@ -278,8 +278,11 @@ def _adapt_agent_response(
     for msg in reversed(messages):
         role = getattr(msg, "role", None) or (msg.get("role") if isinstance(msg, dict) else None)
         if role == "assistant":
-            content = getattr(msg, "content", None) or (msg.get("content") if isinstance(msg, dict) else None)
-            answer = content or ""
+            if hasattr(msg, "content"):
+                content = msg.content
+            else:
+                content = msg.get("content") if isinstance(msg, dict) else None
+            answer = content if content is not None else ""
             break
 
     # Extract chunks from search_response for citation assembly

@@ -544,6 +544,12 @@ class TestAgentStream:
                 assert token_frames[0]["text"] == "Hello "
                 assert token_frames[1]["text"] == "world"
 
+                # Verify streaming request was called with correct URL and message shape
+                call_args = mock_async_client.return_value._make_streaming_request.call_args
+                assert call_args.args[1] == "retrieval/agent", "Second positional arg should be URL"
+                assert "task_prompt" not in call_args.kwargs["json"], "task_prompt must not be in request body"
+                assert "message" in call_args.kwargs["json"], "message must be in request body"
+
     def test_agent_stream_emits_final_event_with_adapted_dict(self):
         """agent_stream() yields final frame with adapted response dict."""
         with mock.patch("apps.api.services.r2r_agent.get_async_client") as mock_async_client, \
