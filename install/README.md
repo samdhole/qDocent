@@ -6,6 +6,7 @@
 2. Open PowerShell and `cd` to this folder.
 3. **First time only:** run `.\install\setup.ps1` — answers two prompts, builds images, opens the app.
 4. **Daily use:** run `.\install\start.ps1` — starts the stack if needed, then opens the app.
+5. **To stop:** run `.\install\stop.ps1`.
 
 ## Linux
 
@@ -13,6 +14,7 @@
 2. Open a terminal and `cd` to this folder.
 3. **First time only:** run `bash install/setup.sh` — answers two prompts, builds images, opens the app.
 4. **Daily use:** run `bash install/start.sh` — starts the stack if needed, then opens the app.
+5. **To stop:** run `bash install/stop.sh`.
 
 ## Prerequisites
 
