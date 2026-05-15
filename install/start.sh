@@ -23,7 +23,7 @@ fi
 cd "${REPO_ROOT}"
 
 # Check if API container is already running
-if docker compose ps --status running 2>/dev/null | grep -q "api"; then
+if docker compose ps --status running 2>/dev/null | grep -qE '(^| )api( |$)'; then
     echo "Stack is already running. Opening browser..."
 else
     echo "Starting stack..."

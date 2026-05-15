@@ -30,7 +30,7 @@ Push-Location $repoRoot
 try {
     # Check if API container already running
     $runningServices = docker compose ps --status running 2>$null
-    if ($runningServices -match 'api') {
+    if ($runningServices -match '(?m)(^| )api( |$)') {
         Write-Host 'Stack is already running. Opening browser...'
     } else {
         Write-Host 'Starting stack...'

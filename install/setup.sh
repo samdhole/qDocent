@@ -22,6 +22,9 @@ if ! docker info >/dev/null 2>&1; then
     exit 1
 fi
 
+echo "Note: This script requires sudo to set data/ directory ownership."
+echo ""
+
 # Prompt: Google API key (masked input)
 printf "Enter your Google API key: "
 read -rs google_api_key

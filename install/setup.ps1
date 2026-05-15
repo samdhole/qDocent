@@ -19,7 +19,7 @@ function ConvertTo-PlainText {
     param([securestring]$SecureString)
     $bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($SecureString)
     try {
-        return [Runtime.InteropServices.Marshal]::PtrToStringAuto($bstr)
+        return [Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr)
     } finally {
         [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr)
     }
