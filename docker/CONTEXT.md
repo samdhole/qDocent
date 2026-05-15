@@ -106,7 +106,9 @@ Do not remove this mapping or R2R will fall back to OpenAI defaults and fail.
    additional apt package. Do not remove the `opencv-python-headless` override from the
    Dockerfile pip install step.
 8. **WSL2 VHD space** — Docker Desktop on Windows uses a VHD (`docker_data.vhdx`). Large
-   layers (pip install ~66s, venv copy ~90s) fill the VHD and cause daemon EOF crashes during
-   image export. Run `docker builder prune -f` between failed builds to reclaim space.
-   `.wslconfig` (at `C:\Users\<user>\`) controls WSL2 RAM/swap: `memory=6GB swap=4GB` is the
-   minimum for this stack.
+   layers (pip install, venv copy) fill the VHD and cause daemon EOF crashes during image export.
+   Run `docker builder prune -f` between failed builds to reclaim space. Requirements:
+   - 20 GB free VHD space minimum for the build
+   - 6 GB Docker Desktop RAM (Settings → Resources → Memory)
+   - `.wslconfig` at `C:\Users\<user>\`: `memory=6GB swap=4GB processors=4`
+   - No model download is required — docling-slim uses classical XML backends.

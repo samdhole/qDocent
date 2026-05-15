@@ -22,6 +22,41 @@ Before you begin, install:
 2. Ensure **"Use the WSL 2 based engine"** is checked
 3. Click Apply & Restart
 
+**Windows memory and disk requirements:**
+
+The Docker build requires significant RAM and disk space. Configure these **before** running `docker compose build`:
+
+1. **Docker Desktop RAM — set to 6 GB minimum:**
+   Open Docker Desktop → Settings → Resources → Memory → drag to 6.00 GB → Apply & Restart.
+   The default is 2 GB, which causes silent EOF crashes during pip install.
+
+2. **WSL2 memory limit — set in `.wslconfig`:**
+   Open (or create) `C:\Users\<YourUsername>\.wslconfig` in a text editor and add:
+   ```ini
+   [wsl2]
+   memory=6GB
+   swap=4GB
+   processors=4
+   ```
+   Then restart WSL2: open PowerShell and run `wsl --shutdown`, then reopen Docker Desktop.
+
+3. **Disk space — 20 GB free required:**
+   Docker builds create intermediate layers in the WSL2 VHD (`docker_data.vhdx`). Check free space:
+   ```powershell
+   docker system df
+   ```
+   If space is low, prune before building:
+   ```powershell
+   docker builder prune -f
+   docker image prune -f
+   ```
+
+4. **If a build fails with EOF or out-of-space errors:**
+   ```powershell
+   docker builder prune -f
+   ```
+   Then retry `docker compose build`.
+
 Verify Docker is running:
 
 ```powershell
@@ -114,7 +149,7 @@ docker compose build
 docker compose up -d
 ```
 
-The first build takes **20–45 minutes** (the API image downloads Python packages + Playwright + docling AI models; the web image is faster at 2–5 minutes). Subsequent starts are fast.
+The first build takes **5–15 minutes** (the API image downloads Python packages; the web image is faster at 2–5 minutes). Subsequent starts are fast.
 
 ### Check that all services are running
 
