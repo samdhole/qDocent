@@ -354,24 +354,35 @@ async def agent_stream(
     last_search_results: dict[str, Any] = {}
     generation_started = False
 
+    # SSE arrives as alternating lines: "event: <type>" then "data: <json>"
+    # _make_streaming_request yields one line at a time as raw strings.
+    # Accumulate into {"event": ..., "data": ...} dicts for parse_retrieval_event.
+    _sse_event_type: str | None = None
+
     try:
         async for raw_event in _client._make_streaming_request(
             "POST", "retrieval/agent", json=_agent_data, version="v3"
         ):
-            # _make_streaming_request yields json.loads(line); if the server
-            # sends SSE format ("data: {...}") json.loads fails and yields the
-            # raw string — parse it back into a dict here.
-            if isinstance(raw_event, str):
+            if not isinstance(raw_event, str):
+                # Already a parsed dict — pass through directly
+                pass
+            else:
                 line = raw_event.strip()
+                if line.startswith("event:"):
+                    _sse_event_type = line[6:].strip()
+                    continue
                 if line.startswith("data:"):
-                    line = line[5:].strip()
-                if not line or line == "[DONE]":
-                    continue
-                try:
-                    raw_event = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
+                    data_str = line[5:].strip()
+                    if not data_str or data_str == "[DONE]":
+                        _sse_event_type = None
+                        continue
+                    raw_event = {"event": _sse_event_type or "unknown", "data": data_str}
+                    _sse_event_type = None
+                else:
+                    continue  # blank line or unknown SSE field
             event = parse_retrieval_event(raw_event)
+            if event is None:
+                continue
             event_type = type(event).__name__
             if event_type == "SearchResultsEvent":
                 payload = _event_payload(event)
