@@ -9,8 +9,11 @@ No LLM calls here — this module is 100% deterministic.
 from __future__ import annotations
 
 import os
+import re
 from pathlib import Path
 from typing import Any
+
+_CID_RE = re.compile(r"\(cid:\d+\)")
 
 import camelot
 import pdfplumber
@@ -22,6 +25,11 @@ from pytesseract import Output
 _TESS_PATH = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 if os.path.exists(_TESS_PATH):
     pytesseract.pytesseract.tesseract_cmd = _TESS_PATH
+
+
+def _clean(text: str) -> str:
+    """Strip (cid:N) glyph-ID artifacts left by pdfplumber on custom-encoded fonts."""
+    return _CID_RE.sub("", text)
 
 
 def parse_pdf(pdf_path: str | Path, parser: str) -> list[dict[str, Any]]:
@@ -47,10 +55,10 @@ def _parse_fast_text(path: Path) -> list[dict[str, Any]]:
     pages = []
     with pdfplumber.open(str(path)) as pdf:
         for i, page in enumerate(pdf.pages):
-            text = page.extract_text() or ""
+            text = _clean(page.extract_text() or "")
             bbox = [page.bbox[0], page.bbox[1], page.bbox[2], page.bbox[3]]
             text_lines = [
-                {"text": l["text"], "x0": l["x0"], "top": l["top"], "x1": l["x1"], "bottom": l["bottom"]}
+                {"text": _clean(l["text"]), "x0": l["x0"], "top": l["top"], "x1": l["x1"], "bottom": l["bottom"]}
                 for l in page.extract_text_lines(return_chars=False)
                 if l.get("text", "").strip()
             ]
@@ -75,10 +83,10 @@ def _parse_table_aware(path: Path) -> list[dict[str, Any]]:
     text_lines_by_page: dict[int, list[dict]] = {}
     with pdfplumber.open(str(path)) as pdf:
         for i, page in enumerate(pdf.pages):
-            text_by_page[i + 1] = page.extract_text() or ""
+            text_by_page[i + 1] = _clean(page.extract_text() or "")
             bbox_by_page[i + 1] = list(page.bbox)
             text_lines_by_page[i + 1] = [
-                {"text": l["text"], "x0": l["x0"], "top": l["top"], "x1": l["x1"], "bottom": l["bottom"]}
+                {"text": _clean(l["text"]), "x0": l["x0"], "top": l["top"], "x1": l["x1"], "bottom": l["bottom"]}
                 for l in page.extract_text_lines(return_chars=False)
                 if l.get("text", "").strip()
             ]

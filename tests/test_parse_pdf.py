@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from packages.ingestion.parse_pdf import _parse_fast_text, _parse_table_aware, parse_pdf
+from packages.ingestion.parse_pdf import _clean, _parse_fast_text, _parse_table_aware, parse_pdf
 
 
 @pytest.fixture
@@ -126,3 +126,17 @@ class TestTextLines:
             assert line["top"] >= page_bbox[1] - 1, "line top must be >= page top"
             assert line["x1"] <= page_bbox[2] + 1, "line x1 must be <= page x1"
             assert line["bottom"] <= page_bbox[3] + 1, "line bottom must be <= page bottom"
+
+
+class TestClean:
+    def test_removes_cid_sequences(self):
+        assert _clean("Hello(cid:2)(cid:2)World") == "HelloWorld"
+
+    def test_removes_cid_with_multiple_digits(self):
+        assert _clean("text(cid:12)more") == "textmore"
+
+    def test_passthrough_clean_text(self):
+        assert _clean("No artifacts here.") == "No artifacts here."
+
+    def test_empty_string(self):
+        assert _clean("") == ""
