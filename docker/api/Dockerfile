@@ -66,6 +66,7 @@ WORKDIR /app
 # Copy application source
 COPY apps/ apps/
 COPY packages/ packages/
+COPY scripts/ scripts/
 
 # Create non-root user and set proper file ownership
 RUN addgroup --system --gid 1001 appgroup && \
