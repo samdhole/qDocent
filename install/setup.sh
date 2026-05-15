@@ -141,7 +141,31 @@ if [ "${healthy}" != "true" ]; then
     exit 1
 fi
 
-echo "API is healthy. Opening browser..."
+echo "API is healthy."
+
+# Set up demo corpus (ingest sample doc, generate wiki + Q&A snapshot)
+echo "Setting up demo corpus (this may take a few minutes)..."
+demo_output=$(docker compose exec -T api python scripts/setup_demo_corpus.py 2>&1)
+echo "${demo_output}" | sed 's/^/  /'
+notebook_id=$(echo "${demo_output}" | grep '^DEMO_NOTEBOOK_ID=' | tail -1 | sed 's/^DEMO_NOTEBOOK_ID=//')
+
+if [ -n "${notebook_id}" ]; then
+    # Inject NEXT_PUBLIC_DEMO_NOTEBOOK_ID into .env
+    if grep -q "^NEXT_PUBLIC_DEMO_NOTEBOOK_ID=" "${ENV_FILE}"; then
+        sed -i "s|^NEXT_PUBLIC_DEMO_NOTEBOOK_ID=.*|NEXT_PUBLIC_DEMO_NOTEBOOK_ID=${notebook_id}|" "${ENV_FILE}"
+    else
+        printf '\nNEXT_PUBLIC_DEMO_NOTEBOOK_ID=%s\n' "${notebook_id}" >> "${ENV_FILE}"
+    fi
+    echo "Demo notebook ID set: ${notebook_id}"
+
+    # Rebuild web container so NEXT_PUBLIC_DEMO_NOTEBOOK_ID is baked in
+    echo "Rebuilding web container with demo notebook ID..."
+    docker compose up -d --build web
+else
+    echo "Warning: demo corpus setup did not return a notebook ID — /demo page will show cached snapshot only." >&2
+fi
+
+echo "Opening browser..."
 
 # Open browser
 if command -v xdg-open >/dev/null 2>&1; then

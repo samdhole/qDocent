@@ -168,6 +168,32 @@ try {
         Write-Error "API did not become healthy within ${healthTimeout}s. See logs above."
         exit 1
     }
+
+    # Set up demo corpus (ingest sample doc, generate wiki + Q&A snapshot)
+    Write-Host 'Setting up demo corpus (this may take a few minutes)...'
+    $demoOutput = docker compose exec -T api python scripts/setup_demo_corpus.py 2>&1
+    $demoOutput | ForEach-Object { Write-Host "  $_" }
+    $notebookLine = $demoOutput | Where-Object { $_ -match '^DEMO_NOTEBOOK_ID=' } | Select-Object -Last 1
+    if ($notebookLine) {
+        $notebookId = $notebookLine -replace '^DEMO_NOTEBOOK_ID=', ''
+        # Inject NEXT_PUBLIC_DEMO_NOTEBOOK_ID into .env
+        $envContent = Get-Content $envFile -Raw
+        if ($envContent -match 'NEXT_PUBLIC_DEMO_NOTEBOOK_ID=') {
+            $envContent = ($envContent -split "`n" | ForEach-Object {
+                if ($_ -match '^NEXT_PUBLIC_DEMO_NOTEBOOK_ID=') { "NEXT_PUBLIC_DEMO_NOTEBOOK_ID=$notebookId" } else { $_ }
+            }) -join "`n"
+        } else {
+            $envContent = $envContent.TrimEnd() + "`nNEXT_PUBLIC_DEMO_NOTEBOOK_ID=$notebookId`n"
+        }
+        [System.IO.File]::WriteAllText($envFile, $envContent, [System.Text.UTF8Encoding]::new($false))
+        Write-Host "Demo notebook ID set: $notebookId"
+
+        # Rebuild web container so NEXT_PUBLIC_DEMO_NOTEBOOK_ID is baked in
+        Write-Host 'Rebuilding web container with demo notebook ID...'
+        docker compose up -d --build web
+    } else {
+        Write-Warning 'Demo corpus setup did not return a notebook ID — /demo page will show cached snapshot only.'
+    }
 } finally {
     Pop-Location
 }
