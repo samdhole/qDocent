@@ -157,14 +157,16 @@ def agent_query(
             return _make_not_found_result(message, conversation_id)
 
     try:
-        response = get_client().retrieval.rag(
-            query=message,
+        response = get_client().retrieval.agent(
+            message={"role": "user", "content": message},
+            conversation_id=conversation_id,
             search_settings=search_settings,
             rag_generation_config={"stream": False},
+            rag_tools=["search_file_knowledge", "search_file_descriptions"],
         )
     except (httpx.HTTPError, R2RException) as exc:
         raise RuntimeError(f"R2R unavailable: {exc}") from exc
-    result = _adapt_rag_response(message, response, conversation_id)
+    result = _adapt_agent_response(message, response)
     return _apply_doc_only_check(result, doc_only)
 
 
@@ -316,22 +318,43 @@ def _adapt_agent_response(question: str, response: Any) -> dict[str, Any]:
             or {}
         )
 
-    # Handle both singular (aggregated_search_result) and plural (aggregated_search_results)
-    # The spike found singular; this handles both for forward compatibility
-    aggregated = metadata.get("aggregated_search_results") or metadata.get("aggregated_search_result") or {}
+    # Primary: citations list → [{id, object, payload: {id, score, text, metadata}}]
+    # R2R 3.6.x agent endpoint populates metadata.citations from tool results.
+    citations_raw = metadata.get("citations") or []
+    chunk_results: list = []
+    for cit in citations_raw:
+        if isinstance(cit, str):
+            try:
+                cit = json.loads(cit)
+            except (json.JSONDecodeError, TypeError):
+                continue
+        if not isinstance(cit, dict):
+            continue
+        payload = cit.get("payload") or {}
+        if payload:
+            chunk_results.append({
+                "id": payload.get("id"),
+                "score": payload.get("score", 0.0),
+                "text": payload.get("text", ""),
+                "metadata": payload.get("metadata") or {},
+            })
 
-    # If aggregated is a JSON string (as found in spike), parse it
-    if isinstance(aggregated, str):
-        try:
-            parsed = json.loads(aggregated)
-        except (json.JSONDecodeError, TypeError):
-            parsed = {}
-        aggregated = parsed if isinstance(parsed, dict) else {}
-    elif not isinstance(aggregated, dict):
-        # Defensive: if it's neither string nor dict (e.g., list from json.loads("[]")), reset
-        aggregated = {}
-
-    chunk_results = aggregated.get("chunk_search_results") or []
+    # Fallback: aggregated_search_result is a JSON string of a list [{source_type, result}]
+    if not chunk_results:
+        aggregated_raw = metadata.get("aggregated_search_results") or metadata.get("aggregated_search_result") or ""
+        if isinstance(aggregated_raw, str):
+            try:
+                parsed = json.loads(aggregated_raw)
+            except (json.JSONDecodeError, TypeError):
+                parsed = []
+        else:
+            parsed = aggregated_raw
+        if isinstance(parsed, list):
+            for item in parsed:
+                if isinstance(item, dict) and item.get("source_type") == "chunk" and "result" in item:
+                    chunk_results.append(item["result"])
+        elif isinstance(parsed, dict):
+            chunk_results = parsed.get("chunk_search_results") or []
     conversation_id = (
         getattr(inner, "conversation_id", None)
         or (inner.get("conversation_id") if isinstance(inner, dict) else None)
@@ -374,24 +397,28 @@ async def agent_stream(
             yield _sse({"type": "final", "result": _make_not_found_result(message, conversation_id)})
             return
 
-    # Use /retrieval/rag instead of /retrieval/agent to avoid two issues:
-    # 1. R2R 3.6.x SDK bug: agent() awaits an async generator (TypeError)
-    # 2. gemini-3-flash-preview thinking model breaks R2R's multi-turn tool-call loop
-    #    with "Function call is missing a thought_signature"; gemini-2.0-flash avoids
-    #    that error but doesn't invoke search tools. /retrieval/rag bypasses tool calls
-    #    entirely — it does search via search_settings then generates in one shot.
+    # Use /retrieval/agent directly via _make_streaming_request (bypasses SDK bug
+    # where async agent() does `await _make_streaming_request(...)` on an async generator).
+    # gemini-3-flash-preview with budget_tokens=0 (in r2r_gemini.toml) disables extended
+    # thinking so no thought_signature is emitted in tool-call responses.
     _client = get_async_client()
-    _rag_data: dict[str, Any] = {
-        "query": message,
+    _agent_data: dict[str, Any] = {
+        "message": {"role": "user", "content": message},
         "rag_generation_config": {"stream": True},
         "search_settings": search_settings,
+        "search_mode": "custom",
         "include_title_if_available": True,
+        "conversation_id": conversation_id,
+        "mode": "rag",
+        "use_system_context": True,
+        "rag_tools": ["search_file_knowledge", "search_file_descriptions"],
     }
 
     yield _sse({"type": "status", "phase": "searching"})
 
     full_text_parts: list[str] = []
     last_search_results: dict[str, Any] = {}
+    accumulated_citations: list[dict[str, Any]] = []
     generation_started = False
 
     # SSE arrives as alternating lines: "event: <type>" then "data: <json>"
@@ -401,7 +428,7 @@ async def agent_stream(
 
     try:
         async for raw_event in _client._make_streaming_request(
-            "POST", "retrieval/rag", json=_rag_data, version="v3"
+            "POST", "retrieval/agent", json=_agent_data, version="v3"
         ):
             if not isinstance(raw_event, str):
                 # Already a parsed dict — pass through directly
@@ -428,6 +455,15 @@ async def agent_stream(
                 payload = _event_payload(event)
                 last_search_results = payload.get("data", payload) or {}
                 yield _sse({"type": "status", "phase": "found_results"})
+            elif event_type == "ToolCallEvent":
+                yield _sse({"type": "status", "phase": "searching"})
+            elif event_type == "ToolResultEvent":
+                yield _sse({"type": "status", "phase": "found_results"})
+            elif event_type == "CitationEvent":
+                payload = _event_payload(event)
+                cit = payload.get("data") or {}
+                if cit:
+                    accumulated_citations.append(cit)
             elif event_type == "MessageEvent":
                 payload = _event_payload(event)
                 delta = (payload.get("data", {}) or {}).get("delta", {}) or {}
@@ -444,12 +480,15 @@ async def agent_stream(
                 # The final event contains the assembled answer + citations.
                 payload = _event_payload(event)
                 final_data = payload.get("data") or {}
+                # Prefer citations accumulated from CitationEvent; fall back to
+                # FinalAnswerEvent.data.citations (same data, different arrival path).
+                final_citations = final_data.get("citations") or accumulated_citations
                 adapted = _adapt_final_event(
                     question=message,
                     payload=payload,
                     fallback_text="".join(full_text_parts),
                     search_results=last_search_results,
-                    final_answer_citations=final_data.get("citations") or [],
+                    final_answer_citations=final_citations,
                     conversation_id=conversation_id,
                 )
                 adapted = _apply_doc_only_check(adapted, doc_only)
@@ -470,6 +509,7 @@ async def agent_stream(
         payload={},
         fallback_text="".join(full_text_parts),
         search_results=last_search_results,
+        final_answer_citations=accumulated_citations,
         conversation_id=conversation_id,
     )
     adapted = _apply_doc_only_check(adapted, doc_only)
