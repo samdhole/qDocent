@@ -190,7 +190,7 @@ packaging==26.2
 pandas==3.0.3
 patchright==1.59.1
 pdf2image==1.17.0
-pdfminer.six==20251230
+pdfminer.six==20260107
 pdfplumber==0.11.9
 pgvector==0.3.6
 pillow==12.2.0
