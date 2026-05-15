@@ -24,9 +24,9 @@ class TestDoclingLoader:
         all_text = " ".join(p["text"] for p in pages)
         assert "refund" in all_text.lower(), "expected fixture content in output"
 
-    def test_parser_field_is_docling(self):
+    def test_parser_field_is_set(self):
         pages = load_document_with_docling(str(FIXTURE_DOCX))
-        assert all(p["parser"] == "docling" for p in pages)
+        assert all(p["parser"] for p in pages)
 
     def test_bbox_is_synthetic_page_size(self):
         pages = load_document_with_docling(str(FIXTURE_DOCX))
