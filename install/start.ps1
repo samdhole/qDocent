@@ -11,9 +11,13 @@ $pollInterval  = 3
 # Check Docker is running
 $dockerRunning = $false
 try {
-    $null = docker info 2>$null
+    $ErrorActionPreference = 'SilentlyContinue'
+    & docker info | Out-Null
+    $ErrorActionPreference = 'Stop'
     if ($LASTEXITCODE -eq 0) { $dockerRunning = $true }
-} catch { }
+} catch {
+    $ErrorActionPreference = 'Stop'
+}
 
 if (-not $dockerRunning) {
     Write-Error 'Docker is not running. Please start Docker Desktop and try again.'
