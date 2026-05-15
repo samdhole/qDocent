@@ -1,6 +1,6 @@
 [app]
-fast_llm = "gemini/gemini-3-flash-preview"
-quality_llm = "gemini/gemini-3-flash-preview"
+fast_llm = "gemini/gemini-2.5-flash"
+quality_llm = "gemini/gemini-2.5-flash"
 vlm = "gemini/gemini-3-flash-preview"
 reasoning_llm = "gemini/gemini-3-flash-preview"
 planning_llm = "gemini/gemini-3-flash-preview"
@@ -45,7 +45,7 @@ concurrent_request_limit = 32
   strategies = ["neighborhood", "semantic"]
   forward_chunks = 3
   backward_chunks = 3
-  generation_config = { model = "gemini/gemini-3-flash-preview" }
+  generation_config = { model = "gemini/gemini-2.0-flash" }
 
 [agent]
 rag_agent_static_prompt = "static_rag_agent"
