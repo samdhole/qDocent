@@ -295,6 +295,26 @@ class ToolCallEvent:
         return {"data": {}}
 
 
+class ToolResultEvent:
+    """Fake ToolResultEvent for testing agent_stream."""
+
+    def __init__(self):
+        pass
+
+    def model_dump(self):
+        return {"data": {}}
+
+
+class ThinkingEvent:
+    """Fake ThinkingEvent for testing agent_stream."""
+
+    def __init__(self):
+        pass
+
+    def model_dump(self):
+        return {"data": {}}
+
+
 class CitationEvent:
     """Fake CitationEvent for testing agent_stream."""
 
@@ -706,6 +726,65 @@ class TestAgentStream:
                 assert result["question"] == "What is the refund policy?"
                 assert "citations" in result
                 assert "retrieved_contexts" in result
+
+    def test_ac2_2_tool_call_event_emits_searching_beat_silent_skip(self):
+        """AC2.2: ToolCallEvent emits status:searching SSE beat; ToolResultEvent and ThinkingEvent produce no output."""
+        with mock.patch("apps.api.services.r2r_agent.get_async_client") as mock_async_client, \
+             mock.patch("apps.api.services.r2r_agent.parse_retrieval_event", side_effect=lambda x: x), \
+             mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures, \
+             mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
+                events = [
+                    SearchResultsEvent([]),  # Initial search results (no chunks)
+                    ToolCallEvent(),         # Agent invokes search tool → emit "searching" beat
+                    ToolResultEvent(),       # Tool result comes back → silently skip (no SSE)
+                    ToolCallEvent(),         # Agent invokes another tool → emit another "searching" beat
+                    ThinkingEvent(),         # Agent thinking → silently skip (no SSE)
+                    MessageEvent("hi"),      # Start generation
+                    FinalAnswerEvent("hi", "conv-1"),
+                ]
+                mock_async_client.return_value._make_streaming_request.return_value = _async_iter(*events)
+                mock_figures.return_value = []
+
+                from apps.api.services.r2r_agent import agent_stream
+
+                frames = asyncio.run(_collect(agent_stream("test?", "conv-1")))
+
+                # Parse all SSE frames
+                frame_list = [json.loads(f.split("data: ")[1]) for f in frames if "data: " in f]
+
+                # Extract status frames and verify "searching" appears at least 3 times:
+                # 1. Initial pre-loop beat
+                # 2. After first ToolCallEvent
+                # 3. After second ToolCallEvent
+                status_frames = [f for f in frame_list if f.get("type") == "status"]
+                status_phases = [s.get("phase") for s in status_frames]
+
+                assert status_phases.count("searching") >= 3, (
+                    f"Expected at least 3 'searching' beats (initial + 2 ToolCallEvents), "
+                    f"got: {status_phases}"
+                )
+
+                # Verify that status frames only contain expected phases
+                # (no spurious phases from ToolResultEvent or ThinkingEvent)
+                expected_phases = {"searching", "found_results", "generating"}
+                for phase in status_phases:
+                    assert phase in expected_phases, (
+                        f"Unexpected phase '{phase}' from ToolResultEvent or ThinkingEvent. "
+                        f"These events should produce no SSE content."
+                    )
+
+                # Verify no SSE frame contains data attributed to ToolResultEvent or ThinkingEvent
+                for frame in frame_list:
+                    # Token frames should only come from MessageEvent
+                    if frame.get("type") == "token":
+                        assert frame.get("text") == "hi", (
+                            f"Token frame should only contain 'hi' from MessageEvent. "
+                            f"Got: {frame.get('text')}"
+                        )
+
+                # Verify final frame is present
+                final_frames = [f for f in frame_list if f.get("type") == "final"]
+                assert len(final_frames) == 1, "Should emit exactly one final frame"
 
 
 class TestDocumentFilter:
