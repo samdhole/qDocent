@@ -55,12 +55,18 @@ def get_client() -> R2RClient:
     return client
 
 
-async def get_async_client() -> R2RAsyncClient:
-    """Async variant of get_client() for async streaming endpoints."""
-    client = R2RAsyncClient(base_url=_BASE_URL)
+def get_async_client() -> R2RAsyncClient:
+    """Async variant of get_client() for async streaming endpoints.
+
+    Authenticates via a throwaway sync client so the async client has a valid
+    access token without requiring an extra await at every call site.
+    """
+    async_client = R2RAsyncClient(base_url=_BASE_URL)
     if _ADMIN_PASSWORD:
-        await client.users.login(email=_ADMIN_EMAIL, password=_ADMIN_PASSWORD)
-    return client
+        sync_client = R2RClient(base_url=_BASE_URL)
+        tokens = sync_client.users.login(email=_ADMIN_EMAIL, password=_ADMIN_PASSWORD)
+        async_client.access_token = tokens.results.access_token.token
+    return async_client
 
 
 def create_r2r_collection(name: str) -> str:

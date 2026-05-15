@@ -332,7 +332,7 @@ async def agent_stream(
             return
 
     try:
-        stream = await (await get_async_client()).retrieval.agent(
+        stream = await get_async_client().retrieval.agent(
             message={"role": "user", "content": message},
             conversation_id=conversation_id,
             search_settings=search_settings,
