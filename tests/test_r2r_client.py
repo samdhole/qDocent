@@ -977,8 +977,7 @@ class TestRagQueryCollectionId:
             from apps.api.services import r2r_client
             r2r_client.rag_query("test question", collection_id="col-xyz")
             call_kwargs = mock_get.return_value.retrieval.rag.call_args[1]
-            filters = call_kwargs["search_settings"]["filters"]
-            assert filters == {"collection_ids": {"$overlap": ["col-xyz"]}}
+            assert call_kwargs["search_settings"]["selected_collection_ids"] == ["col-xyz"]
 
     def test_no_filter_when_collection_id_none(self):
         with mock.patch("apps.api.services.r2r_client.get_client") as mock_get:
@@ -1017,9 +1016,8 @@ class TestRagQueryCollectionId:
             from apps.api.services import r2r_client
             r2r_client.rag_query("q", document_ids=["doc-1"], collection_id="col-xyz")
             call_kwargs = mock_get.return_value.retrieval.rag.call_args[1]
-            assert call_kwargs["search_settings"]["filters"] == {
-                "collection_ids": {"$overlap": ["col-xyz"]}
-            }
+            assert call_kwargs["search_settings"]["selected_collection_ids"] == ["col-xyz"]
+            assert "filters" not in call_kwargs["search_settings"]
 
 
 class TestRagQueryBracketRewrite:

@@ -78,8 +78,17 @@ class TestStartShSyntax:
         bash = shutil.which("bash")
         if bash is None:
             pytest.skip("bash not available on this system")
+        probe = subprocess.run([bash, "-c", "exit 0"], capture_output=True, timeout=5)
+        if probe.returncode != 0:
+            pytest.skip("bash found but not functional (e.g. WSL2 network issue)")
+        sh_path = str(START_SH)
+        if sys.platform == "win32":
+            wslpath = subprocess.run(["wsl", "wslpath", sh_path], capture_output=True, text=True, timeout=5)
+            if wslpath.returncode != 0:
+                pytest.skip("cannot convert path to WSL format")
+            sh_path = wslpath.stdout.strip()
         result = subprocess.run(
-            [bash, "-n", str(START_SH)],
+            [bash, "-n", sh_path],
             capture_output=True,
             text=True,
         )
@@ -289,8 +298,17 @@ class TestSetupShSyntax:
         bash = shutil.which("bash")
         if bash is None:
             pytest.skip("bash not available on this system")
+        probe = subprocess.run([bash, "-c", "exit 0"], capture_output=True, timeout=5)
+        if probe.returncode != 0:
+            pytest.skip("bash found but not functional (e.g. WSL2 network issue)")
+        sh_path = str(SETUP_SH)
+        if sys.platform == "win32":
+            wslpath = subprocess.run(["wsl", "wslpath", sh_path], capture_output=True, text=True, timeout=5)
+            if wslpath.returncode != 0:
+                pytest.skip("cannot convert path to WSL format")
+            sh_path = wslpath.stdout.strip()
         result = subprocess.run(
-            [bash, "-n", str(SETUP_SH)],
+            [bash, "-n", sh_path],
             capture_output=True,
             text=True,
         )
