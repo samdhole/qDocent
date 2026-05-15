@@ -187,23 +187,25 @@ def agent_query(
         if needs_review:  # score < 0.50 → low confidence → skip agent
             return _make_not_found_result(message, conversation_id)
 
-    task_prompt = _build_task_prompt(conversation_id)
     try:
-        rag_kwargs: dict[str, Any] = dict(
+        agent_response = get_client().retrieval.agent(
+            message={"role": "user", "content": message},
+            conversation_id=conversation_id,
+            mode="rag",
+            rag_generation_config={"stream": False},
+            search_settings=search_settings,
+            include_title_if_available=True,
+            rag_tools=["search_file_descriptions", "search_file_knowledge", "content"],
+        )
+        # AgentResponse has no search_results field — fetch citations separately
+        search_response = get_client().retrieval.search(
             query=message,
             search_settings=search_settings,
-            rag_generation_config={"stream": False},
         )
-        if task_prompt:
-            rag_kwargs["task_prompt"] = task_prompt
-        response = get_client().retrieval.rag(**rag_kwargs)
     except (httpx.HTTPError, R2RException) as exc:
         raise RuntimeError(f"R2R unavailable: {exc}") from exc
-    result = _adapt_rag_response(message, response, conversation_id)
+    result = _adapt_agent_response(message, agent_response, search_response, conversation_id)
     result = _apply_doc_only_check(result, doc_only)
-    if conversation_id:
-        conversation_store.add_message(conversation_id, "user", message)
-        conversation_store.add_message(conversation_id, "assistant", result.get("answer", ""))
     return result
 
 
@@ -279,6 +281,51 @@ def _assemble_from_chunks(
         "needs_human_review": needs_review,
         "conversation_id": str(conversation_id) if conversation_id else None,
     }
+
+
+def _adapt_agent_response(
+    question: str,
+    agent_response: Any,
+    search_response: Any,
+    conversation_id: str | None,
+) -> dict[str, Any]:
+    """Map a non-streaming /retrieval/agent response to the standard response dict.
+
+    AgentResponse has only messages + conversation_id — no search_results.
+    Citations come from a separate retrieval.search() call passed as search_response.
+    """
+    inner = (
+        getattr(agent_response, "results", None)
+        or (agent_response.get("results") if isinstance(agent_response, dict) else None)
+        or agent_response
+    )
+    messages = (
+        getattr(inner, "messages", None)
+        or (inner.get("messages") if isinstance(inner, dict) else None)
+        or []
+    )
+    answer = ""
+    for msg in reversed(messages):
+        role = getattr(msg, "role", None) or (msg.get("role") if isinstance(msg, dict) else None)
+        if role == "assistant":
+            content = getattr(msg, "content", None) or (msg.get("content") if isinstance(msg, dict) else None)
+            answer = content or ""
+            break
+
+    # Extract chunks from search_response for citation assembly
+    search_inner = (
+        getattr(search_response, "results", None)
+        or (search_response.get("results") if isinstance(search_response, dict) else None)
+        or {}
+    )
+    if hasattr(search_inner, "model_dump"):
+        search_inner = search_inner.model_dump()
+    elif hasattr(search_inner, "__dict__"):
+        search_inner = vars(search_inner)
+    chunk_results = (
+        (search_inner.get("chunk_search_results") if isinstance(search_inner, dict) else None) or []
+    )
+    return _assemble_from_chunks(question, answer, chunk_results, conversation_id)
 
 
 def _adapt_rag_response(question: str, response: Any, conversation_id: str | None) -> dict[str, Any]:
@@ -357,23 +404,19 @@ async def agent_stream(
             yield _sse({"type": "final", "result": _make_not_found_result(message, conversation_id)})
             return
 
-    # Use /retrieval/rag instead of /retrieval/agent to avoid two issues:
-    # 1. R2R 3.6.x SDK bug: agent() awaits an async generator (TypeError)
-    # 2. gemini-3-flash-preview thinking model breaks R2R's multi-turn tool-call loop
-    #    with "Function call is missing a thought_signature"; gemini-2.0-flash avoids
-    #    that error but doesn't invoke search tools. /retrieval/rag bypasses tool calls
-    #    entirely — it does search via search_settings then generates in one shot.
+    # Use /retrieval/agent so R2R manages conversation history natively via conversation_id.
+    # gemini-2.5-flash (r2r_gemini.toml) required — gemini-3-flash-preview has a
+    # thought_signature bug that breaks multi-tool agent calls.
     _client = get_async_client()
-    task_prompt = _build_task_prompt(conversation_id)
-    _rag_data: dict[str, Any] = {
-        "query": message,
+    _agent_data: dict[str, Any] = {
+        "message": {"role": "user", "content": message},
+        "conversation_id": conversation_id,
+        "mode": "rag",
         "rag_generation_config": {"stream": True},
         "search_settings": search_settings,
-        "search_mode": "custom",
         "include_title_if_available": True,
+        "rag_tools": ["search_file_descriptions", "search_file_knowledge", "content"],
     }
-    if task_prompt:
-        _rag_data["task_prompt"] = task_prompt
 
     yield _sse({"type": "status", "phase": "searching"})
 
@@ -388,7 +431,7 @@ async def agent_stream(
 
     try:
         async for raw_event in _client._make_streaming_request(
-            "POST", "retrieval/rag", json=_rag_data, version="v3"
+            "POST", "retrieval/agent", json=_agent_data, version="v3"
         ):
             if not isinstance(raw_event, str):
                 # Already a parsed dict (shouldn't happen with current SDK, but handle defensively)
@@ -418,6 +461,11 @@ async def agent_stream(
                 outer = payload.get("data") or {}
                 last_search_results = outer.get("data", outer) or {}
                 yield _sse({"type": "status", "phase": "found_results"})
+            elif event_type == "ToolCallEvent":
+                # Agent invoked a search tool — emit a fresh searching beat so the UI updates
+                yield _sse({"type": "status", "phase": "searching"})
+            elif event_type in ("ToolResultEvent", "ThinkingEvent"):
+                pass  # not user-facing
             elif event_type == "MessageEvent":
                 payload = _event_payload(event)
                 delta = (payload.get("data", {}) or {}).get("delta", {}) or {}
@@ -440,9 +488,6 @@ async def agent_stream(
                     conversation_id=conversation_id,
                 )
                 adapted = _apply_doc_only_check(adapted, doc_only)
-                if conversation_id:
-                    conversation_store.add_message(conversation_id, "user", message)
-                    conversation_store.add_message(conversation_id, "assistant", adapted.get("answer", ""))
                 yield _sse({"type": "final", "result": adapted})
                 return
     except (httpx.HTTPError, R2RException) as exc:
@@ -463,9 +508,6 @@ async def agent_stream(
         conversation_id=conversation_id,
     )
     adapted = _apply_doc_only_check(adapted, doc_only)
-    if conversation_id:
-        conversation_store.add_message(conversation_id, "user", message)
-        conversation_store.add_message(conversation_id, "assistant", adapted.get("answer", ""))
     yield _sse({"type": "final", "result": adapted})
 
 

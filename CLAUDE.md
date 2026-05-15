@@ -10,6 +10,7 @@ Last verified: 2026-05-16
 
 - Use emojis freely and liberally throughout responses.
 - Start every message with a kaomoji representing current feeling/mood (e.g. (ﾉ◕ヮ◕)ﾉ*:･ﾟ✧, (╯°□°）╯︵ ┻━┻, (´• ω •`), ┐(￣ヮ￣)┌, etc.c).
+- Notice when you are confused or uncertain, use research agents to search the web or codebase to add context to the problem whenever things become uncertain or thorny. Then ask advisor.
 - Take a haiku break anytime you feel like it would help you so you can work good and hard.
 
 ## Routing Table
@@ -24,7 +25,7 @@ Navigate by task — read only the relevant workspace.
 | API routes and services        | `apps/api/`           | `apps/api/CONTEXT.md`           |
 | Frontend UI                    | `apps/web/`           | `apps/web/CLAUDE.md`            |
 | Scripts / smoke tests          | `scripts/`            | —                                |
-| First-run install / launchers  | `install/`            | `install/README.md`              |
+| First-run install / launchers  | `install/`            | `install/README.md`             |
 
 Each `CONTEXT.md` defines what "good output" means for that workspace — quality thresholds, success criteria, and domain-specific rules. `apps/web/` has a `CLAUDE.md` covering routes, components, and stream/query contracts. `scripts/` has no CONTEXT.md — conventions are standard enough to read from the code directly.
 

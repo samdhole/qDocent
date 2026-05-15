@@ -33,6 +33,28 @@ def _rag_response(answer: str, chunk_results=None):
     return resp
 
 
+def _agent_response(answer: str, chunk_results=None):
+    """Build a mock retrieval.agent() response with AgentResponse shape.
+
+    AgentResponse shape:
+        results.messages            → list of message dicts with role/content
+        results.conversation_id     → string ID
+    """
+    resp = mock.MagicMock()
+    resp.results.messages = [{"role": "assistant", "content": answer}]
+    resp.results.conversation_id = "conv-1"
+
+    # Also mock the search response (called separately for citations)
+    # The search response needs a results object with chunk_search_results
+    search_resp = mock.MagicMock()
+    search_results_obj = mock.MagicMock()
+    search_results_obj.chunk_search_results = chunk_results or []
+    # Mock model_dump() to return a dict representation
+    search_results_obj.model_dump.return_value = {"chunk_search_results": chunk_results or []}
+    search_resp.results = search_results_obj
+    return resp, search_resp
+
+
 class TestCreateConversation:
     """Test conversation creation."""
 
@@ -68,25 +90,25 @@ class TestAgentQuery:
     """Test agent query and response adaptation."""
 
     def test_agent_query_extracts_answer_and_citations(self):
-        """agent_query() extracts answer, citations, and retrieved_contexts from rag response."""
+        """agent_query() extracts answer, citations, and retrieved_contexts from agent response."""
+        chunks = [
+            {
+                "text": "DocQuery Citation: document_id=doc1; source_file=policy.pdf; page_start=1; page_end=1; section_path=Refunds; chunk_index=0\n\nRefund policy details",
+                "metadata": {
+                    "chunk_id": "chunk-1",
+                    "source_file": "policy.pdf",
+                    "page_start": 1,
+                },
+                "score": 0.85,
+                "id": "chunk-1",
+            }
+        ]
         with mock.patch("apps.api.services.r2r_agent.get_client") as mock_client_factory, \
              mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures, \
              mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
-                mock_client_factory.return_value.retrieval.rag.return_value = _rag_response(
-                    "The policy is 30 days.",
-                    [
-                        {
-                            "text": "DocQuery Citation: document_id=doc1; source_file=policy.pdf; page_start=1; page_end=1; section_path=Refunds; chunk_index=0\n\nRefund policy details",
-                            "metadata": {
-                                "chunk_id": "chunk-1",
-                                "source_file": "policy.pdf",
-                                "page_start": 1,
-                            },
-                            "score": 0.85,
-                            "id": "chunk-1",
-                        }
-                    ],
-                )
+                agent_resp, search_resp = _agent_response("The policy is 30 days.", chunks)
+                mock_client_factory.return_value.retrieval.agent.return_value = agent_resp
+                mock_client_factory.return_value.retrieval.search.return_value = search_resp
                 mock_figures.return_value = []
 
                 from apps.api.services.r2r_agent import agent_query
@@ -106,7 +128,9 @@ class TestAgentQuery:
         with mock.patch("apps.api.services.r2r_agent.get_client") as mock_client_factory, \
              mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures, \
              mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
-                mock_client_factory.return_value.retrieval.rag.return_value = _rag_response("Answer")
+                agent_resp, search_resp = _agent_response("Answer")
+                mock_client_factory.return_value.retrieval.agent.return_value = agent_resp
+                mock_client_factory.return_value.retrieval.search.return_value = search_resp
                 mock_figures.return_value = []
 
                 from apps.api.services.r2r_agent import agent_query
@@ -120,9 +144,9 @@ class TestAgentQuery:
         with mock.patch("apps.api.services.r2r_agent.get_client") as mock_client_factory, \
              mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures, \
              mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
-                mock_client_factory.return_value.retrieval.rag.return_value = _rag_response(
-                    "I don't have enough information."
-                )
+                agent_resp, search_resp = _agent_response("I don't have enough information.")
+                mock_client_factory.return_value.retrieval.agent.return_value = agent_resp
+                mock_client_factory.return_value.retrieval.search.return_value = search_resp
                 mock_figures.return_value = []
 
                 from apps.api.services.r2r_agent import agent_query
@@ -135,13 +159,13 @@ class TestAgentQuery:
                 assert result["needs_human_review"] is True
 
     def test_agent_query_handles_string_completion(self):
-        """agent_query() handles when completion is a plain string (R2R 3.6.x RAG shape)."""
+        """agent_query() handles when answer is a plain string."""
         with mock.patch("apps.api.services.r2r_agent.get_client") as mock_client_factory, \
              mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures, \
              mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
-                mock_client_factory.return_value.retrieval.rag.return_value = _rag_response(
-                    "Please specify which document you are referring to."
-                )
+                agent_resp, search_resp = _agent_response("Please specify which document you are referring to.")
+                mock_client_factory.return_value.retrieval.agent.return_value = agent_resp
+                mock_client_factory.return_value.retrieval.search.return_value = search_resp
                 mock_figures.return_value = []
 
                 from apps.api.services.r2r_agent import agent_query
@@ -158,27 +182,31 @@ class TestAgentQuery:
         with mock.patch("apps.api.services.r2r_agent.get_client") as mock_client_factory, \
              mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures, \
              mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
-                response_dict = {
+                agent_dict = {
                     "results": {
-                        "completion": "The answer is here.",
-                        "search_results": {
-                            "chunk_search_results": [
-                                {
-                                    "text": "DocQuery Citation: document_id=doc2; source_file=guide.pdf; page_start=5; page_end=5; section_path=Overview; chunk_index=0\n\nGuide text",
-                                    "metadata": {
-                                        "chunk_id": "chunk-2",
-                                        "source_file": "guide.pdf",
-                                        "page_start": 5,
-                                    },
-                                    "score": 0.92,
-                                    "id": "chunk-2",
-                                }
-                            ]
-                        },
+                        "messages": [{"role": "assistant", "content": "The answer is here."}],
+                        "conversation_id": "conv-dict"
+                    }
+                }
+                search_dict = {
+                    "results": {
+                        "chunk_search_results": [
+                            {
+                                "text": "DocQuery Citation: document_id=doc2; source_file=guide.pdf; page_start=5; page_end=5; section_path=Overview; chunk_index=0\n\nGuide text",
+                                "metadata": {
+                                    "chunk_id": "chunk-2",
+                                    "source_file": "guide.pdf",
+                                    "page_start": 5,
+                                },
+                                "score": 0.92,
+                                "id": "chunk-2",
+                            }
+                        ]
                     }
                 }
 
-                mock_client_factory.return_value.retrieval.rag.return_value = response_dict
+                mock_client_factory.return_value.retrieval.agent.return_value = agent_dict
+                mock_client_factory.return_value.retrieval.search.return_value = search_dict
                 mock_figures.return_value = []
 
                 from apps.api.services.r2r_agent import agent_query
@@ -192,24 +220,24 @@ class TestAgentQuery:
 
     def test_agent_query_includes_chunk_index_from_header(self):
         """Task 1: chunk_index from DocQuery citation header is included in citations."""
+        chunks = [
+            {
+                "text": "DocQuery Citation: document_id=doc1; source_file=policy.pdf; page_start=1; page_end=1; section_path=Refunds; chunk_index=5\n\nRefund policy details",
+                "metadata": {
+                    "chunk_id": "chunk-1",
+                    "source_file": "policy.pdf",
+                    "page_start": 1,
+                },
+                "score": 0.85,
+                "id": "chunk-1",
+            }
+        ]
         with mock.patch("apps.api.services.r2r_agent.get_client") as mock_client_factory, \
              mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures, \
              mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
-                mock_client_factory.return_value.retrieval.rag.return_value = _rag_response(
-                    "The policy is 30 days.",
-                    [
-                        {
-                            "text": "DocQuery Citation: document_id=doc1; source_file=policy.pdf; page_start=1; page_end=1; section_path=Refunds; chunk_index=5\n\nRefund policy details",
-                            "metadata": {
-                                "chunk_id": "chunk-1",
-                                "source_file": "policy.pdf",
-                                "page_start": 1,
-                            },
-                            "score": 0.85,
-                            "id": "chunk-1",
-                        }
-                    ],
-                )
+                agent_resp, search_resp = _agent_response("The policy is 30 days.", chunks)
+                mock_client_factory.return_value.retrieval.agent.return_value = agent_resp
+                mock_client_factory.return_value.retrieval.search.return_value = search_resp
                 mock_figures.return_value = []
 
                 from apps.api.services.r2r_agent import agent_query
@@ -255,6 +283,16 @@ class FinalAnswerEvent:
                 "conversation_id": self._conv_id,
             }
         }
+
+
+class ToolCallEvent:
+    """Fake ToolCallEvent for testing agent_stream."""
+
+    def __init__(self):
+        pass
+
+    def model_dump(self):
+        return {"data": {}}
 
 
 class CitationEvent:
@@ -315,34 +353,37 @@ class TestDocOnly:
                 assert result["doc_only_not_found"] is True
 
     def test_ac3_4_doc_only_high_score_chunk(self):
-        """AC3.4: doc_only=True with high-score chunk → pre-flight passes, rag called, answer preserved."""
+        """AC3.4: doc_only=True with high-score chunk → pre-flight passes, agent called, answer preserved."""
+        chunks = [
+            {
+                "text": "DocQuery Citation: document_id=doc1; source_file=policy.pdf; page_start=1; page_end=1; section_path=Refunds; chunk_index=0\n\nRefund policy details: 30 days",
+                "metadata": {
+                    "chunk_id": "chunk-1",
+                    "source_file": "policy.pdf",
+                    "page_start": 1,
+                },
+                "score": 0.016,
+                "id": "chunk-1",
+            }
+        ]
         with mock.patch("apps.api.services.r2r_agent.get_client") as mock_client_factory, \
              mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures, \
              mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
-                # score 0.016 >= 0.015 → needs_review=False → rag IS called
-                mock_client_factory.return_value.retrieval.search.return_value = _make_search_response([0.016])
-                mock_client_factory.return_value.retrieval.rag.return_value = _rag_response(
-                    "The refund policy is 30 days.",
-                    [
-                        {
-                            "text": "DocQuery Citation: document_id=doc1; source_file=policy.pdf; page_start=1; page_end=1; section_path=Refunds; chunk_index=0\n\nRefund policy details: 30 days",
-                            "metadata": {
-                                "chunk_id": "chunk-1",
-                                "source_file": "policy.pdf",
-                                "page_start": 1,
-                            },
-                            "score": 0.016,
-                            "id": "chunk-1",
-                        }
-                    ],
-                )
+                # score 0.016 >= 0.015 → needs_review=False → agent IS called
+                agent_resp, search_resp = _agent_response("The refund policy is 30 days.", chunks)
+                mock_client_factory.return_value.retrieval.agent.return_value = agent_resp
+                # search_response is called twice: once in pre-flight, once in agent_query
+                mock_client_factory.return_value.retrieval.search.side_effect = [
+                    _make_search_response([0.016]),  # pre-flight
+                    search_resp,  # agent query search call
+                ]
                 mock_figures.return_value = []
 
                 from apps.api.services.r2r_agent import agent_query
 
                 result = agent_query("What is the refund policy?", "conv-1", doc_only=True)
 
-                mock_client_factory.return_value.retrieval.rag.assert_called_once()
+                mock_client_factory.return_value.retrieval.agent.assert_called_once()
                 assert result["answer"] == "The refund policy is 30 days."
                 assert result["confidence_label"] == "high"
                 assert result["needs_human_review"] is False
@@ -353,9 +394,9 @@ class TestDocOnly:
         with mock.patch("apps.api.services.r2r_agent.get_client") as mock_client_factory, \
              mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures, \
              mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
-                mock_client_factory.return_value.retrieval.rag.return_value = _rag_response(
-                    "Based on general knowledge, refund periods vary by industry."
-                )
+                agent_resp, search_resp = _agent_response("Based on general knowledge, refund periods vary by industry.")
+                mock_client_factory.return_value.retrieval.agent.return_value = agent_resp
+                mock_client_factory.return_value.retrieval.search.return_value = search_resp
                 mock_figures.return_value = []
 
                 from apps.api.services.r2r_agent import agent_query
@@ -444,7 +485,7 @@ class TestDocOnly:
                 assert not result.get("doc_only_not_found")
 
     def test_doc_only_preflight_blocks_rag_call(self):
-        """Core guarantee: when pre-flight score is low, rag is never called."""
+        """Core guarantee: when pre-flight score is low, agent is never called."""
         with mock.patch("apps.api.services.r2r_agent.get_client") as mock_client_factory:
             mock_client_factory.return_value.retrieval.search.return_value = _make_search_response([])
 
@@ -452,7 +493,7 @@ class TestDocOnly:
 
             result = agent_query("Unrelated question about Jupiter", "conv-x", doc_only=True)
 
-            mock_client_factory.return_value.retrieval.rag.assert_not_called()
+            mock_client_factory.return_value.retrieval.agent.assert_not_called()
             assert result["doc_only_not_found"] is True
             assert result["answer"] == "I couldn't find this in your documents."
 
@@ -671,14 +712,16 @@ class TestDocumentFilter:
              mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures, \
              mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
                 mock_manifest.return_value = {"r2r_document_ids": ["r2r-uuid-1", "r2r-uuid-2"]}
-                mock_client_factory.return_value.retrieval.rag.return_value = _rag_response("The answer is here.")
+                agent_resp, search_resp = _agent_response("The answer is here.")
+                mock_client_factory.return_value.retrieval.agent.return_value = agent_resp
+                mock_client_factory.return_value.retrieval.search.return_value = search_resp
                 mock_figures.return_value = []
 
                 from apps.api.services.r2r_agent import agent_query
 
                 agent_query("What is the answer?", "conv-1", document_ids=["doc1"])
 
-                call_kwargs = mock_client_factory.return_value.retrieval.rag.call_args.kwargs
+                call_kwargs = mock_client_factory.return_value.retrieval.agent.call_args.kwargs
                 assert "search_settings" in call_kwargs
                 search_settings = call_kwargs["search_settings"]
                 assert "filters" in search_settings
@@ -693,14 +736,16 @@ class TestDocumentFilter:
              mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures, \
              mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
                 mock_manifest.return_value = None
-                mock_client_factory.return_value.retrieval.rag.return_value = _rag_response("Fallback answer.")
+                agent_resp, search_resp = _agent_response("Fallback answer.")
+                mock_client_factory.return_value.retrieval.agent.return_value = agent_resp
+                mock_client_factory.return_value.retrieval.search.return_value = search_resp
                 mock_figures.return_value = []
 
                 from apps.api.services.r2r_agent import agent_query
 
                 agent_query("What is the answer?", "conv-1", document_ids=["doc1"])
 
-                call_kwargs = mock_client_factory.return_value.retrieval.rag.call_args.kwargs
+                call_kwargs = mock_client_factory.return_value.retrieval.agent.call_args.kwargs
                 search_settings = call_kwargs["search_settings"]
                 assert "filters" not in search_settings
 
@@ -711,14 +756,16 @@ class TestDocumentFilter:
              mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures, \
              mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
                 mock_manifest.return_value = {"r2r_document_ids": []}
-                mock_client_factory.return_value.retrieval.rag.return_value = _rag_response("Fallback answer.")
+                agent_resp, search_resp = _agent_response("Fallback answer.")
+                mock_client_factory.return_value.retrieval.agent.return_value = agent_resp
+                mock_client_factory.return_value.retrieval.search.return_value = search_resp
                 mock_figures.return_value = []
 
                 from apps.api.services.r2r_agent import agent_query
 
                 agent_query("What is the answer?", "conv-1", document_ids=["doc1"])
 
-                call_kwargs = mock_client_factory.return_value.retrieval.rag.call_args.kwargs
+                call_kwargs = mock_client_factory.return_value.retrieval.agent.call_args.kwargs
                 search_settings = call_kwargs["search_settings"]
                 assert "filters" not in search_settings
 
@@ -728,7 +775,9 @@ class TestDocumentFilter:
              mock.patch("apps.api.services.r2r_agent.load_document_manifest") as mock_manifest, \
              mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures, \
              mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
-                mock_client_factory.return_value.retrieval.rag.return_value = _rag_response("Answer.")
+                agent_resp, search_resp = _agent_response("Answer.")
+                mock_client_factory.return_value.retrieval.agent.return_value = agent_resp
+                mock_client_factory.return_value.retrieval.search.return_value = search_resp
                 mock_figures.return_value = []
 
                 from apps.api.services.r2r_agent import agent_query
@@ -736,7 +785,7 @@ class TestDocumentFilter:
                 agent_query("What is the answer?", "conv-1")
 
                 mock_manifest.assert_not_called()
-                call_kwargs = mock_client_factory.return_value.retrieval.rag.call_args.kwargs
+                call_kwargs = mock_client_factory.return_value.retrieval.agent.call_args.kwargs
                 search_settings = call_kwargs["search_settings"]
                 assert "filters" not in search_settings
 
@@ -801,21 +850,22 @@ class TestBuildSearchSettingsCollectionId:
         """collection_id uses selected_collection_ids (not $overlap which breaks streaming RAG)."""
         with mock.patch("apps.api.services.r2r_agent.get_client") as mock_get, \
              mock.patch("apps.api.services.r2r_agent.figures_for_response", return_value=[]), \
-             mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)), \
-             mock.patch("apps.api.services.r2r_agent.conversation_store"):
-            mock_get.return_value.retrieval.rag.return_value = _rag_response("answer")
+             mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
+            agent_resp, search_resp = _agent_response("answer")
+            mock_get.return_value.retrieval.agent.return_value = agent_resp
+            mock_get.return_value.retrieval.search.return_value = search_resp
 
             from apps.api.services.r2r_agent import agent_query
 
             agent_query(
                 message="q",
-                conversation_id=None,
+                conversation_id="conv-1",
                 doc_only=False,
                 document_ids=None,
                 collection_id="col-abc",
             )
 
-            call_kwargs = mock_get.return_value.retrieval.rag.call_args.kwargs
+            call_kwargs = mock_get.return_value.retrieval.agent.call_args.kwargs
             assert call_kwargs["search_settings"]["selected_collection_ids"] == ["col-abc"]
             assert "filters" not in call_kwargs["search_settings"]
 
@@ -826,19 +876,21 @@ class TestBuildSearchSettingsCollectionId:
              mock.patch("apps.api.services.r2r_agent.figures_for_response", return_value=[]), \
              mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
             mock_manifest.return_value = {"r2r_document_ids": ["r2r-001"]}
-            mock_get.return_value.retrieval.rag.return_value = _rag_response("answer")
+            agent_resp, search_resp = _agent_response("answer")
+            mock_get.return_value.retrieval.agent.return_value = agent_resp
+            mock_get.return_value.retrieval.search.return_value = search_resp
 
             from apps.api.services.r2r_agent import agent_query
 
             agent_query(
                 message="q",
-                conversation_id=None,
+                conversation_id="conv-1",
                 doc_only=False,
                 document_ids=["local-doc-1"],
                 collection_id=None,
             )
 
-            call_kwargs = mock_get.return_value.retrieval.rag.call_args.kwargs
+            call_kwargs = mock_get.return_value.retrieval.agent.call_args.kwargs
             filters = call_kwargs["search_settings"]["filters"]
             assert filters == {"document_id": {"$in": ["r2r-001"]}}
 
@@ -847,19 +899,21 @@ class TestBuildSearchSettingsCollectionId:
         with mock.patch("apps.api.services.r2r_agent.get_client") as mock_get, \
              mock.patch("apps.api.services.r2r_agent.figures_for_response", return_value=[]), \
              mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
-            mock_get.return_value.retrieval.rag.return_value = _rag_response("answer")
+            agent_resp, search_resp = _agent_response("answer")
+            mock_get.return_value.retrieval.agent.return_value = agent_resp
+            mock_get.return_value.retrieval.search.return_value = search_resp
 
             from apps.api.services.r2r_agent import agent_query
 
             agent_query(
                 message="q",
-                conversation_id=None,
+                conversation_id="conv-1",
                 doc_only=False,
                 document_ids=None,
                 collection_id=None,
             )
 
-            call_kwargs = mock_get.return_value.retrieval.rag.call_args.kwargs
+            call_kwargs = mock_get.return_value.retrieval.agent.call_args.kwargs
             assert "filters" not in call_kwargs.get("search_settings", {})
 
     def test_collection_id_takes_precedence_over_document_ids(self):
@@ -867,22 +921,23 @@ class TestBuildSearchSettingsCollectionId:
         with mock.patch("apps.api.services.r2r_agent.get_client") as mock_get, \
              mock.patch("apps.api.services.r2r_agent.load_document_manifest") as mock_manifest, \
              mock.patch("apps.api.services.r2r_agent.figures_for_response", return_value=[]), \
-             mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)), \
-             mock.patch("apps.api.services.r2r_agent.conversation_store"):
+             mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
             mock_manifest.return_value = {"r2r_document_ids": ["r2r-001"]}
-            mock_get.return_value.retrieval.rag.return_value = _rag_response("answer")
+            agent_resp, search_resp = _agent_response("answer")
+            mock_get.return_value.retrieval.agent.return_value = agent_resp
+            mock_get.return_value.retrieval.search.return_value = search_resp
 
             from apps.api.services.r2r_agent import agent_query
 
             agent_query(
                 message="q",
-                conversation_id=None,
+                conversation_id="conv-1",
                 doc_only=False,
                 document_ids=["doc-1"],
                 collection_id="col-xyz",
             )
 
-            call_kwargs = mock_get.return_value.retrieval.rag.call_args.kwargs
+            call_kwargs = mock_get.return_value.retrieval.agent.call_args.kwargs
             assert call_kwargs["search_settings"]["selected_collection_ids"] == ["col-xyz"]
             assert "filters" not in call_kwargs["search_settings"]
             mock_manifest.assert_not_called()
@@ -892,8 +947,7 @@ class TestBuildSearchSettingsCollectionId:
         with mock.patch("apps.api.services.r2r_agent.get_async_client") as mock_get, \
              mock.patch("apps.api.services.r2r_agent.parse_retrieval_event", side_effect=lambda x: x), \
              mock.patch("apps.api.services.r2r_agent.figures_for_response", return_value=[]), \
-             mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)), \
-             mock.patch("apps.api.services.r2r_agent.conversation_store"):
+             mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
             events = [
                 MessageEvent("answer"),
                 FinalAnswerEvent("answer", "conv-1"),
