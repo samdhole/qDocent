@@ -29,7 +29,8 @@ log = logging.getLogger(__name__)
 
 _DOC_ONLY_NOT_FOUND = "I couldn't find this in your documents."
 
-_HISTORY_TURNS = 6  # prior turns to inject (3 Q+A pairs)
+_HISTORY_LIMIT = 40       # messages to load (20 Q+A pairs)
+_ANSWER_SNIPPET_CHARS = 2000  # truncate long assistant answers in history to save tokens
 
 
 def _build_task_prompt(conversation_id: str) -> str | None:
@@ -38,14 +39,22 @@ def _build_task_prompt(conversation_id: str) -> str | None:
     Returns None when there are no prior messages (first turn).
     The block is injected via RAG's task_prompt so the LLM has context for
     follow-up questions even though /retrieval/rag is stateless.
+
+    Long assistant answers are truncated to _ANSWER_SNIPPET_CHARS so the
+    history block stays within a reasonable token budget even for long sessions.
     """
-    messages = conversation_store.get_messages(conversation_id, limit=_HISTORY_TURNS * 2)
+    messages = conversation_store.get_messages(conversation_id, limit=_HISTORY_LIMIT)
     if not messages:
         return None
     lines = ["Prior conversation (use this context to answer follow-up questions):"]
     for msg in messages:
-        prefix = "User" if msg["role"] == "user" else "Assistant"
-        lines.append(f"{prefix}: {msg['content']}")
+        if msg["role"] == "user":
+            lines.append(f"User: {msg['content']}")
+        else:
+            content = msg["content"]
+            if len(content) > _ANSWER_SNIPPET_CHARS:
+                content = content[:_ANSWER_SNIPPET_CHARS] + "…"
+            lines.append(f"Assistant: {content}")
     lines.append("\nCurrent question:")
     return "\n".join(lines)
 
