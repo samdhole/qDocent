@@ -1,5 +1,5 @@
 # pattern: Imperative Shell
-"""Convert DOCX and PPTX files to page dicts using docling-slim (torch-free).
+"""Convert DOCX and PPTX files to page dicts using python-docx / python-pptx (torch-free).
 
 Page dicts match the shape produced by parse_pdf.py so all downstream
 chunking (chunk_templates.py) works without modification.
@@ -11,6 +11,7 @@ for these document types; that is acceptable for this version.
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 from typing import Any
 
 log = logging.getLogger(__name__)
@@ -25,23 +26,56 @@ def load_document_with_docling(file_path: str) -> list[dict[str, Any]]:
     Each dict has: page_number, text, tables, confidence, bbox, text_lines, parser.
     Large documents are split into ~3000-char synthetic pages for downstream chunking.
     """
-    from docling.document_converter import DocumentConverter  # lazy import
+    path = Path(file_path)
+    suffix = path.suffix.lower()
 
-    converter = DocumentConverter()
-    try:
-        result = converter.convert(file_path)
-    except Exception as exc:
-        raise RuntimeError(f"Docling failed to convert '{file_path}': {exc}") from exc
-
-    doc = result.document
-    full_text = doc.export_to_markdown()
+    if suffix == ".docx":
+        full_text = _extract_docx(file_path)
+    elif suffix == ".pptx":
+        full_text = _extract_pptx(file_path)
+    else:
+        raise ValueError(f"Unsupported format for docling_loader: {suffix}")
 
     if not full_text.strip():
-        log.warning("Docling produced empty text for '%s'", file_path)
+        log.warning("Produced empty text for '%s'", file_path)
         return [_make_page(1, "(empty document)")]
 
-    # Split into synthetic pages by character count to keep downstream chunk sizes sane
     return _split_into_pages(full_text)
+
+
+def _extract_docx(file_path: str) -> str:
+    import docx  # python-docx
+
+    doc = docx.Document(file_path)
+    parts: list[str] = []
+    for para in doc.paragraphs:
+        text = para.text.strip()
+        if text:
+            parts.append(text)
+    for table in doc.tables:
+        for row in table.rows:
+            row_text = "\t".join(cell.text.strip() for cell in row.cells)
+            if row_text.strip():
+                parts.append(row_text)
+    return "\n\n".join(parts)
+
+
+def _extract_pptx(file_path: str) -> str:
+    from pptx import Presentation  # python-pptx
+
+    prs = Presentation(file_path)
+    parts: list[str] = []
+    for slide_num, slide in enumerate(prs.slides, start=1):
+        slide_parts: list[str] = []
+        for shape in slide.shapes:
+            if shape.has_text_frame:
+                for para in shape.text_frame.paragraphs:
+                    text = para.text.strip()
+                    if text:
+                        slide_parts.append(text)
+        if slide_parts:
+            parts.append(f"[Slide {slide_num}]\n" + "\n".join(slide_parts))
+    return "\n\n".join(parts)
 
 
 def _split_into_pages(text: str) -> list[dict[str, Any]]:
@@ -78,5 +112,5 @@ def _make_page(page_number: int, text: str) -> dict[str, Any]:
         "confidence": 100.0,
         "bbox": list(_SYNTHETIC_PAGE_BBOX),
         "text_lines": [],
-        "parser": "docling",
+        "parser": "python-docx/pptx",
     }
