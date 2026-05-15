@@ -358,6 +358,19 @@ async def agent_stream(
         async for raw_event in _client._make_streaming_request(
             "POST", "retrieval/agent", json=_agent_data, version="v3"
         ):
+            # _make_streaming_request yields json.loads(line); if the server
+            # sends SSE format ("data: {...}") json.loads fails and yields the
+            # raw string — parse it back into a dict here.
+            if isinstance(raw_event, str):
+                line = raw_event.strip()
+                if line.startswith("data:"):
+                    line = line[5:].strip()
+                if not line or line == "[DONE]":
+                    continue
+                try:
+                    raw_event = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
             event = parse_retrieval_event(raw_event)
             event_type = type(event).__name__
             if event_type == "SearchResultsEvent":
