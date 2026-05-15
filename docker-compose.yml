@@ -57,6 +57,8 @@ services:
     environment:
       R2R_BASE_URL: http://r2r:8000
       GOOGLE_API_KEY: ${GOOGLE_API_KEY}
+      R2R_ADMIN_EMAIL: ${R2R_ADMIN_EMAIL}
+      R2R_ADMIN_PASSWORD: ${R2R_ADMIN_PASSWORD}
       APP_ENV: ${APP_ENV:-production}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
