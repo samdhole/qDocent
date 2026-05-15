@@ -7,29 +7,29 @@ from apps.api.services.r2r_client_helpers import _label_from_score
 
 
 def test_high_confidence():
-    """top_score=0.80 -> confidence_label='high', needs_human_review=False."""
-    confidence_label, needs_review = _label_from_score(0.80)
+    """top_score=0.016 (RRF near-max) -> confidence_label='high', needs_human_review=False."""
+    confidence_label, needs_review = _label_from_score(0.016)
     assert confidence_label == "high"
     assert needs_review is False
 
 
 def test_medium_boundary():
-    """top_score=0.79 -> confidence_label='medium', needs_human_review=False."""
-    confidence_label, needs_review = _label_from_score(0.79)
-    assert confidence_label == "medium"
+    """top_score=0.015 (RRF high boundary) -> confidence_label='high', needs_human_review=False."""
+    confidence_label, needs_review = _label_from_score(0.015)
+    assert confidence_label == "high"
     assert needs_review is False
 
 
 def test_medium_lower():
-    """top_score=0.50 -> confidence_label='medium', needs_human_review=False."""
-    confidence_label, needs_review = _label_from_score(0.50)
+    """top_score=0.010 (RRF medium range) -> confidence_label='medium', needs_human_review=False."""
+    confidence_label, needs_review = _label_from_score(0.010)
     assert confidence_label == "medium"
     assert needs_review is False
 
 
 def test_low_boundary():
-    """top_score=0.49 -> confidence_label='low', needs_human_review=True."""
-    confidence_label, needs_review = _label_from_score(0.49)
+    """top_score=0.007 (below 0.008 threshold) -> confidence_label='low', needs_human_review=True."""
+    confidence_label, needs_review = _label_from_score(0.007)
     assert confidence_label == "low"
     assert needs_review is True
 

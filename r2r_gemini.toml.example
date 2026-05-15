@@ -23,6 +23,7 @@ concurrent_request_limit = 32
   top_p = 1
   max_tokens_to_sample = 4096
   stream = false
+  budget_tokens = 0
 
 [embedding]
 provider = "litellm"

@@ -20,6 +20,19 @@ def _async_iter(*events):
     return _gen()
 
 
+def _rag_response(answer: str, chunk_results=None):
+    """Build a mock retrieval.rag() response with the RAG response shape.
+
+    RAG response shape (R2R 3.6.x):
+        results.completion          → answer string
+        results.search_results      → dict with chunk_search_results
+    """
+    resp = mock.MagicMock()
+    resp.results.completion = answer
+    resp.results.search_results = {"chunk_search_results": chunk_results or []}
+    return resp
+
+
 class TestCreateConversation:
     """Test conversation creation."""
 
@@ -55,37 +68,25 @@ class TestAgentQuery:
     """Test agent query and response adaptation."""
 
     def test_agent_query_extracts_answer_and_citations(self):
-        """agent_query() extracts answer, citations, and retrieved_contexts from agent response."""
+        """agent_query() extracts answer, citations, and retrieved_contexts from rag response."""
         with mock.patch("apps.api.services.r2r_agent.get_client") as mock_client_factory, \
              mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures, \
              mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
-                # Create a fake agent response matching actual spike shape:
-                # aggregated_search_result is a JSON string, not a dict
-                mock_message = mock.MagicMock()
-                mock_message.content = "The policy is 30 days."
-                mock_message.metadata = {
-                    "citations": [],
-                    "aggregated_search_result": json.dumps({
-                        "chunk_search_results": [
-                            {
-                                "text": "DocQuery Citation: document_id=doc1; source_file=policy.pdf; page_start=1; page_end=1; section_path=Refunds; chunk_index=0\n\nRefund policy details",
-                                "metadata": {
-                                    "chunk_id": "chunk-1",
-                                    "source_file": "policy.pdf",
-                                    "page_start": 1,
-                                },
-                                "score": 0.85,
-                                "id": "chunk-1",
-                            }
-                        ]
-                    })
-                }
-
-                mock_response = mock.MagicMock()
-                mock_response.results.messages = [mock_message]
-                mock_response.results.conversation_id = "conv-1"
-
-                mock_client_factory.return_value.retrieval.agent.return_value = mock_response
+                mock_client_factory.return_value.retrieval.rag.return_value = _rag_response(
+                    "The policy is 30 days.",
+                    [
+                        {
+                            "text": "DocQuery Citation: document_id=doc1; source_file=policy.pdf; page_start=1; page_end=1; section_path=Refunds; chunk_index=0\n\nRefund policy details",
+                            "metadata": {
+                                "chunk_id": "chunk-1",
+                                "source_file": "policy.pdf",
+                                "page_start": 1,
+                            },
+                            "score": 0.85,
+                            "id": "chunk-1",
+                        }
+                    ],
+                )
                 mock_figures.return_value = []
 
                 from apps.api.services.r2r_agent import agent_query
@@ -105,17 +106,7 @@ class TestAgentQuery:
         with mock.patch("apps.api.services.r2r_agent.get_client") as mock_client_factory, \
              mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures, \
              mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
-                mock_message = mock.MagicMock()
-                mock_message.content = "Answer"
-                mock_message.metadata = {
-                    "aggregated_search_result": json.dumps({"chunk_search_results": []})
-                }
-
-                mock_response = mock.MagicMock()
-                mock_response.results.messages = [mock_message]
-                mock_response.results.conversation_id = "conv-abc-123"
-
-                mock_client_factory.return_value.retrieval.agent.return_value = mock_response
+                mock_client_factory.return_value.retrieval.rag.return_value = _rag_response("Answer")
                 mock_figures.return_value = []
 
                 from apps.api.services.r2r_agent import agent_query
@@ -129,17 +120,9 @@ class TestAgentQuery:
         with mock.patch("apps.api.services.r2r_agent.get_client") as mock_client_factory, \
              mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures, \
              mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
-                mock_message = mock.MagicMock()
-                mock_message.content = "I don't have enough information."
-                mock_message.metadata = {
-                    "aggregated_search_result": json.dumps({"chunk_search_results": []})
-                }
-
-                mock_response = mock.MagicMock()
-                mock_response.results.messages = [mock_message]
-                mock_response.results.conversation_id = "conv-1"
-
-                mock_client_factory.return_value.retrieval.agent.return_value = mock_response
+                mock_client_factory.return_value.retrieval.rag.return_value = _rag_response(
+                    "I don't have enough information."
+                )
                 mock_figures.return_value = []
 
                 from apps.api.services.r2r_agent import agent_query
@@ -151,25 +134,14 @@ class TestAgentQuery:
                 assert result["confidence_label"] == "low"
                 assert result["needs_human_review"] is True
 
-    def test_agent_query_handles_empty_list_from_json_parse(self):
-        """agent_query() handles when json.loads returns a list (e.g., '[]')."""
+    def test_agent_query_handles_string_completion(self):
+        """agent_query() handles when completion is a plain string (R2R 3.6.x RAG shape)."""
         with mock.patch("apps.api.services.r2r_agent.get_client") as mock_client_factory, \
              mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures, \
              mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
-                # This is the critical C1 scenario: aggregated_search_result is "[]" string
-                # which parses to a Python list, not a dict
-                mock_message = mock.MagicMock()
-                mock_message.content = "Please specify which document you are referring to."
-                mock_message.metadata = {
-                    "citations": [],
-                    "aggregated_search_result": "[]"  # Empty array JSON string
-                }
-
-                mock_response = mock.MagicMock()
-                mock_response.results.messages = [mock_message]
-                mock_response.results.conversation_id = "conv-empty"
-
-                mock_client_factory.return_value.retrieval.agent.return_value = mock_response
+                mock_client_factory.return_value.retrieval.rag.return_value = _rag_response(
+                    "Please specify which document you are referring to."
+                )
                 mock_figures.return_value = []
 
                 from apps.api.services.r2r_agent import agent_query
@@ -186,35 +158,27 @@ class TestAgentQuery:
         with mock.patch("apps.api.services.r2r_agent.get_client") as mock_client_factory, \
              mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures, \
              mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
-                # Return a plain dict instead of an object with .results attribute
                 response_dict = {
                     "results": {
-                        "messages": [
-                            {
-                                "content": "The answer is here.",
-                                "metadata": {
-                                    "aggregated_search_result": json.dumps({
-                                        "chunk_search_results": [
-                                            {
-                                                "text": "DocQuery Citation: document_id=doc2; source_file=guide.pdf; page_start=5; page_end=5; section_path=Overview; chunk_index=0\n\nGuide text",
-                                                "metadata": {
-                                                    "chunk_id": "chunk-2",
-                                                    "source_file": "guide.pdf",
-                                                    "page_start": 5,
-                                                },
-                                                "score": 0.92,
-                                                "id": "chunk-2",
-                                            }
-                                        ]
-                                    })
+                        "completion": "The answer is here.",
+                        "search_results": {
+                            "chunk_search_results": [
+                                {
+                                    "text": "DocQuery Citation: document_id=doc2; source_file=guide.pdf; page_start=5; page_end=5; section_path=Overview; chunk_index=0\n\nGuide text",
+                                    "metadata": {
+                                        "chunk_id": "chunk-2",
+                                        "source_file": "guide.pdf",
+                                        "page_start": 5,
+                                    },
+                                    "score": 0.92,
+                                    "id": "chunk-2",
                                 }
-                            }
-                        ],
-                        "conversation_id": "conv-dict"
+                            ]
+                        },
                     }
                 }
 
-                mock_client_factory.return_value.retrieval.agent.return_value = response_dict
+                mock_client_factory.return_value.retrieval.rag.return_value = response_dict
                 mock_figures.return_value = []
 
                 from apps.api.services.r2r_agent import agent_query
@@ -231,31 +195,21 @@ class TestAgentQuery:
         with mock.patch("apps.api.services.r2r_agent.get_client") as mock_client_factory, \
              mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures, \
              mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
-                mock_message = mock.MagicMock()
-                mock_message.content = "The policy is 30 days."
-                mock_message.metadata = {
-                    "citations": [],
-                    "aggregated_search_result": json.dumps({
-                        "chunk_search_results": [
-                            {
-                                "text": "DocQuery Citation: document_id=doc1; source_file=policy.pdf; page_start=1; page_end=1; section_path=Refunds; chunk_index=5\n\nRefund policy details",
-                                "metadata": {
-                                    "chunk_id": "chunk-1",
-                                    "source_file": "policy.pdf",
-                                    "page_start": 1,
-                                },
-                                "score": 0.85,
-                                "id": "chunk-1",
-                            }
-                        ]
-                    })
-                }
-
-                mock_response = mock.MagicMock()
-                mock_response.results.messages = [mock_message]
-                mock_response.results.conversation_id = "conv-1"
-
-                mock_client_factory.return_value.retrieval.agent.return_value = mock_response
+                mock_client_factory.return_value.retrieval.rag.return_value = _rag_response(
+                    "The policy is 30 days.",
+                    [
+                        {
+                            "text": "DocQuery Citation: document_id=doc1; source_file=policy.pdf; page_start=1; page_end=1; section_path=Refunds; chunk_index=5\n\nRefund policy details",
+                            "metadata": {
+                                "chunk_id": "chunk-1",
+                                "source_file": "policy.pdf",
+                                "page_start": 1,
+                            },
+                            "score": 0.85,
+                            "id": "chunk-1",
+                        }
+                    ],
+                )
                 mock_figures.return_value = []
 
                 from apps.api.services.r2r_agent import agent_query
@@ -325,7 +279,7 @@ class TestDocOnly:
     """Test doc_only pre-flight + defense-in-depth post-hoc check for strict document-only mode."""
 
     def test_ac3_2_doc_only_empty_retrieval(self):
-        """AC3.2: doc_only=True with empty retrieval → pre-flight blocks agent, returns not-found."""
+        """AC3.2: doc_only=True with empty retrieval → pre-flight blocks rag, returns not-found."""
         with mock.patch("apps.api.services.r2r_agent.get_client") as mock_client_factory, \
              mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures, \
              mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
@@ -336,70 +290,59 @@ class TestDocOnly:
 
                 result = agent_query("What is the refund policy?", "conv-1", doc_only=True)
 
-                mock_client_factory.return_value.retrieval.agent.assert_not_called()
+                mock_client_factory.return_value.retrieval.rag.assert_not_called()
                 assert result["answer"] == "I couldn't find this in your documents."
                 assert result["confidence_label"] == "low"
                 assert result["needs_human_review"] is True
                 assert result["doc_only_not_found"] is True
 
     def test_ac3_3_doc_only_low_score_chunk(self):
-        """AC3.3: doc_only=True with low-score chunk (score < 0.50) → pre-flight blocks agent, returns not-found."""
+        """AC3.3: doc_only=True with low-score chunk → pre-flight blocks rag, returns not-found."""
         with mock.patch("apps.api.services.r2r_agent.get_client") as mock_client_factory, \
              mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures, \
              mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
-                # score 0.3 < 0.50 → _label_from_score returns needs_review=True → agent skipped
-                mock_client_factory.return_value.retrieval.search.return_value = _make_search_response([0.3])
+                mock_client_factory.return_value.retrieval.search.return_value = _make_search_response([0.003])
                 mock_figures.return_value = []
 
                 from apps.api.services.r2r_agent import agent_query
 
                 result = agent_query("What is the refund policy?", "conv-1", doc_only=True)
 
-                mock_client_factory.return_value.retrieval.agent.assert_not_called()
+                mock_client_factory.return_value.retrieval.rag.assert_not_called()
                 assert result["answer"] == "I couldn't find this in your documents."
                 assert result["confidence_label"] == "low"
                 assert result["needs_human_review"] is True
                 assert result["doc_only_not_found"] is True
 
     def test_ac3_4_doc_only_high_score_chunk(self):
-        """AC3.4: doc_only=True with high-score chunk (score >= 0.80) → pre-flight passes, agent called, answer preserved."""
+        """AC3.4: doc_only=True with high-score chunk → pre-flight passes, rag called, answer preserved."""
         with mock.patch("apps.api.services.r2r_agent.get_client") as mock_client_factory, \
              mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures, \
              mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
-                # score 0.85 >= 0.50 → needs_review=False → agent IS called
-                mock_client_factory.return_value.retrieval.search.return_value = _make_search_response([0.85])
-
-                mock_message = mock.MagicMock()
-                mock_message.content = "The refund policy is 30 days."
-                mock_message.metadata = {
-                    "aggregated_search_result": json.dumps({
-                        "chunk_search_results": [
-                            {
-                                "text": "DocQuery Citation: document_id=doc1; source_file=policy.pdf; page_start=1; page_end=1; section_path=Refunds; chunk_index=0\n\nRefund policy details: 30 days",
-                                "metadata": {
-                                    "chunk_id": "chunk-1",
-                                    "source_file": "policy.pdf",
-                                    "page_start": 1,
-                                },
-                                "score": 0.85,
-                                "id": "chunk-1",
-                            }
-                        ]
-                    })
-                }
-
-                mock_response = mock.MagicMock()
-                mock_response.results.messages = [mock_message]
-                mock_response.results.conversation_id = "conv-1"
-
-                mock_client_factory.return_value.retrieval.agent.return_value = mock_response
+                # score 0.016 >= 0.015 → needs_review=False → rag IS called
+                mock_client_factory.return_value.retrieval.search.return_value = _make_search_response([0.016])
+                mock_client_factory.return_value.retrieval.rag.return_value = _rag_response(
+                    "The refund policy is 30 days.",
+                    [
+                        {
+                            "text": "DocQuery Citation: document_id=doc1; source_file=policy.pdf; page_start=1; page_end=1; section_path=Refunds; chunk_index=0\n\nRefund policy details: 30 days",
+                            "metadata": {
+                                "chunk_id": "chunk-1",
+                                "source_file": "policy.pdf",
+                                "page_start": 1,
+                            },
+                            "score": 0.016,
+                            "id": "chunk-1",
+                        }
+                    ],
+                )
                 mock_figures.return_value = []
 
                 from apps.api.services.r2r_agent import agent_query
 
                 result = agent_query("What is the refund policy?", "conv-1", doc_only=True)
 
-                mock_client_factory.return_value.retrieval.agent.assert_called_once()
+                mock_client_factory.return_value.retrieval.rag.assert_called_once()
                 assert result["answer"] == "The refund policy is 30 days."
                 assert result["confidence_label"] == "high"
                 assert result["needs_human_review"] is False
@@ -410,17 +353,9 @@ class TestDocOnly:
         with mock.patch("apps.api.services.r2r_agent.get_client") as mock_client_factory, \
              mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures, \
              mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
-                mock_message = mock.MagicMock()
-                mock_message.content = "Based on general knowledge, refund periods vary by industry."
-                mock_message.metadata = {
-                    "aggregated_search_result": json.dumps({"chunk_search_results": []})
-                }
-
-                mock_response = mock.MagicMock()
-                mock_response.results.messages = [mock_message]
-                mock_response.results.conversation_id = "conv-1"
-
-                mock_client_factory.return_value.retrieval.agent.return_value = mock_response
+                mock_client_factory.return_value.retrieval.rag.return_value = _rag_response(
+                    "Based on general knowledge, refund periods vary by industry."
+                )
                 mock_figures.return_value = []
 
                 from apps.api.services.r2r_agent import agent_query
@@ -434,8 +369,9 @@ class TestDocOnly:
                 assert not result.get("doc_only_not_found")
 
     def test_ac3_2_doc_only_stream_empty_retrieval(self):
-        """AC3.2 stream path: doc_only=True with empty retrieval → pre-flight blocks agent, single final SSE."""
+        """AC3.2 stream path: doc_only=True with empty retrieval → pre-flight blocks stream, single final SSE."""
         with mock.patch("apps.api.services.r2r_agent.get_client") as mock_client_factory, \
+             mock.patch("apps.api.services.r2r_agent.get_async_client") as mock_async_client, \
              mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures, \
              mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
                 mock_client_factory.return_value.retrieval.search.return_value = _make_search_response([])
@@ -445,7 +381,8 @@ class TestDocOnly:
 
                 frames = asyncio.run(_collect(agent_stream("What is the refund policy?", "conv-1", doc_only=True)))
 
-                mock_client_factory.return_value.retrieval.agent.assert_not_called()
+                # _make_streaming_request must NOT be called (pre-flight blocked it)
+                mock_async_client.return_value._make_streaming_request.assert_not_called()
 
                 final_frames = [
                     json.loads(f.split("data: ")[1])
@@ -461,13 +398,14 @@ class TestDocOnly:
                 assert result.get("doc_only_not_found") is True
 
     def test_ac3_4_doc_only_stream_high_score(self):
-        """AC3.4 stream path: doc_only=True with high-score chunk → pre-flight passes, agent called, answer preserved."""
+        """AC3.4 stream path: doc_only=True with high-score chunk → pre-flight passes, stream called, answer preserved."""
         with mock.patch("apps.api.services.r2r_agent.get_client") as mock_client_factory, \
              mock.patch("apps.api.services.r2r_agent.get_async_client") as mock_async_client, \
+             mock.patch("apps.api.services.r2r_agent.parse_retrieval_event", side_effect=lambda x: x), \
              mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures, \
              mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
-                # score 0.85 → pre-flight passes, agent IS called via streaming
-                mock_client_factory.return_value.retrieval.search.return_value = _make_search_response([0.85])
+                # score 0.016 → pre-flight passes, stream IS called
+                mock_client_factory.return_value.retrieval.search.return_value = _make_search_response([0.016])
 
                 events = [
                     SearchResultsEvent([
@@ -478,14 +416,14 @@ class TestDocOnly:
                                 "source_file": "policy.pdf",
                                 "page_start": 1,
                             },
-                            "score": 0.85,
+                            "score": 0.016,
                             "id": "chunk-1",
                         }
                     ]),
                     MessageEvent("The refund policy is 30 days."),
                     FinalAnswerEvent("The refund policy is 30 days.", "conv-1"),
                 ]
-                mock_async_client.return_value.retrieval.agent = AsyncMock(return_value=_async_iter(*events))
+                mock_async_client.return_value._make_streaming_request.return_value = _async_iter(*events)
                 mock_figures.return_value = []
 
                 from apps.api.services.r2r_agent import agent_stream
@@ -505,8 +443,8 @@ class TestDocOnly:
                 assert result["needs_human_review"] is False
                 assert not result.get("doc_only_not_found")
 
-    def test_doc_only_preflight_blocks_agent_call(self):
-        """Core guarantee: when pre-flight score < 0.50, agent is never called (no conversation memory divergence)."""
+    def test_doc_only_preflight_blocks_rag_call(self):
+        """Core guarantee: when pre-flight score is low, rag is never called."""
         with mock.patch("apps.api.services.r2r_agent.get_client") as mock_client_factory:
             mock_client_factory.return_value.retrieval.search.return_value = _make_search_response([])
 
@@ -514,7 +452,7 @@ class TestDocOnly:
 
             result = agent_query("Unrelated question about Jupiter", "conv-x", doc_only=True)
 
-            mock_client_factory.return_value.retrieval.agent.assert_not_called()
+            mock_client_factory.return_value.retrieval.rag.assert_not_called()
             assert result["doc_only_not_found"] is True
             assert result["answer"] == "I couldn't find this in your documents."
 
@@ -524,28 +462,30 @@ class TestAgentStream:
 
     def test_agent_stream_yields_status_first(self):
         """agent_stream() yields status=searching as first frame."""
-        with mock.patch("apps.api.services.r2r_agent.get_async_client") as mock_client_factory:
-            mock_client_factory.return_value.retrieval.agent = AsyncMock(return_value=_async_iter())
+        with mock.patch("apps.api.services.r2r_agent.get_async_client") as mock_async_client, \
+             mock.patch("apps.api.services.r2r_agent.parse_retrieval_event", side_effect=lambda x: x):
+                mock_async_client.return_value._make_streaming_request.return_value = _async_iter()
 
-            from apps.api.services.r2r_agent import agent_stream
+                from apps.api.services.r2r_agent import agent_stream
 
-            frames = asyncio.run(_collect(agent_stream("test?", "conv-1")))
+                frames = asyncio.run(_collect(agent_stream("test?", "conv-1")))
 
-            assert len(frames) >= 1
-            first_frame = json.loads(frames[0].split("data: ")[1])
-            assert first_frame["type"] == "status"
-            assert first_frame["phase"] == "searching"
+                assert len(frames) >= 1
+                first_frame = json.loads(frames[0].split("data: ")[1])
+                assert first_frame["type"] == "status"
+                assert first_frame["phase"] == "searching"
 
     def test_agent_stream_emits_token_events_per_message_event(self):
         """agent_stream() yields token frame for each MessageEvent content delta."""
-        with mock.patch("apps.api.services.r2r_agent.get_async_client") as mock_client_factory, \
+        with mock.patch("apps.api.services.r2r_agent.get_async_client") as mock_async_client, \
+             mock.patch("apps.api.services.r2r_agent.parse_retrieval_event", side_effect=lambda x: x), \
              mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures, \
              mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
                 events = [
                     MessageEvent("Hello "),
                     MessageEvent("world"),
                 ]
-                mock_client_factory.return_value.retrieval.agent = AsyncMock(return_value=_async_iter(*events))
+                mock_async_client.return_value._make_streaming_request.return_value = _async_iter(*events)
                 mock_figures.return_value = []
 
                 from apps.api.services.r2r_agent import agent_stream
@@ -565,14 +505,15 @@ class TestAgentStream:
 
     def test_agent_stream_emits_final_event_with_adapted_dict(self):
         """agent_stream() yields final frame with adapted response dict."""
-        with mock.patch("apps.api.services.r2r_agent.get_async_client") as mock_client_factory, \
+        with mock.patch("apps.api.services.r2r_agent.get_async_client") as mock_async_client, \
+             mock.patch("apps.api.services.r2r_agent.parse_retrieval_event", side_effect=lambda x: x), \
              mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures, \
              mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
                 events = [
                     MessageEvent("The answer is 42."),
                     FinalAnswerEvent("The answer is 42.", "conv-1"),
                 ]
-                mock_client_factory.return_value.retrieval.agent = AsyncMock(return_value=_async_iter(*events))
+                mock_async_client.return_value._make_streaming_request.return_value = _async_iter(*events)
                 mock_figures.return_value = []
 
                 from apps.api.services.r2r_agent import agent_stream
@@ -594,26 +535,29 @@ class TestAgentStream:
                 assert "retrieved_contexts" in result
 
     def test_agent_stream_emits_error_when_sdk_raises(self):
-        """agent_stream() yields error frame when retrieval.agent raises."""
-        with mock.patch("apps.api.services.r2r_agent.get_async_client") as mock_client_factory:
+        """agent_stream() yields error frame when _make_streaming_request raises."""
+        with mock.patch("apps.api.services.r2r_agent.get_async_client") as mock_async_client:
             import httpx
 
-            mock_client_factory.return_value.retrieval.agent = AsyncMock(
-                side_effect=httpx.ConnectError("R2R connection failed")
-            )
+            async def _failing():
+                raise httpx.ConnectError("R2R connection failed")
+                yield  # make it an async generator
+
+            mock_async_client.return_value._make_streaming_request.return_value = _failing()
 
             from apps.api.services.r2r_agent import agent_stream
 
             frames = asyncio.run(_collect(agent_stream("test?", "conv-1")))
 
-            assert len(frames) >= 1
-            first_frame = json.loads(frames[0].split("data: ")[1])
-            assert first_frame["type"] == "error"
-            assert "R2R unavailable" in first_frame["detail"]
+            frame_list = [json.loads(f.split("data: ")[1]) for f in frames if "data: " in f]
+            error_frames = [f for f in frame_list if f.get("type") == "error"]
+            assert len(error_frames) == 1
+            assert "stream interrupted" in error_frames[0]["detail"]
 
     def test_agent_stream_emits_error_mid_stream(self):
-        """agent_stream() yields tokens then error frame when stream raises."""
-        with mock.patch("apps.api.services.r2r_agent.get_async_client") as mock_client_factory:
+        """agent_stream() yields tokens then error frame when stream raises mid-iteration."""
+        with mock.patch("apps.api.services.r2r_agent.get_async_client") as mock_async_client, \
+             mock.patch("apps.api.services.r2r_agent.parse_retrieval_event", side_effect=lambda x: x):
             import httpx
 
             async def failing_async_generator():
@@ -621,9 +565,7 @@ class TestAgentStream:
                 yield MessageEvent("answer")
                 raise httpx.ReadError("Network error")
 
-            mock_client_factory.return_value.retrieval.agent = AsyncMock(
-                return_value=failing_async_generator()
-            )
+            mock_async_client.return_value._make_streaming_request.return_value = failing_async_generator()
 
             from apps.api.services.r2r_agent import agent_stream
 
@@ -641,17 +583,9 @@ class TestAgentStream:
             assert "stream interrupted" in error_frames[0]["detail"]
 
     def test_agent_stream_citation_event_between_tokens_does_not_regress_phase(self):
-        """CitationEvent does not emit a status frame that regresses phase order.
-
-        R2R may emit CitationEvent during/after the MessageEvent token stream.
-        Previously, CitationEvent yielded a status frame with phase=found_results,
-        causing UI regression: "Generating answer…" → "Reading citations…" (backwards).
-
-        This test verifies that CitationEvent does NOT yield any status frame,
-        preserving monotonic forward-only phase progression:
-        "Searching…" → "Reading citations…" → "Generating…"
-        """
-        with mock.patch("apps.api.services.r2r_agent.get_async_client") as mock_client_factory, \
+        """CitationEvent does not emit a status frame that regresses phase order."""
+        with mock.patch("apps.api.services.r2r_agent.get_async_client") as mock_async_client, \
+             mock.patch("apps.api.services.r2r_agent.parse_retrieval_event", side_effect=lambda x: x), \
              mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures, \
              mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
                 events = [
@@ -661,7 +595,7 @@ class TestAgentStream:
                     MessageEvent(" world"),  # Continue generation
                     FinalAnswerEvent("hello world", "conv-1"),
                 ]
-                mock_client_factory.return_value.retrieval.agent = AsyncMock(return_value=_async_iter(*events))
+                mock_async_client.return_value._make_streaming_request.return_value = _async_iter(*events)
                 mock_figures.return_value = []
 
                 from apps.api.services.r2r_agent import agent_stream
@@ -669,35 +603,30 @@ class TestAgentStream:
                 frames = asyncio.run(_collect(agent_stream("test?", "conv-1")))
                 frame_list = [json.loads(f.split("data: ")[1]) for f in frames if "data: " in f]
 
-                # Extract status frames to verify phase order
                 status_frames = [f for f in frame_list if f.get("type") == "status"]
                 token_frames = [f for f in frame_list if f.get("type") == "token"]
 
-                # Verify status frames are in forward-only order: searching → found_results → generating
                 status_phases = [s.get("phase") for s in status_frames]
                 assert status_phases == ["searching", "found_results", "generating"], (
                     f"Phase order must be monotonically forward. Got: {status_phases}"
                 )
 
-                # Verify tokens are streamed in order with no regressive status frames between them
                 assert len(token_frames) == 2
                 assert token_frames[0]["text"] == "hello"
                 assert token_frames[1]["text"] == " world"
 
-                # Verify no duplicate "found_results" phase (which would come from CitationEvent)
                 found_results_count = status_phases.count("found_results")
                 assert found_results_count == 1, (
-                    f"'found_results' phase should appear exactly once (from SearchResultsEvent). "
-                    f"Got {found_results_count} occurrences. This indicates CitationEvent is "
-                    f"emitting a regressive status frame."
+                    f"'found_results' phase should appear exactly once. "
+                    f"Got {found_results_count} occurrences."
                 )
 
     def test_agent_stream_synthesizes_final_frame_when_no_final_event(self):
         """Defensive branch: loop exits without FinalAnswerEvent; synthesizes final frame from accumulated text."""
-        with mock.patch("apps.api.services.r2r_agent.get_async_client") as mock_client_factory, \
+        with mock.patch("apps.api.services.r2r_agent.get_async_client") as mock_async_client, \
+             mock.patch("apps.api.services.r2r_agent.parse_retrieval_event", side_effect=lambda x: x), \
              mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures, \
              mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
-                # Events: search result and message delta, but no FinalAnswerEvent
                 events = [
                     SearchResultsEvent([
                         {
@@ -714,17 +643,14 @@ class TestAgentStream:
                     MessageEvent("The refund policy is 30 days."),
                     # No FinalAnswerEvent - loop exits without it
                 ]
-                mock_client_factory.return_value.retrieval.agent = AsyncMock(return_value=_async_iter(*events))
+                mock_async_client.return_value._make_streaming_request.return_value = _async_iter(*events)
                 mock_figures.return_value = []
 
                 from apps.api.services.r2r_agent import agent_stream
 
                 frames = asyncio.run(_collect(agent_stream("What is the refund policy?", "conv-1")))
 
-                # Parse all frames
                 frame_list = [json.loads(f.split("data: ")[1]) for f in frames if "data: " in f]
-
-                # Find the final frame
                 final_frames = [f for f in frame_list if f.get("type") == "final"]
 
                 assert len(final_frames) == 1, "Should emit exactly one final frame (synthesized)"
@@ -744,30 +670,15 @@ class TestDocumentFilter:
              mock.patch("apps.api.services.r2r_agent.load_document_manifest") as mock_manifest, \
              mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures, \
              mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
-                # Mock manifest returns a list of r2r document IDs
-                mock_manifest.return_value = {
-                    "r2r_document_ids": ["r2r-uuid-1", "r2r-uuid-2"]
-                }
-
-                mock_message = mock.MagicMock()
-                mock_message.content = "The answer is here."
-                mock_message.metadata = {
-                    "aggregated_search_result": json.dumps({"chunk_search_results": []})
-                }
-
-                mock_response = mock.MagicMock()
-                mock_response.results.messages = [mock_message]
-                mock_response.results.conversation_id = "conv-1"
-
-                mock_client_factory.return_value.retrieval.agent.return_value = mock_response
+                mock_manifest.return_value = {"r2r_document_ids": ["r2r-uuid-1", "r2r-uuid-2"]}
+                mock_client_factory.return_value.retrieval.rag.return_value = _rag_response("The answer is here.")
                 mock_figures.return_value = []
 
                 from apps.api.services.r2r_agent import agent_query
 
-                result = agent_query("What is the answer?", "conv-1", document_ids=["doc1"])
+                agent_query("What is the answer?", "conv-1", document_ids=["doc1"])
 
-                # Verify that the agent was called with filters
-                call_kwargs = mock_client_factory.return_value.retrieval.agent.call_args.kwargs
+                call_kwargs = mock_client_factory.return_value.retrieval.rag.call_args.kwargs
                 assert "search_settings" in call_kwargs
                 search_settings = call_kwargs["search_settings"]
                 assert "filters" in search_settings
@@ -781,28 +692,15 @@ class TestDocumentFilter:
              mock.patch("apps.api.services.r2r_agent.load_document_manifest") as mock_manifest, \
              mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures, \
              mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
-                # Manifest returns None (document has no r2r_document_ids)
                 mock_manifest.return_value = None
-
-                mock_message = mock.MagicMock()
-                mock_message.content = "Fallback answer without filters."
-                mock_message.metadata = {
-                    "aggregated_search_result": json.dumps({"chunk_search_results": []})
-                }
-
-                mock_response = mock.MagicMock()
-                mock_response.results.messages = [mock_message]
-                mock_response.results.conversation_id = "conv-1"
-
-                mock_client_factory.return_value.retrieval.agent.return_value = mock_response
+                mock_client_factory.return_value.retrieval.rag.return_value = _rag_response("Fallback answer.")
                 mock_figures.return_value = []
 
                 from apps.api.services.r2r_agent import agent_query
 
-                result = agent_query("What is the answer?", "conv-1", document_ids=["doc1"])
+                agent_query("What is the answer?", "conv-1", document_ids=["doc1"])
 
-                # Verify that search_settings does NOT contain filters key
-                call_kwargs = mock_client_factory.return_value.retrieval.agent.call_args.kwargs
+                call_kwargs = mock_client_factory.return_value.retrieval.rag.call_args.kwargs
                 search_settings = call_kwargs["search_settings"]
                 assert "filters" not in search_settings
 
@@ -812,28 +710,15 @@ class TestDocumentFilter:
              mock.patch("apps.api.services.r2r_agent.load_document_manifest") as mock_manifest, \
              mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures, \
              mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
-                # Manifest returns dict with empty list
                 mock_manifest.return_value = {"r2r_document_ids": []}
-
-                mock_message = mock.MagicMock()
-                mock_message.content = "Fallback answer without filters."
-                mock_message.metadata = {
-                    "aggregated_search_result": json.dumps({"chunk_search_results": []})
-                }
-
-                mock_response = mock.MagicMock()
-                mock_response.results.messages = [mock_message]
-                mock_response.results.conversation_id = "conv-1"
-
-                mock_client_factory.return_value.retrieval.agent.return_value = mock_response
+                mock_client_factory.return_value.retrieval.rag.return_value = _rag_response("Fallback answer.")
                 mock_figures.return_value = []
 
                 from apps.api.services.r2r_agent import agent_query
 
-                result = agent_query("What is the answer?", "conv-1", document_ids=["doc1"])
+                agent_query("What is the answer?", "conv-1", document_ids=["doc1"])
 
-                # Verify that search_settings does NOT contain filters key
-                call_kwargs = mock_client_factory.return_value.retrieval.agent.call_args.kwargs
+                call_kwargs = mock_client_factory.return_value.retrieval.rag.call_args.kwargs
                 search_settings = call_kwargs["search_settings"]
                 assert "filters" not in search_settings
 
@@ -843,73 +728,49 @@ class TestDocumentFilter:
              mock.patch("apps.api.services.r2r_agent.load_document_manifest") as mock_manifest, \
              mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures, \
              mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
-                mock_message = mock.MagicMock()
-                mock_message.content = "Answer without document scope."
-                mock_message.metadata = {
-                    "aggregated_search_result": json.dumps({"chunk_search_results": []})
-                }
-
-                mock_response = mock.MagicMock()
-                mock_response.results.messages = [mock_message]
-                mock_response.results.conversation_id = "conv-1"
-
-                mock_client_factory.return_value.retrieval.agent.return_value = mock_response
+                mock_client_factory.return_value.retrieval.rag.return_value = _rag_response("Answer.")
                 mock_figures.return_value = []
 
                 from apps.api.services.r2r_agent import agent_query
 
-                # Call without document_id
-                result = agent_query("What is the answer?", "conv-1")
+                agent_query("What is the answer?", "conv-1")
 
-                # Verify that load_document_manifest was NOT called
                 mock_manifest.assert_not_called()
-
-                # Verify that search_settings does NOT contain filters key
-                call_kwargs = mock_client_factory.return_value.retrieval.agent.call_args.kwargs
+                call_kwargs = mock_client_factory.return_value.retrieval.rag.call_args.kwargs
                 search_settings = call_kwargs["search_settings"]
                 assert "filters" not in search_settings
 
     def test_ac4_3_agent_stream_with_document_id_applies_filter(self):
         """AC4.3 stream path: agent_stream with document_id applies r2r document ID filter."""
-        with mock.patch("apps.api.services.r2r_agent.get_async_client") as mock_client_factory, \
+        with mock.patch("apps.api.services.r2r_agent.get_async_client") as mock_async_client, \
              mock.patch("apps.api.services.r2r_agent.load_document_manifest") as mock_manifest, \
+             mock.patch("apps.api.services.r2r_agent.parse_retrieval_event", side_effect=lambda x: x), \
              mock.patch("apps.api.services.r2r_agent.figures_for_response") as mock_figures, \
              mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
-                # Mock manifest returns a list of r2r document IDs
-                mock_manifest.return_value = {
-                    "r2r_document_ids": ["r2r-uuid-1"]
-                }
+                mock_manifest.return_value = {"r2r_document_ids": ["r2r-uuid-1"]}
 
-                # Mock streaming events with a SearchResultsEvent (doc_id "doc1", score 0.85)
-                # followed by message and final answer
                 events = [
                     SearchResultsEvent([
                         {
                             "text": "DocQuery Citation: document_id=doc1; source_file=filtered.pdf; page_start=1; page_end=1; section_path=Results; chunk_index=0\n\nFiltered result",
-                            "metadata": {
-                                "chunk_id": "chunk-1",
-                                "source_file": "filtered.pdf",
-                                "page_start": 1,
-                            },
-                            "score": 0.85,
+                            "metadata": {"chunk_id": "chunk-1", "source_file": "filtered.pdf", "page_start": 1},
+                            "score": 0.016,
                             "id": "chunk-1",
                         }
                     ]),
                     MessageEvent("This is from the filtered document."),
                     FinalAnswerEvent("This is from the filtered document.", "conv-1"),
                 ]
-                mock_client_factory.return_value.retrieval.agent = AsyncMock(return_value=_async_iter(*events))
+                mock_async_client.return_value._make_streaming_request.return_value = _async_iter(*events)
                 mock_figures.return_value = []
 
                 from apps.api.services.r2r_agent import agent_stream
 
-                # Consume the generator to trigger the actual call
                 asyncio.run(_collect(agent_stream("What?", "conv-1", document_ids=["doc1"])))
 
-                # Verify that the agent was called with filters
-                call_kwargs = mock_client_factory.return_value.retrieval.agent.call_args.kwargs
-                assert "search_settings" in call_kwargs
-                search_settings = call_kwargs["search_settings"]
+                # Verify _make_streaming_request was called with the filter in the JSON body
+                call_kwargs = mock_async_client.return_value._make_streaming_request.call_args.kwargs
+                search_settings = call_kwargs["json"]["search_settings"]
                 assert "filters" in search_settings
                 assert search_settings["filters"] == {
                     "document_id": {"$in": ["r2r-uuid-1"]}
@@ -941,10 +802,7 @@ class TestBuildSearchSettingsCollectionId:
         with mock.patch("apps.api.services.r2r_agent.get_client") as mock_get, \
              mock.patch("apps.api.services.r2r_agent.figures_for_response", return_value=[]), \
              mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
-            mock_response = mock.Mock()
-            mock_response.results.messages = [mock.Mock(role="assistant", content="answer")]
-            mock_response.results.search_results.chunk_search_results = []
-            mock_get.return_value.retrieval.agent.return_value = mock_response
+            mock_get.return_value.retrieval.rag.return_value = _rag_response("answer")
 
             from apps.api.services.r2r_agent import agent_query
 
@@ -956,7 +814,7 @@ class TestBuildSearchSettingsCollectionId:
                 collection_id="col-abc",
             )
 
-            call_kwargs = mock_get.return_value.retrieval.agent.call_args[1]
+            call_kwargs = mock_get.return_value.retrieval.rag.call_args.kwargs
             filters = call_kwargs["search_settings"]["filters"]
             assert filters == {"collection_ids": {"$overlap": ["col-abc"]}}
 
@@ -967,10 +825,7 @@ class TestBuildSearchSettingsCollectionId:
              mock.patch("apps.api.services.r2r_agent.figures_for_response", return_value=[]), \
              mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
             mock_manifest.return_value = {"r2r_document_ids": ["r2r-001"]}
-            mock_response = mock.Mock()
-            mock_response.results.messages = [mock.Mock(role="assistant", content="answer")]
-            mock_response.results.search_results.chunk_search_results = []
-            mock_get.return_value.retrieval.agent.return_value = mock_response
+            mock_get.return_value.retrieval.rag.return_value = _rag_response("answer")
 
             from apps.api.services.r2r_agent import agent_query
 
@@ -982,7 +837,7 @@ class TestBuildSearchSettingsCollectionId:
                 collection_id=None,
             )
 
-            call_kwargs = mock_get.return_value.retrieval.agent.call_args[1]
+            call_kwargs = mock_get.return_value.retrieval.rag.call_args.kwargs
             filters = call_kwargs["search_settings"]["filters"]
             assert filters == {"document_id": {"$in": ["r2r-001"]}}
 
@@ -991,10 +846,7 @@ class TestBuildSearchSettingsCollectionId:
         with mock.patch("apps.api.services.r2r_agent.get_client") as mock_get, \
              mock.patch("apps.api.services.r2r_agent.figures_for_response", return_value=[]), \
              mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
-            mock_response = mock.Mock()
-            mock_response.results.messages = [mock.Mock(role="assistant", content="answer")]
-            mock_response.results.search_results.chunk_search_results = []
-            mock_get.return_value.retrieval.agent.return_value = mock_response
+            mock_get.return_value.retrieval.rag.return_value = _rag_response("answer")
 
             from apps.api.services.r2r_agent import agent_query
 
@@ -1006,7 +858,7 @@ class TestBuildSearchSettingsCollectionId:
                 collection_id=None,
             )
 
-            call_kwargs = mock_get.return_value.retrieval.agent.call_args[1]
+            call_kwargs = mock_get.return_value.retrieval.rag.call_args.kwargs
             assert "filters" not in call_kwargs.get("search_settings", {})
 
     def test_collection_id_takes_precedence_over_document_ids(self):
@@ -1016,10 +868,7 @@ class TestBuildSearchSettingsCollectionId:
              mock.patch("apps.api.services.r2r_agent.figures_for_response", return_value=[]), \
              mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
             mock_manifest.return_value = {"r2r_document_ids": ["r2r-001"]}
-            mock_response = mock.Mock()
-            mock_response.results.messages = [mock.Mock(role="assistant", content="answer")]
-            mock_response.results.search_results.chunk_search_results = []
-            mock_get.return_value.retrieval.agent.return_value = mock_response
+            mock_get.return_value.retrieval.rag.return_value = _rag_response("answer")
 
             from apps.api.services.r2r_agent import agent_query
 
@@ -1031,27 +880,25 @@ class TestBuildSearchSettingsCollectionId:
                 collection_id="col-xyz",
             )
 
-            call_kwargs = mock_get.return_value.retrieval.agent.call_args[1]
+            call_kwargs = mock_get.return_value.retrieval.rag.call_args.kwargs
             filters = call_kwargs["search_settings"]["filters"]
             assert filters == {"collection_ids": {"$overlap": ["col-xyz"]}}
-            # Verify document_ids manifest was NOT called (collection_id took priority)
             mock_manifest.assert_not_called()
 
     def test_agent_stream_with_collection_id(self):
         """agent_stream() also accepts collection_id and applies $overlap filter."""
         with mock.patch("apps.api.services.r2r_agent.get_async_client") as mock_get, \
+             mock.patch("apps.api.services.r2r_agent.parse_retrieval_event", side_effect=lambda x: x), \
              mock.patch("apps.api.services.r2r_agent.figures_for_response", return_value=[]), \
              mock.patch("apps.api.services.r2r_agent.rewrite_brackets", side_effect=lambda a, c, r: (a, c, r)):
-            # Simple streaming events
             events = [
                 MessageEvent("answer"),
                 FinalAnswerEvent("answer", "conv-1"),
             ]
-            mock_get.return_value.retrieval.agent = AsyncMock(return_value=_async_iter(*events))
+            mock_get.return_value._make_streaming_request.return_value = _async_iter(*events)
 
             from apps.api.services.r2r_agent import agent_stream
 
-            # Consume the generator to trigger the call
             asyncio.run(_collect(agent_stream(
                 message="q",
                 conversation_id="conv-1",
@@ -1060,7 +907,6 @@ class TestBuildSearchSettingsCollectionId:
                 collection_id="col-abc",
             )))
 
-            call_kwargs = mock_get.return_value.retrieval.agent.call_args[1]
-            filters = call_kwargs["search_settings"]["filters"]
+            call_kwargs = mock_get.return_value._make_streaming_request.call_args.kwargs
+            filters = call_kwargs["json"]["search_settings"]["filters"]
             assert filters == {"collection_ids": {"$overlap": ["col-abc"]}}
-

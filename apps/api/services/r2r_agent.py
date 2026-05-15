@@ -157,14 +157,14 @@ def agent_query(
             return _make_not_found_result(message, conversation_id)
 
     try:
-        response = get_client().retrieval.agent(
-            message={"role": "user", "content": message},
-            conversation_id=conversation_id,
+        response = get_client().retrieval.rag(
+            query=message,
             search_settings=search_settings,
+            rag_generation_config={"stream": False},
         )
     except (httpx.HTTPError, R2RException) as exc:
         raise RuntimeError(f"R2R unavailable: {exc}") from exc
-    result = _adapt_agent_response(message, response)
+    result = _adapt_rag_response(message, response, conversation_id)
     return _apply_doc_only_check(result, doc_only)
 
 
@@ -240,6 +240,47 @@ def _assemble_from_chunks(
         "needs_human_review": needs_review,
         "conversation_id": str(conversation_id) if conversation_id else None,
     }
+
+
+def _adapt_rag_response(question: str, response: Any, conversation_id: str | None) -> dict[str, Any]:
+    """Map a non-streaming retrieval/rag response to the standard response dict.
+
+    RAG response shape (R2R 3.6.x):
+        results.completion          → answer string (not an object with .choices)
+        results.search_results.chunk_search_results → list of retrieved chunks
+    """
+    inner = (
+        getattr(response, "results", None)
+        or (response.get("results") if isinstance(response, dict) else None)
+        or response
+    )
+
+    # completion is a plain string in the RAG response
+    answer = (
+        getattr(inner, "completion", None)
+        or (inner.get("completion") if isinstance(inner, dict) else None)
+        or ""
+    )
+    if not isinstance(answer, str):
+        # Defensive: handle object shape if R2R version differs
+        answer = str(answer)
+
+    search_results = (
+        getattr(inner, "search_results", None)
+        or (inner.get("search_results") if isinstance(inner, dict) else None)
+        or {}
+    )
+    if hasattr(search_results, "__dict__") or hasattr(search_results, "model_dump"):
+        search_results = (
+            search_results.model_dump() if hasattr(search_results, "model_dump")
+            else vars(search_results)
+        )
+    chunk_results = (
+        (search_results.get("chunk_search_results") if isinstance(search_results, dict) else None)
+        or []
+    )
+
+    return _assemble_from_chunks(question, answer, chunk_results, conversation_id)
 
 
 def _adapt_agent_response(question: str, response: Any) -> dict[str, Any]:
@@ -333,19 +374,18 @@ async def agent_stream(
             yield _sse({"type": "final", "result": _make_not_found_result(message, conversation_id)})
             return
 
-    # R2R 3.6.x SDK bug: AsyncRetrievalMethods.agent() does `await _make_streaming_request()`
-    # but _make_streaming_request is an async generator — awaiting it raises TypeError.
-    # Bypass agent() and call _make_streaming_request directly with async for.
+    # Use /retrieval/rag instead of /retrieval/agent to avoid two issues:
+    # 1. R2R 3.6.x SDK bug: agent() awaits an async generator (TypeError)
+    # 2. gemini-3-flash-preview thinking model breaks R2R's multi-turn tool-call loop
+    #    with "Function call is missing a thought_signature"; gemini-2.0-flash avoids
+    #    that error but doesn't invoke search tools. /retrieval/rag bypasses tool calls
+    #    entirely — it does search via search_settings then generates in one shot.
     _client = get_async_client()
-    _agent_data: dict[str, Any] = {
+    _rag_data: dict[str, Any] = {
+        "query": message,
         "rag_generation_config": {"stream": True},
         "search_settings": search_settings,
         "include_title_if_available": True,
-        "conversation_id": str(conversation_id) if conversation_id else None,
-        "use_system_context": True,
-        "mode": "rag",
-        "search_mode": "custom",
-        "message": {"role": "user", "content": message},
     }
 
     yield _sse({"type": "status", "phase": "searching"})
@@ -361,7 +401,7 @@ async def agent_stream(
 
     try:
         async for raw_event in _client._make_streaming_request(
-            "POST", "retrieval/agent", json=_agent_data, version="v3"
+            "POST", "retrieval/rag", json=_rag_data, version="v3"
         ):
             if not isinstance(raw_event, str):
                 # Already a parsed dict — pass through directly
@@ -410,6 +450,7 @@ async def agent_stream(
                     fallback_text="".join(full_text_parts),
                     search_results=last_search_results,
                     final_answer_citations=final_data.get("citations") or [],
+                    conversation_id=conversation_id,
                 )
                 adapted = _apply_doc_only_check(adapted, doc_only)
                 yield _sse({"type": "final", "result": adapted})
@@ -429,6 +470,7 @@ async def agent_stream(
         payload={},
         fallback_text="".join(full_text_parts),
         search_results=last_search_results,
+        conversation_id=conversation_id,
     )
     adapted = _apply_doc_only_check(adapted, doc_only)
     yield _sse({"type": "final", "result": adapted})
@@ -454,6 +496,7 @@ def _adapt_final_event(
     fallback_text: str,
     search_results: dict[str, Any],
     final_answer_citations: list[dict[str, Any]] | None = None,
+    conversation_id: str | None = None,
 ) -> dict[str, Any]:
     """Build the standard response dict from streaming events.
 
@@ -487,6 +530,7 @@ def _adapt_final_event(
         }
 
     chunk_results = search_results.get("chunk_search_results") or []
-    conversation_id = (payload.get("data") or {}).get("conversation_id")
-    return _assemble_from_chunks(question, final_answer, chunk_results, conversation_id)
+    # Use caller-supplied conversation_id (RAG endpoint doesn't echo it back)
+    event_conversation_id = (payload.get("data") or {}).get("conversation_id") or conversation_id
+    return _assemble_from_chunks(question, final_answer, chunk_results, event_conversation_id)
 
