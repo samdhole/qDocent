@@ -188,4 +188,16 @@ describe("CitationBadge", () => {
       chunkIndex: null,
     })
   })
+
+  it("AC2.2: clickable badge renders as button (not a Popover dialog)", () => {
+    renderBadge(1)
+
+    // HoverCard trigger is still a <button> — role="button" present
+    const button = screen.getByRole("button", { name: /Citation 1/ })
+    expect(button).toBeInTheDocument()
+    expect(button).not.toBeDisabled()
+
+    // Popover would produce role="dialog" on open; HoverCard does not open on click
+    expect(document.querySelector("[role='dialog']")).toBeNull()
+  })
 })
