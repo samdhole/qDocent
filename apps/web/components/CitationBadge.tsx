@@ -2,7 +2,7 @@
 "use client"
 
 import * as React from "react"
-import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card"
+import { HoverCard, HoverCardTrigger, HoverCardContent } from "@/components/ui/hover-card"
 import { useCitationContext } from "@/components/CitationContext"
 import { canOpenSource } from "@/lib/citationClickable"
 import { cn } from "@/lib/utils"
@@ -18,8 +18,6 @@ export function CitationBadge({ index, variant = "inline" }: Props) {
   const citation = citations[index - 1]
   const context = retrievedContexts[index - 1]
 
-  // Match the existing AnswerCard guard: only invoke onSelectCitation when
-  // document_id is present AND page is present. Otherwise click is a no-op.
   const isClickable = canOpenSource(citation, onSelectCitation)
 
   const handleSelect = () => {
@@ -33,7 +31,7 @@ export function CitationBadge({ index, variant = "inline" }: Props) {
     })
   }
 
-  // AC1.4: out-of-bounds → greyed fallback with no hover
+  // Out-of-bounds → greyed fallback with no interaction
   if (!citation) {
     return (
       <span
@@ -48,56 +46,56 @@ export function CitationBadge({ index, variant = "inline" }: Props) {
     )
   }
 
-  const trigger = (
-    <button
-      type="button"
-      onClick={handleSelect}
-      disabled={!isClickable}
-      className={cn(
-        "inline-flex items-center rounded px-1 text-xs font-medium",
-        isClickable
-          ? "bg-blue-50 text-blue-700 hover:bg-blue-100 cursor-pointer"
-          : "bg-muted text-muted-foreground cursor-default",
-        variant === "panel" && "px-2 py-0.5 text-sm"
-      )}
-      aria-label={`Citation ${index}: ${citation.document ?? "source"}`}
-    >
-      [{index}]
-    </button>
+  const badgeClasses = cn(
+    "inline-flex items-center rounded px-1 text-xs font-medium",
+    isClickable
+      ? "bg-blue-50 text-blue-700 hover:bg-blue-100 cursor-pointer"
+      : "bg-muted text-muted-foreground cursor-default",
+    variant === "panel" && "px-2 py-0.5 text-sm"
   )
 
-  const hoverContent = (
-    <div className="space-y-1.5">
-      {context?.text && (
-        <p className="text-xs leading-relaxed line-clamp-4">{context.text}</p>
-      )}
-      <p className="text-xs text-muted-foreground">
-        {[
-          citation.page != null && `p.${citation.page}`,
-          citation.document,
-        ]
-          .filter(Boolean)
-          .join(" · ")}
-      </p>
-      {isClickable && (
+  // Non-clickable badges: plain disabled button with no hover card (no source to open).
+  if (!isClickable) {
+    return (
+      <button
+        type="button"
+        disabled
+        className={badgeClasses}
+        aria-label={`Citation ${index}: ${citation.document ?? "source"}`}
+      >
+        [{index}]
+      </button>
+    )
+  }
+
+  // Clickable badges: HoverCard for touch-accessible chunk preview.
+  // Hovering shows the chunk text preview; clicking opens the SourcePanel.
+  return (
+    <HoverCard openDelay={150} closeDelay={0}>
+      <HoverCardTrigger asChild>
         <button
           type="button"
           onClick={handleSelect}
-          className="text-xs text-blue-600 hover:underline"
+          className={badgeClasses}
+          aria-label={`Citation ${index}: ${citation.document ?? "source"}`}
         >
-          Open source →
+          [{index}]
         </button>
-      )}
-    </div>
-  )
-
-  return (
-    // AC1.1: openDelay=150ms (~150ms per design spec; within the 200ms success criterion)
-    <HoverCard openDelay={150} closeDelay={200}>
-      <HoverCardTrigger asChild>{trigger}</HoverCardTrigger>
-      {/* AC1.2: verbatim text, document name, page footer */}
-      <HoverCardContent className="w-80" side="top" align="start">
-        {hoverContent}
+      </HoverCardTrigger>
+      <HoverCardContent side="top" align="start" className="w-72">
+        <div className="space-y-1.5">
+          {context?.text && (
+            <p className="text-xs leading-relaxed line-clamp-4">{context.text}</p>
+          )}
+          <p className="text-xs text-muted-foreground">
+            {[
+              citation.page != null && `p.${citation.page}`,
+              citation.document,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
+          </p>
+        </div>
       </HoverCardContent>
     </HoverCard>
   )
