@@ -9,7 +9,7 @@
 ## Prerequisites
 
 - Local stack running: `make r2r`, `make api`, `make web` in separate terminals (R2R on :7272, API on :8000, web on :3000)
-- At least one ingested PDF with multi-page chunks. If none exist, run `make ingest` or upload a multi-page PDF via `/documents`
+- At least one ingested PDF (any PDF — the pipeline produces single-page chunks by design, so multi-page citations will not appear in the browser regardless of corpus)
 - Vitest gate passing: `cd apps/web && npx vitest run components/__tests__/SourcePanel.test.tsx` reports `16 passed`
 - A modern browser (Chrome/Firefox/Safari) — text-layer requires real canvas
 
@@ -34,25 +34,24 @@
 | Step | Action | Expected |
 |------|--------|----------|
 | 1 | Click a citation whose page range is a **single page** (e.g. cited page 5 only, `pageStart === pageEnd`). | SourcePanel opens. Footer (between Previous/Next buttons) reads exactly `Page 5`. No `·` middle-dot, no `cited pp.` suffix anywhere in the footer. |
-| 2 | Click a citation whose page range **spans multiple pages** (e.g. `pageStart=3, pageEnd=7`). The cited answer needs to reference a multi-page chunk; if no such citation exists in your corpus, you can craft one by asking a question that produces a long cited passage. | SourcePanel opens at page 3. Footer reads exactly `Page 3 · cited pp.3–7` with an en-dash (U+2013) between `3` and `7` and a middle-dot (U+00B7) between `Page 3` and `cited`. |
-| 3 | With the multi-page citation still open, click **Next**. | Page advances to 4. Footer updates to `Page 4 · cited pp.3–7` (the current page changes; the cited range stays fixed at 3–7). |
-| 4 | Click **Next** until disabled. | Footer ends at `Page 7 · cited pp.3–7`. The **Next** button is now disabled (greyed). |
-| 5 | Click **Previous** repeatedly until disabled. | Footer regresses to `Page 3 · cited pp.3–7`. The **Previous** button is now disabled. Note: nav is bounded by the cited range, not the full document. |
+| 2 | *(AC2.2 — automated test only)* Multi-page footer `Page N · cited pp.X–Y` cannot be triggered manually. The DocQuery pipeline always sets `page_start = page_end = current page` in `chunk_templates.py`, so every real citation is single-page. The `· cited pp.X–Y` suffix is covered by `SourcePanel.test.tsx:332` via a synthetic `pageStart:3, pageEnd:7` citation. No manual step needed. | N/A — see automated test. |
+| 3 | *(Skipped — depends on step 2)* | N/A |
+| 4 | *(Skipped — depends on step 2)* | N/A |
+| 5 | *(Skipped — depends on step 2)* | N/A |
 | 6 | Scan the entire footer area while interacting with several different citations (single + multi). | At no point does the legacy `Page N of M` format appear. The format is always one of: `Page N` or `Page N · cited pp.X–Y`. |
 
 ---
 
-## End-to-End: Cited multi-page passage with text-layer copy
+## End-to-End: Cited passage with text-layer copy
 
-Purpose: validates AC1 (text layer) + AC2 (footer format) together on a single realistic flow.
+Purpose: validates AC1 (text layer) + AC2 (footer format) together on a single realistic flow. Multi-page citations do not occur with this corpus (pipeline is page-per-chunk by design), so the end-to-end uses a single-page citation.
 
-1. Open `/ask` (or a notebook conversation) and submit a question that returns a multi-page citation (e.g. one summarizing a section that spans 3+ pages of a long PDF).
-2. Click the `[N]` citation chip. SourcePanel opens.
-3. Verify the document name in the header, the page range subtext (e.g. `Pages 3–7`), and the footer (e.g. `Page 3 · cited pp.3–7`) all align.
+1. Open `/ask` and submit a question that produces a cited answer (e.g. "What are the key findings?").
+2. Click any `[N]` citation chip. SourcePanel opens.
+3. Verify the document name in the header and the footer shows `Page N` (single-page format).
 4. Click-drag-select a sentence inside the cited passage on the rendered PDF page. Copy with `Ctrl+C` and paste elsewhere.
 5. Confirm the pasted text matches what is visually rendered on the page.
-6. Click **Next**. Verify footer increments the current page only (`Page 4 · cited pp.3–7`).
-7. Click the **X** in the header. Sheet closes. Conversation view regains focus.
+6. Click the **X** in the header. Sheet closes. Conversation view regains focus.
 
 ---
 
@@ -73,6 +72,6 @@ Purpose: validates AC1 (text layer) + AC2 (footer format) together on a single r
 | AC1.2 (overlay still on top) | — (manual only) | Phase 1, step 6 |
 | AC1.3 (regression — tests still pass) | `SourcePanel.test.tsx` — all 16 tests pass | — (covered by CI) |
 | AC2.1 (single-page footer "Page N") | `SourcePanel.test.tsx:354` | Phase 2, step 1 |
-| AC2.2 (multi-page footer "Page N · cited pp.X–Y") | `SourcePanel.test.tsx:332` | Phase 2, steps 2–5 |
+| AC2.2 (multi-page footer "Page N · cited pp.X–Y") | `SourcePanel.test.tsx:332` | **Automated only** — pipeline produces single-page chunks by design; no manual step possible with this corpus |
 | AC2.3 (no range suffix when single-page) | `SourcePanel.test.tsx:372` (negative assertion) | Phase 2, step 1 |
 | AC2.4 (no stale assertions on old format) | All 16 tests pass, no `N of M` references remain | Phase 2, step 6 |
