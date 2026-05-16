@@ -189,15 +189,35 @@ describe("CitationBadge", () => {
     })
   })
 
-  it("AC2.2: clickable badge renders as button (not a Popover dialog)", () => {
+  it("AC2.1: hover shows chunk preview with text, page, and document name", async () => {
+    const user = userEvent.setup()
     renderBadge(1)
 
-    // HoverCard trigger is still a <button> — role="button" present
     const button = screen.getByRole("button", { name: /Citation 1/ })
-    expect(button).toBeInTheDocument()
-    expect(button).not.toBeDisabled()
 
-    // Popover would produce role="dialog" on open; HoverCard does not open on click
+    // Hover the badge — HoverCard should open and show preview
+    await user.hover(button)
+
+    // Preview should show the chunk text from testContexts[0]
+    await screen.findByText(/The refund policy states 30 days\./)
+
+    // Preview should show page number and document name
+    await screen.findByText(/p\.3 · policy\.pdf/)
+  })
+
+  it("AC2.2: click does not open a dialog (HoverCard, not Popover)", async () => {
+    const user = userEvent.setup()
+    renderBadge(1)
+
+    const button = screen.getByRole("button", { name: /Citation 1/ })
+
+    // Verify dialog is NOT present initially
+    expect(document.querySelector("[role='dialog']")).toBeNull()
+
+    // Click the button (should NOT open a dialog, only invoke callback)
+    await user.click(button)
+
+    // Dialog should still not be present after click
     expect(document.querySelector("[role='dialog']")).toBeNull()
   })
 })

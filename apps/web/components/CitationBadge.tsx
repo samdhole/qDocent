@@ -61,7 +61,7 @@ export function CitationBadge({ index, variant = "inline" }: Props) {
         type="button"
         disabled
         className={badgeClasses}
-        aria-label={`Citation ${index}: ${citation.document ?? "source"}`}
+        aria-label={`Citation ${index}: ${citation.document ?? "source"} (no source link)`}
       >
         [{index}]
       </button>
@@ -71,7 +71,8 @@ export function CitationBadge({ index, variant = "inline" }: Props) {
   // Clickable badges: HoverCard for touch-accessible chunk preview.
   // Hovering shows the chunk text preview; clicking opens the SourcePanel.
   return (
-    <HoverCard openDelay={150} closeDelay={0}>
+    <HoverCard openDelay={150} closeDelay={75}>
+      {/* 150ms openDelay matches AC2.1 hover-open threshold */}
       <HoverCardTrigger asChild>
         <button
           type="button"
