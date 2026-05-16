@@ -3,13 +3,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { Document, Page } from "react-pdf";
 import "@/lib/pdfWorker"; // Side-effect import — sets the worker URL once.
+import "react-pdf/dist/esm/Page/TextLayer.css";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 
 import type { ChunkManifestEntry, ChunksResponse, SelectedCitation } from "@/lib/types";
-import { bboxToCssBox, findOverlayChunk } from "@/lib/bboxConversion";
+import { bboxToCssBox, findOverlayChunk, isFullPageBbox } from "@/lib/bboxConversion";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -60,6 +61,11 @@ export default function SourcePanel({ citation, onClose }: Props) {
       naturalWidthPt: pageDims.naturalWidth,
       naturalHeightPt: pageDims.naturalHeight,
     });
+  }, [overlayChunk, pageDims]);
+
+  const isFullPage = useMemo(() => {
+    if (!overlayChunk?.bbox || !pageDims) return false;
+    return isFullPageBbox(overlayChunk.bbox, pageDims.naturalWidth, pageDims.naturalHeight);
   }, [overlayChunk, pageDims]);
 
   const open = citation !== null;
@@ -119,14 +125,13 @@ export default function SourcePanel({ citation, onClose }: Props) {
                     width={580}
                     onLoadSuccess={handlePageLoadSuccess}
                     renderAnnotationLayer={false}
-                    renderTextLayer={false}
+                    renderTextLayer={true}
                   />
                 )}
               </Document>
-              {overlayCss && (
+              {overlayCss && !isFullPage && (
                 <div
-                  // bbox may cover the full page for non-table chunks; ingestion pipeline improvement is tracked as a follow-up
-                  className="absolute pointer-events-none border-2 border-yellow-400 bg-yellow-300/30"
+                  className="absolute pointer-events-none border-2 border-yellow-400 bg-yellow-300/50 z-10"
                   style={{
                     left: overlayCss.left,
                     top: overlayCss.top,
@@ -139,6 +144,15 @@ export default function SourcePanel({ citation, onClose }: Props) {
           </div>
         </div>
 
+        {overlayChunk?.text_preview && (
+          <div className="px-4 py-3 border-t bg-muted/20">
+            <p className="text-xs font-medium text-muted-foreground mb-1">Cited passage</p>
+            <p className="text-xs leading-relaxed line-clamp-4 text-foreground">
+              {overlayChunk.text_preview}
+            </p>
+          </div>
+        )}
+
         <div className="px-4 py-2 border-t flex items-center justify-between bg-background">
           <Button
             variant="outline"
@@ -149,7 +163,7 @@ export default function SourcePanel({ citation, onClose }: Props) {
             <ChevronLeft className="size-4 mr-1" /> Previous
           </Button>
           <span className="text-xs text-muted-foreground">
-            {pageNum} of {citation.pageEnd ?? citation.pageStart}
+            Page {pageNum} · citation {citation.pageStart === (citation.pageEnd ?? citation.pageStart) ? `p.${citation.pageStart}` : `pp.${citation.pageStart}–${citation.pageEnd}`}
           </span>
           <Button
             variant="outline"
