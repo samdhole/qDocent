@@ -137,4 +137,46 @@ describe("remarkCitationBadges", () => {
       expect(allNodes.length).toBeGreaterThan(0)
     })
   })
+
+  describe("comma-separated citation groups", () => {
+    it("converts [2, 4, 5] to three separate citationRef nodes (AC1.1)", () => {
+      const tree = parseWithPlugin("answer [2, 4, 5] here")
+      const citationRefs = findNodes(tree, "citationRef")
+      expect(citationRefs).toHaveLength(3)
+      expect(
+        citationRefs.map((n) => (n as CiteNode).data?.hProperties?.["data-num"])
+      ).toEqual(["2", "4", "5"])
+    })
+
+    it("preserves single [N] as one citationRef node (AC1.2)", () => {
+      const tree = parseWithPlugin("answer [1] here")
+      const citationRefs = findNodes(tree, "citationRef")
+      expect(citationRefs).toHaveLength(1)
+      expect(citationRefs[0]).toHaveProperty("data.hProperties.data-num", "1")
+    })
+
+    it("handles mixed [1] and [2, 4] in same paragraph (AC1.3)", () => {
+      const tree = parseWithPlugin("first [1] then [2, 4] done")
+      const citationRefs = findNodes(tree, "citationRef")
+      expect(citationRefs).toHaveLength(3)
+      expect(
+        citationRefs.map((n) => (n as CiteNode).data?.hProperties?.["data-num"])
+      ).toEqual(["1", "2", "4"])
+    })
+
+    it("does not convert [2, 4] inside a code block (AC1.4)", () => {
+      const tree = parseWithPlugin("```\n[2, 4]\n```")
+      const citationRefs = findNodes(tree, "citationRef")
+      expect(citationRefs).toHaveLength(0)
+    })
+
+    it("handles [2,4,5] without spaces after commas", () => {
+      const tree = parseWithPlugin("answer [2,4,5] here")
+      const citationRefs = findNodes(tree, "citationRef")
+      expect(citationRefs).toHaveLength(3)
+      expect(
+        citationRefs.map((n) => (n as CiteNode).data?.hProperties?.["data-num"])
+      ).toEqual(["2", "4", "5"])
+    })
+  })
 })
