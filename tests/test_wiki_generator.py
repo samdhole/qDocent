@@ -2,6 +2,7 @@ import json
 import pytest
 from unittest import mock
 from apps.api.services import wiki_generator, wiki_store, notebook_store
+from apps.api.services.wiki_xml_parser import WikiPageSpec
 
 VALID_XML = """<wiki_structure>
   <title>Test Wiki</title><description>Desc</description>
@@ -86,3 +87,37 @@ class TestGenerateWiki:
         job = wiki_store.get_job("job-empty")
         assert job["status"] == "failed"
         assert "No documents" in (job["error"] or "")
+
+    def test_generate_page_content_forwards_all_pages_and_notebook_id(self, fake_notebook):
+        """AC2.1: Verify _generate_page_content forwards all_pages + notebook_id kwargs to build_page_prompt."""
+        nb_id = fake_notebook["id"]
+        pages = [
+            WikiPageSpec(
+                slug="overview", title="Overview", description="Big picture",
+                importance="high", source_doc_ids=[], related_slugs=[]
+            ),
+            WikiPageSpec(
+                slug="details", title="Details", description="In depth",
+                importance="medium", source_doc_ids=[], related_slugs=[]
+            ),
+        ]
+
+        with mock.patch("apps.api.services.wiki_generator.r2r_client.rag_query") as mock_rag, \
+             mock.patch("apps.api.services.wiki_generator.build_page_prompt") as mock_prompt, \
+             mock.patch("apps.api.services.wiki_generator._make_llm") as mock_llm_factory, \
+             mock.patch("apps.api.services.wiki_generator.wiki_store.update_page_content") as mock_update, \
+             mock.patch("apps.api.services.wiki_generator.wiki_store.increment_pages_done") as mock_increment:
+
+            mock_rag.return_value = {"retrieved_contexts": [{"text": "chunk text"}]}
+            mock_prompt.return_value = "Generated prompt"
+            instance = mock_llm_factory.return_value
+            instance.invoke.return_value = _mock_llm_response("# Overview\n\nContent.")
+
+            # Call _generate_page_content for the first page
+            wiki_generator._generate_page_content(pages[0], nb_id, "col-abc", "job-001", pages)
+
+            # Assert build_page_prompt was called with all_pages and notebook_id kwargs
+            mock_prompt.assert_called_once()
+            call_args = mock_prompt.call_args
+            assert call_args.kwargs.get("all_pages") == pages, "all_pages kwarg not forwarded"
+            assert call_args.kwargs.get("notebook_id") == nb_id, "notebook_id kwarg not forwarded"

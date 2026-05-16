@@ -116,6 +116,21 @@ def build_page_prompt(
             f"(none — link to any page above)\n\n"
         )
 
+    # Build conditional linking rules based on whether notebook_id is provided
+    linking_rules = ""
+    if notebook_id:
+        linking_rules = (
+            f"7. When you reference a topic covered by another wiki page, use a Markdown link from the cross-reference index above — e.g. [Overview](/notebooks/{notebook_id}/wiki/overview)\n"
+            f"8. Do NOT invent URLs — only link to pages listed in the cross-reference index\n"
+            f"9. Write clear, professional technical prose\n"
+            f"10. End with a brief summary paragraph\n\n"
+        )
+    else:
+        linking_rules = (
+            f"7. Write clear, professional technical prose\n"
+            f"8. End with a brief summary paragraph\n\n"
+        )
+
     return (
         f"You are an expert technical writer.\n"
         f"Write a comprehensive wiki page in Markdown about: **{page.title}**\n\n"
@@ -130,10 +145,6 @@ def build_page_prompt(
         f"4. Include at least one Mermaid diagram if the content has structural relationships\n"
         f"5. Use Markdown tables to summarize key information\n"
         f"6. Ground every claim in the provided source material\n"
-        + (f"7. When you reference a topic covered by another wiki page, use a Markdown link from the cross-reference index above — e.g. [Overview](/notebooks/{notebook_id}/wiki/overview)\n"
-           f"8. Do NOT invent URLs — only link to pages listed in the cross-reference index\n"
-           f"9. Write clear, professional technical prose\n"
-           f"10. End with a brief summary paragraph\n\n" if notebook_id else f"7. Write clear, professional technical prose\n"
-           f"8. End with a brief summary paragraph\n\n")
+        + linking_rules
         + f"Generate ONLY the Markdown content for this page."
     )

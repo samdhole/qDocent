@@ -4,6 +4,7 @@
 import Link from 'next/link';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { ExternalLink } from 'lucide-react';
 import MermaidDiagram from '@/components/MermaidDiagram';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000';
@@ -60,9 +61,10 @@ export default function WikiPage({ title, content, sourceDocIds, docNames }: Wik
                   href={href}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-xs bg-muted text-muted-foreground hover:text-foreground px-2 py-1 rounded font-mono transition-colors"
+                  className="text-xs bg-muted text-muted-foreground hover:text-foreground px-2 py-1 rounded font-mono transition-colors inline-flex items-center gap-1"
                 >
                   {name}
+                  <ExternalLink className="inline h-3 w-3 opacity-60" />
                 </a>
               );
             })}
