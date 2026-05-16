@@ -85,19 +85,18 @@ def build_page_prompt(
     """
     # Build cross-reference index
     cross_ref_lines = []
+    related_lines = []
     if all_pages and notebook_id:
+        related_set = set(page.related_slugs)
         for p in all_pages:
             if p.slug == page.slug:
                 continue  # skip self
             url = f"/notebooks/{notebook_id}/wiki/{p.slug}"
-            cross_ref_lines.append(f"- [{p.title}]({url})")
-
-    # Identify related pages for prominent callout
-    related_set = set(page.related_slugs)
-    related_lines = [
-        line for line in cross_ref_lines
-        if any(f"/wiki/{slug}" in line for slug in related_set)
-    ]
+            line = f"- [{p.title}]({url})"
+            cross_ref_lines.append(line)
+            # Identify related pages for prominent callout
+            if p.slug in related_set:
+                related_lines.append(line)
 
     # Build cross-reference section
     cross_ref_section = ""
@@ -131,9 +130,10 @@ def build_page_prompt(
         f"4. Include at least one Mermaid diagram if the content has structural relationships\n"
         f"5. Use Markdown tables to summarize key information\n"
         f"6. Ground every claim in the provided source material\n"
-        f"7. When you reference a topic covered by another wiki page, use a Markdown link from the cross-reference index above — e.g. [Overview](/notebooks/{notebook_id}/wiki/overview)\n"
-        f"8. Do NOT invent URLs — only link to pages listed in the cross-reference index\n"
-        f"9. Write clear, professional technical prose\n"
-        f"10. End with a brief summary paragraph\n\n"
-        f"Generate ONLY the Markdown content for this page."
+        + (f"7. When you reference a topic covered by another wiki page, use a Markdown link from the cross-reference index above — e.g. [Overview](/notebooks/{notebook_id}/wiki/overview)\n"
+           f"8. Do NOT invent URLs — only link to pages listed in the cross-reference index\n"
+           f"9. Write clear, professional technical prose\n"
+           f"10. End with a brief summary paragraph\n\n" if notebook_id else f"7. Write clear, professional technical prose\n"
+           f"8. End with a brief summary paragraph\n\n")
+        + f"Generate ONLY the Markdown content for this page."
     )
