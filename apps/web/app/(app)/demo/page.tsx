@@ -38,11 +38,7 @@ export default function DemoPage() {
             className="max-w-full rounded"
           />
           <p className="text-sm text-muted-foreground mt-2">
-            Figure extracted from the demo 10-K corpus. Run{" "}
-            <code className="text-xs bg-muted px-1 py-0.5 rounded">
-              make demo-setup
-            </code>{" "}
-            to replace with a real figure.
+            Figure extracted from the demo 10-K corpus.
           </p>
         </div>
       </section>
