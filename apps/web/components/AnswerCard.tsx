@@ -83,11 +83,9 @@ export default function AnswerCard({ result, onSelectCitation, onSwitchToGeneral
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
               <span>Answer</span>
-              <span title="Confidence reflects how well the answer is grounded in retrieved source material. Low = answer may be incomplete or speculative.">
-                <Badge variant={LABEL_VARIANT[result.confidence_label] ?? "outline"} className="capitalize cursor-help">
-                  {(result.confidence_label ?? "unknown").replace("_", " ")}
-                </Badge>
-              </span>
+              <Badge variant={LABEL_VARIANT[result.confidence_label] ?? "outline"} className="capitalize">
+                {(result.confidence_label ?? "unknown").replace("_", " ")}
+              </Badge>
               {result.needs_human_review && (
                 <span className="text-xs text-orange-700">Human review recommended</span>
               )}
@@ -155,25 +153,22 @@ export default function AnswerCard({ result, onSelectCitation, onSwitchToGeneral
         )}
 
         {result.retrieved_contexts.length > 0 && (
-          <details className="group">
-            <summary className="cursor-pointer text-xs text-muted-foreground select-none list-none flex items-center gap-1 py-1">
-              <span className="group-open:rotate-90 transition-transform inline-block">▶</span>
-              Retrieved sources ({result.retrieved_contexts.length})
-            </summary>
-            <Card className="mt-2">
-              <CardContent className="pt-4 space-y-2">
-                {result.retrieved_contexts.map((ctx, i) => (
-                  <div
-                    key={ctx.chunk_id != null ? `${ctx.chunk_id}-${i}` : i}
-                    className="text-xs text-muted-foreground border-l-2 pl-2"
-                  >
-                    <span className="text-muted-foreground/70">score {ctx.score}</span>
-                    <p className="mt-1 text-foreground/80">{ctx.text}</p>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          </details>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold text-muted-foreground">Retrieved Chunks</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {result.retrieved_contexts.map((ctx, i) => (
+                <div
+                  key={ctx.chunk_id != null ? `${ctx.chunk_id}-${i}` : i}
+                  className="text-xs text-muted-foreground border-l-2 pl-2"
+                >
+                  <span className="text-muted-foreground/70">score {ctx.score}</span>
+                  <p className="mt-1 text-foreground/80">{ctx.text}</p>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
         )}
       </div>
     </CitationProvider>
