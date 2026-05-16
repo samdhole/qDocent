@@ -6,12 +6,12 @@ This design adds three related upload enhancements to the DocQuery web UI, all f
 
 The centerpiece is a folder ingestion wizard: a 4-step Dialog that lets a user point at a local folder, create a notebook, and watch all supported documents (.pdf, .docx, .pptx) upload in parallel batches of four. A new `useBatchUpload` hook owns the concurrency logic, per-file status tracking, and basename-based duplicate detection so re-running an import never double-injects files already in the notebook. On completion the wizard offers to kick off wiki generation and navigate directly into the notebook.
 
-The two supporting features are smaller: the existing `Dropzone` component is made configurable via an `accept` prop (currently hardwired to PDF) so the same component can accept all three document types everywhere it appears, and a URL ingest input is added to the notebook detail page so users can pull in web pages alongside local files. All three features are delivered in four sequential phases, each with a self-contained "done when" definition mapping to numbered acceptance criteria.
+The two supporting features are smaller: the existing `Dropzone` component is made configurable via an `accept` prop (currently hardwired to PDF) so the notebook detail page can accept all three document types, and a URL ingest input is added to the notebook detail page so users can pull in web pages alongside local files. All three features are delivered in four sequential phases, each with a self-contained "done when" definition mapping to numbered acceptance criteria.
 
 ## Definition of Done
 
-1. User can pick a local folder from the notebook page → a wizard creates or selects a notebook → all .pdf/.docx/.pptx files in the folder are ingested in batches of 4 → aggregate progress (`12 / 47 · 3 failed`) + per-file errors are shown → duplicates (by basename) are skipped → wiki generation is offered at completion.
-2. Dropzone accepts .pdf, .docx, and .pptx everywhere it appears (notebook page + /documents page).
+1. User can pick a local folder from the `/notebooks` list page → a wizard creates a notebook → all .pdf/.docx/.pptx files in the folder are ingested in batches of 4 → aggregate progress (`12 / 47 · 3 failed`) + per-file errors are shown → duplicates (by basename) are skipped → wiki generation is offered at completion.
+2. Dropzone on the notebook detail page (`/notebooks/[id]`) accepts .pdf, .docx, and .pptx files.
 3. Notebook page has a URL input that ingests a web page via `POST /notebooks/{id}/ingest/url`.
 
 All three features are tested and working on desktop Chrome/Firefox.
@@ -37,7 +37,7 @@ All three features are tested and working on desktop Chrome/Firefox.
 ### folder-ingest.AC2: Multi-format Dropzone
 
 - **folder-ingest.AC2.1 Success:** Dropzone on the notebook page (`/notebooks/[id]`) accepts `.pdf`, `.docx`, and `.pptx` files
-- **folder-ingest.AC2.2 Success:** Dropzone on the `/documents` page accepts `.pdf`, `.docx`, and `.pptx` files
+- **folder-ingest.AC2.2 Success:** When `accept` prop is omitted, Dropzone defaults to accepting `.pdf` only (backward-compatible default — `/documents` page stays PDF-only intentionally)
 - **folder-ingest.AC2.3 Failure:** Dropzone rejects files with unsupported extensions (e.g. `.txt`, `.jpg`) with a descriptive toast error
 
 ### folder-ingest.AC3: URL ingest UI
@@ -82,7 +82,6 @@ Three independent features share one entry point: the notebooks section of the w
 - `apps/web/components/NotebookGrid.tsx` — adds "📂 Import Folder" button alongside "New Notebook"; renders `<FolderImportDialog>` controlled by `importOpen` boolean, same pattern as the existing create-notebook `Dialog`.
 - `apps/web/components/Dropzone.tsx` — gains an `accept?: Record<string, string[]>` prop; default remains `{ "application/pdf": [".pdf"] }` for backward compatibility; rejection toast message becomes derived from the accepted extensions list.
 - `apps/web/app/(app)/notebooks/[id]/page.tsx` — passes `NOTEBOOK_ACCEPT` to `Dropzone`; adds URL ingest input below Dropzone inside the existing `<details>` section.
-- `apps/web/app/(app)/documents/page.tsx` — passes `NOTEBOOK_ACCEPT` to its `Dropzone` (multi-format on the global ingest page too).
 
 ### Key contracts
 
@@ -160,14 +159,13 @@ The `useUploadQueue` hook (used by `/documents` page) is not reused — it polls
 
 **Components:**
 - `apps/web/lib/acceptedTypes.ts` — new file exporting `NOTEBOOK_ACCEPT` constant
-- `apps/web/components/Dropzone.tsx` — add optional `accept` prop; derive rejection toast message from accepted extensions; default stays PDF-only
-- `apps/web/app/(app)/documents/page.tsx` — pass `NOTEBOOK_ACCEPT` to its `Dropzone`
+- `apps/web/components/Dropzone.tsx` — add optional `accept` prop; derive rejection toast message from accepted extensions; default stays PDF-only (backward compat — `/documents` page remains unchanged)
 - `apps/web/app/(app)/notebooks/[id]/page.tsx` — pass `NOTEBOOK_ACCEPT` to its `Dropzone`
-- `apps/web/components/__tests__/` — update existing Dropzone tests to cover `.docx`/`.pptx` acceptance and dynamic rejection message
+- `apps/web/components/__tests__/` — update existing Dropzone tests to cover `.docx`/`.pptx` acceptance, default PDF-only behavior, and dynamic rejection message
 
 **Dependencies:** None (standalone change)
 
-**Done when:** Dropzone accepts `.pdf`, `.docx`, `.pptx` when passed `NOTEBOOK_ACCEPT`; rejects other types with correct toast message; all existing and new Dropzone tests pass; `folder-ingest.AC2.1`, `folder-ingest.AC2.2`, `folder-ingest.AC2.3` covered by tests.
+**Done when:** Dropzone accepts `.pdf`, `.docx`, `.pptx` when passed `NOTEBOOK_ACCEPT`; defaults to PDF-only when `accept` is omitted; rejects other types with correct toast message; all existing and new Dropzone tests pass; `folder-ingest.AC2.1`, `folder-ingest.AC2.2`, `folder-ingest.AC2.3` covered by tests.
 <!-- END_PHASE_1 -->
 
 <!-- START_PHASE_2 -->
@@ -207,7 +205,7 @@ The `useUploadQueue` hook (used by `/documents` page) is not reused — it polls
 
 **Dependencies:** None (standalone change; Phase 1 must be complete for the multi-format Dropzone on the same page)
 
-**Done when:** URL input submits to correct endpoint, `toast.success` on 2xx, `toast.error` on failure, input clears on success, button disabled while in-flight; component tests cover success and error paths; covers `folder-ingest.AC3.1`, `folder-ingest.AC3.2`, `folder-ingest.AC3.3`.
+**Done when:** URL input submits to correct endpoint, `toast.success` on 2xx, `toast.error` on failure, input clears on success, button disabled while in-flight; component tests cover success and error paths; covers `folder-ingest.AC3.1`, `folder-ingest.AC3.2`, `folder-ingest.AC3.3`; all four phases manually verified end-to-end on desktop Chrome and Firefox.
 <!-- END_PHASE_4 -->
 
 ## Additional Considerations
