@@ -111,6 +111,7 @@ export type Notebook = {
   r2r_collection_id: string;
   created_at: string;
   updated_at: string;
+  document_count?: number;
 };
 
 export type NotebookDocument = {

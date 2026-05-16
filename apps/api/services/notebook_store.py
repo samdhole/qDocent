@@ -133,7 +133,13 @@ def list_notebooks() -> list[dict]:
         try:
             _ensure_tables(conn)
             rows = conn.execute(
-                "SELECT * FROM notebooks ORDER BY created_at ASC"
+                """
+                SELECT n.*, COUNT(nd.document_id) AS document_count
+                FROM notebooks n
+                LEFT JOIN notebook_documents nd ON n.id = nd.notebook_id
+                GROUP BY n.id
+                ORDER BY n.created_at ASC
+                """
             ).fetchall()
         finally:
             conn.close()
