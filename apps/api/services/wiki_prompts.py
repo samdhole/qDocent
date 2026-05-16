@@ -144,7 +144,7 @@ def build_page_prompt(
         f"3. {_MERMAID_RULES}\n"
         f"4. Include at least one Mermaid diagram if the content has structural relationships\n"
         f"5. Use Markdown tables to summarize key information\n"
-        f"6. Ground every claim in the provided source material\n"
+        f"6. Ground every claim in the provided source material. If the source material is empty or does not contain enough information for a section, write only a short note explaining that — do NOT invent facts, names, or details not present in the source material\n"
         + linking_rules
         + f"Generate ONLY the Markdown content for this page."
     )

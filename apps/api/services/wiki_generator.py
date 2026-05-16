@@ -51,13 +51,32 @@ def _generate_page_content(
     """
     page_log = logging.LoggerAdapter(log, {"job_id": job_id, "notebook_id": notebook_id})
     try:
-        # Retrieve relevant chunks from R2R using source_doc_ids or collection_id
+        # Retrieve relevant chunks — try doc-scoped first, fall back to collection scope
+        # if doc-scoped returns nothing (happens when structure XML has wrong/invented doc IDs).
+        _query = f"{page.title}. {page.description}"
         retrieval_result = r2r_client.rag_query(
-            query=f"Explain: {page.title}. {page.description}",
+            query=_query,
             document_ids=page.source_doc_ids if page.source_doc_ids else None,
             collection_id=r2r_collection_id if not page.source_doc_ids else None,
         )
         chunk_texts = [ctx.get("text", "") for ctx in retrieval_result.get("retrieved_contexts", [])]
+
+        if not chunk_texts and page.source_doc_ids:
+            # Doc-scoped retrieval returned nothing — fall back to full collection
+            page_log.warning(
+                "Page '%s': doc-scoped retrieval returned no chunks (source_doc_ids=%s); "
+                "falling back to collection-scoped retrieval",
+                page.slug, page.source_doc_ids,
+            )
+            retrieval_result = r2r_client.rag_query(
+                query=_query,
+                collection_id=r2r_collection_id,
+            )
+            chunk_texts = [ctx.get("text", "") for ctx in retrieval_result.get("retrieved_contexts", [])]
+
+        if not chunk_texts:
+            page_log.warning("Page '%s': no chunks retrieved from collection either", page.slug)
+
         chunk_context = "\n\n".join(chunk_texts) if chunk_texts else "(No source material retrieved)"
 
         # Generate page markdown via Gemini
