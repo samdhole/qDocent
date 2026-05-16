@@ -4,13 +4,13 @@
 
 This design adds three related upload enhancements to the DocQuery web UI, all frontend-only. The backend already exposes every required endpoint — no API changes are needed.
 
-The centerpiece is a folder ingestion wizard: a 4-step Dialog that lets a user point at a local folder, create a notebook, and watch all supported documents (.pdf, .docx, .pptx) upload in parallel batches of four. A new `useBatchUpload` hook owns the concurrency logic, per-file status tracking, and basename-based duplicate detection so re-running an import never double-injects files already in the notebook. On completion the wizard offers to kick off wiki generation and navigate directly into the notebook.
+The centerpiece is a folder ingestion wizard: a 4-step Dialog that lets a user point at a local folder, create a notebook, and watch all supported documents (.pdf, .docx, .pptx) upload in parallel batches of four. A new `useBatchUpload` hook owns the concurrency logic and per-file status tracking. On completion the wizard offers to kick off wiki generation and navigate directly into the notebook.
 
 The two supporting features are smaller: the existing `Dropzone` component is made configurable via an `accept` prop (currently hardwired to PDF) so the notebook detail page can accept all three document types, and a URL ingest input is added to the notebook detail page so users can pull in web pages alongside local files. All three features are delivered in four sequential phases, each with a self-contained "done when" definition mapping to numbered acceptance criteria.
 
 ## Definition of Done
 
-1. User can pick a local folder from the `/notebooks` list page → a wizard creates a notebook → all .pdf/.docx/.pptx files in the folder are ingested in batches of 4 → aggregate progress (`12 / 47 · 3 failed`) + per-file errors are shown → duplicates (by basename) are skipped → wiki generation is offered at completion.
+1. User can pick a local folder from the `/notebooks` list page → a wizard creates a notebook → all .pdf/.docx/.pptx files in the folder are ingested in batches of 4 → aggregate progress (`12 / 47 · 3 failed`) + per-file errors are shown → wiki generation is offered at completion.
 2. Dropzone on the notebook detail page (`/notebooks/[id]`) accepts .pdf, .docx, and .pptx files.
 3. Notebook page has a URL input that ingests a web page via `POST /notebooks/{id}/ingest/url`.
 
@@ -25,14 +25,12 @@ All three features are tested and working on desktop Chrome/Firefox.
 - **folder-ingest.AC1.3 Success:** Step 1 displays count of valid files (`.pdf`/`.docx`/`.pptx`) and count of filtered-out files (unsupported extensions); "Next" is enabled only when ≥1 valid file is selected
 - **folder-ingest.AC1.4 Success:** Step 3 aggregate counter increments as files complete (`N / M · X failed`)
 - **folder-ingest.AC1.5 Success:** Failed files appear in a scrollable per-file error list in step 3
-- **folder-ingest.AC1.6 Success:** Files whose basename matches an existing document in the notebook are skipped before upload begins; skipped count appears in step 4 summary
-- **folder-ingest.AC1.7 Success:** No more than 4 files are uploaded concurrently at any point
-- **folder-ingest.AC1.8 Success:** Step 4 "Generate Wiki" button fires `POST /notebooks/{id}/wiki` and dismisses (fire-and-forget)
-- **folder-ingest.AC1.9 Success:** Step 4 "View Notebook →" navigates to `/notebooks/{id}`
-- **folder-ingest.AC1.10 Failure:** Dialog X button and Cancel are disabled while step 3 upload is running
-- **folder-ingest.AC1.11 Failure:** "Start Import →" button is disabled when step 2 notebook name field is empty
-- **folder-ingest.AC1.12 Failure:** Notebook creation (`POST /notebooks`) failure shows an error in the Dialog; wizard stays on step 2
-- **folder-ingest.AC1.13 Edge:** All selected files are duplicates → step 4 shows `0 ingested · 0 failed · N skipped`
+- **folder-ingest.AC1.6 Success:** No more than 4 files are uploaded concurrently at any point
+- **folder-ingest.AC1.7 Success:** Step 4 "Generate Wiki" button fires `POST /notebooks/{id}/wiki` and dismisses (fire-and-forget)
+- **folder-ingest.AC1.8 Success:** Step 4 "View Notebook →" navigates to `/notebooks/{id}`
+- **folder-ingest.AC1.9 Failure:** Dialog X button and Cancel are disabled while step 3 upload is running
+- **folder-ingest.AC1.10 Failure:** "Start Import →" button is disabled when step 2 notebook name field is empty
+- **folder-ingest.AC1.11 Failure:** Notebook creation (`POST /notebooks`) failure shows an error in the Dialog; wizard stays on step 2
 
 ### folder-ingest.AC2: Multi-format Dropzone
 
@@ -55,8 +53,7 @@ All three features are tested and working on desktop Chrome/Firefox.
 - **Dropzone**: The `Dropzone.tsx` component — a drag-and-drop file upload surface backed by `react-dropzone`. Used on both the notebook detail page and the global `/documents` page.
 - **react-dropzone**: A React library that wraps the browser File API into a declarative component with drag-and-drop, MIME-type filtering, and rejection callbacks.
 - **`webkitdirectory`**: A non-standard HTML attribute on `<input type="file">` that makes the browser present a folder picker instead of a file picker. Supported on Chrome and Firefox desktop only; not part of any W3C standard.
-- **`useBatchUpload`**: New React hook introduced by this design. Encapsulates concurrent file upload state: per-file status, aggregate counters, dedup filtering, and `AbortController`-based cleanup on unmount.
-- **Dedup (duplicate detection)**: Before uploads begin, `useBatchUpload` calls `GET /notebooks/{id}/documents` and filters out any file whose basename already exists in the notebook.
+- **`useBatchUpload`**: New React hook introduced by this design. Encapsulates concurrent file upload state: per-file status, aggregate counters, and `AbortController`-based cleanup on unmount.
 - **`AbortController`**: Browser API that cancels in-flight `fetch` requests. Used by `useBatchUpload` to cancel running uploads if the component unmounts.
 - **shadcn/ui**: The component library used throughout the web app (`Dialog`, `Sheet`, `Button`, etc.). Components are copied into the codebase rather than imported as a package.
 - **`Dialog`**: A shadcn/ui modal overlay component. Already used by `NotebookGrid.tsx` for the "New Notebook" form; `FolderImportDialog` follows the same pattern.
@@ -100,7 +97,6 @@ type UseBatchUploadResult = {
   total: number;
   done: number;
   failed: number;
-  skipped: number;           // files filtered by dedup check
   batchStatus: "idle" | "running" | "complete";
   start: (files: File[], notebookId: string) => void;
 };
@@ -108,7 +104,7 @@ type UseBatchUploadResult = {
 function useBatchUpload(options?: { concurrency?: number }): UseBatchUploadResult
 ```
 
-`start()` fetches `GET /notebooks/{id}/documents`, filters out files whose basename already exists (dedup), then uploads up to `concurrency` (default 4) files concurrently via `POST /notebooks/{id}/documents`. HTTP response status determines `done` vs `failed` — no polling. `AbortController` cancels in-flight requests on unmount.
+`start()` uploads up to `concurrency` (default 4) files concurrently via `POST /notebooks/{id}/documents`. HTTP response status determines `done` vs `failed` — no polling. `AbortController` cancels in-flight requests on unmount.
 
 **`NOTEBOOK_ACCEPT` constant:**
 
@@ -127,7 +123,7 @@ export const NOTEBOOK_ACCEPT = {
 | 1 | `pick` | Hidden `<input type="file" webkitdirectory multiple>` triggered by button. Displays file count and filtered-out count (unsupported extensions). Next enabled when ≥1 valid file selected. |
 | 2 | `name` | Text input prefilled with folder name; optional description. "Start Import →" calls `POST /notebooks`, then `start(files, newNotebookId)`, then advances to step 3. |
 | 3 | `progress` | Aggregate counter `N / M · X failed`; scrollable per-file error list (failed items only). X/Cancel disabled while running. Auto-advances when `batchStatus === "complete"`. |
-| 4 | `done` | Summary line `M ingested · X failed · S skipped`. [Generate Wiki] → `POST /notebooks/{id}/wiki` (fire-and-forget). [View Notebook →] → navigate to `/notebooks/{id}`. |
+| 4 | `done` | Summary line `M ingested · X failed`. [Generate Wiki] → `POST /notebooks/{id}/wiki` (fire-and-forget). [View Notebook →] → navigate to `/notebooks/{id}`. |
 
 **URL ingest UI** (notebook page, inside `<details>`, below Dropzone):
 - `<input type="url">` + "Ingest URL" button
@@ -178,7 +174,7 @@ The `useUploadQueue` hook (used by `/documents` page) is not reused — it polls
 
 **Dependencies:** Phase 1 (`NOTEBOOK_ACCEPT` constant available)
 
-**Done when:** Hook correctly caps concurrency at 4, dedup filter skips files with matching basenames, per-file status transitions through `pending → uploading → done/failed`, abort on unmount cancels in-flight requests, all tests pass; covers `folder-ingest.AC1.4`, `folder-ingest.AC1.5`, `folder-ingest.AC1.6`, `folder-ingest.AC1.7`.
+**Done when:** Hook correctly caps concurrency at 4, per-file status transitions through `pending → uploading → done/failed`, abort on unmount cancels in-flight requests, all tests pass; covers `folder-ingest.AC1.4`, `folder-ingest.AC1.5`, `folder-ingest.AC1.6`.
 <!-- END_PHASE_2 -->
 
 <!-- START_PHASE_3 -->
@@ -192,7 +188,7 @@ The `useUploadQueue` hook (used by `/documents` page) is not reused — it polls
 
 **Dependencies:** Phase 2 (`useBatchUpload` hook)
 
-**Done when:** Full 4-step flow works end-to-end — folder selected, notebook created, files ingested with progress, wiki offer appears; duplicate files skipped and counted; component tests cover step transitions, `POST /notebooks` called before upload starts, `POST /notebooks/{id}/wiki` called on wiki button; covers `folder-ingest.AC1.1`, `folder-ingest.AC1.2`, `folder-ingest.AC1.3`, `folder-ingest.AC1.8`, `folder-ingest.AC1.9`.
+**Done when:** Full 4-step flow works end-to-end — folder selected, notebook created, files ingested with progress, wiki offer appears; component tests cover step transitions, `POST /notebooks` called before upload starts, `POST /notebooks/{id}/wiki` called on wiki button; covers `folder-ingest.AC1.1`, `folder-ingest.AC1.2`, `folder-ingest.AC1.3`, `folder-ingest.AC1.7`, `folder-ingest.AC1.8`.
 <!-- END_PHASE_3 -->
 
 <!-- START_PHASE_4 -->
@@ -210,6 +206,6 @@ The `useUploadQueue` hook (used by `/documents` page) is not reused — it polls
 
 ## Additional Considerations
 
-**Cancel during ingest:** The Dialog X button is disabled while step 3 is running. If the user force-closes the browser tab mid-upload, in-flight requests complete or time out server-side; the notebook will contain a partial set of documents. This is acceptable — the user can re-run the import (dedup will skip already-ingested files).
+**Cancel during ingest:** The Dialog X button is disabled while step 3 is running. If the user force-closes the browser tab mid-upload, in-flight requests complete or time out server-side; the notebook will contain a partial set of documents. This is acceptable — the user can open the notebook and drop the remaining files via Dropzone.
 
 **Folder picker and `react-dropzone`:** `webkitdirectory` cannot be set via `react-dropzone`'s `accept` prop — it is a non-standard HTML attribute on the underlying `<input>`. The folder picker in `FolderImportDialog` uses a separate hidden `<input type="file" webkitdirectory multiple>` and is not a `Dropzone` instance.
