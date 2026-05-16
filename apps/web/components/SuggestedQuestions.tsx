@@ -22,13 +22,6 @@ type Props = {
   disabled?: boolean;
 };
 
-async function fetchQuestions(documentId: string, signal: AbortSignal): Promise<string[]> {
-  const res = await fetch(`${API}/documents/${documentId}/questions`, { signal });
-  if (!res.ok) return [];
-  const data = (await res.json()) as { questions?: string[] };
-  return data.questions ?? [];
-}
-
 export function SuggestedQuestions({ onSelect, disabled }: Props) {
   const [docTitles, setDocTitles] = useState<string[]>([]);
   const [apiQuestions, setApiQuestions] = useState<string[]>([]);
@@ -38,27 +31,24 @@ export function SuggestedQuestions({ onSelect, disabled }: Props) {
     const controller = new AbortController();
     fetch(`${API}/documents`, { signal: controller.signal })
       .then((r) => (r.ok ? r.json() : { documents: [] }))
-      .then(async (d: { documents?: SourceDocument[] }) => {
+      .then((d: { documents?: SourceDocument[] }) => {
         const docs = d.documents ?? [];
         const titles = docs.slice(0, 2).map((doc) => formatDocTitle(doc.source_file));
         setDocTitles(titles);
-
-        const targets = docs.slice(0, 2);
-        if (targets.length === 0) return;
-
-        setQuestionsLoading(true);
-        try {
-          const results = await Promise.allSettled(
-            targets.map((doc) => fetchQuestions(doc.document_id, controller.signal))
-          );
-          const merged = Array.from(
-            new Set(
-              results.flatMap((r) => (r.status === "fulfilled" ? r.value : []))
-            )
-          );
-          if (merged.length > 0) setApiQuestions(merged);
-        } finally {
-          setQuestionsLoading(false);
+        const firstDoc = docs[0];
+        if (firstDoc) {
+          setQuestionsLoading(true);
+          fetch(`${API}/documents/${firstDoc.document_id}/questions`, {
+            signal: controller.signal,
+          })
+            .then((r) => (r.ok ? r.json() : { questions: [] }))
+            .then((data: { questions?: string[] }) => {
+              setApiQuestions(data.questions ?? []);
+            })
+            .catch(() => {
+              // Fall through to static seeds.
+            })
+            .finally(() => setQuestionsLoading(false));
         }
       })
       .catch(() => {
