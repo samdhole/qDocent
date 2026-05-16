@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Document, Page } from "react-pdf";
 import "@/lib/pdfWorker"; // Side-effect import — sets the worker URL once.
+// react-pdf internal path — verify this path exists after any react-pdf major-version upgrade
+import "react-pdf/dist/esm/Page/TextLayer.css";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -125,7 +127,7 @@ export default function SourcePanel({ citation, onClose }: Props) {
                     width={580}
                     onLoadSuccess={handlePageLoadSuccess}
                     renderAnnotationLayer={false}
-                    renderTextLayer={false}
+                    renderTextLayer={true}
                   />
                 )}
               </Document>
