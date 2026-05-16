@@ -2,6 +2,7 @@ import json
 import pytest
 from unittest import mock
 from apps.api.services import wiki_generator, wiki_store, notebook_store
+from apps.api.services.wiki_generator import _valid_doc_ids
 from apps.api.services.wiki_xml_parser import WikiPageSpec
 
 VALID_XML = """<wiki_structure>
@@ -121,3 +122,75 @@ class TestGenerateWiki:
             call_args = mock_prompt.call_args
             assert call_args.kwargs.get("all_pages") == pages, "all_pages kwarg not forwarded"
             assert call_args.kwargs.get("notebook_id") == nb_id, "notebook_id kwarg not forwarded"
+
+    def test_invented_doc_ids_are_dropped(self, fake_notebook):
+        """Integration test: when structure XML contains invented doc IDs, they are dropped before upsert.
+
+        AC3.1 + AC3.2: invented IDs not in manifest are removed, pages with empty source_doc_ids
+        fall back to collection-scoped retrieval.
+        """
+        nb_id = fake_notebook["id"]
+        job = wiki_store.create_job(nb_id, "job-001")
+
+        # XML with one page that lists an invented doc ID ("invented-999")
+        xml_with_invented_id = """<wiki_structure>
+          <title>Test Wiki</title><description>Desc</description>
+          <pages>
+            <page id="page-1"><title>Overview</title><description>Big picture</description>
+              <importance>high</importance><file_path>invented-999</file_path><relevant_files/><related_pages/>
+            </page>
+          </pages>
+        </wiki_structure>"""
+
+        with mock.patch("apps.api.services.wiki_generator._make_llm") as mock_llm_factory, \
+             mock.patch("apps.api.services.wiki_generator.r2r_client.rag_query") as mock_rag, \
+             mock.patch("apps.api.services.wiki_generator.wiki_store.upsert_page") as mock_upsert, \
+             mock.patch("apps.api.services.wiki_generator.wiki_store.store_structure") as mock_store_struct, \
+             mock.patch("apps.api.services.wiki_generator.wiki_store.update_job") as mock_update_job, \
+             mock.patch("apps.api.services.wiki_generator._generate_page_content"):
+
+            mock_rag.return_value = {"retrieved_contexts": [{"text": "chunk text"}]}
+            instance = mock_llm_factory.return_value
+            instance.invoke.return_value = _mock_llm_response(xml_with_invented_id)
+
+            wiki_generator.generate_wiki(nb_id, "col-abc", "job-001")
+
+        # Verify upsert_page was called with source_doc_ids=[] (invented ID dropped)
+        mock_upsert.assert_called_once()
+        call_kwargs = mock_upsert.call_args.kwargs
+        assert call_kwargs["source_doc_ids"] == [], \
+            f"Expected source_doc_ids=[], got {call_kwargs['source_doc_ids']}"
+        assert "invented-999" not in call_kwargs["source_doc_ids"], \
+            "Invented ID should not appear in upsert_page call"
+
+
+class TestValidDocIds:
+    """Unit tests for _valid_doc_ids helper function.
+
+    AC1: Pure helper filters IDs correctly.
+    """
+
+    def test_all_valid(self):
+        """AC1.3: Returns full list unchanged when all page_ids are valid."""
+        result = _valid_doc_ids(["a", "b"], {"a", "b", "c"})
+        assert result == ["a", "b"]
+
+    def test_all_invalid(self):
+        """AC1.2: Returns empty list when all page_ids are invented (not in manifest)."""
+        result = _valid_doc_ids(["x", "y"], {"a", "b"})
+        assert result == []
+
+    def test_mixed(self):
+        """AC1.1: Returns only IDs present in manifest_ids (set intersection, order-preserving)."""
+        result = _valid_doc_ids(["a", "x", "b"], {"a", "b"})
+        assert result == ["a", "b"]
+
+    def test_empty_input(self):
+        """AC1.4: Returns empty list when page_ids is empty."""
+        result = _valid_doc_ids([], {"a", "b"})
+        assert result == []
+
+    def test_preserves_order(self):
+        """Order preservation: input order is preserved in output."""
+        result = _valid_doc_ids(["b", "a"], {"a", "b"})
+        assert result == ["b", "a"]

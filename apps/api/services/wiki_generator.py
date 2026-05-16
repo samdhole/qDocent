@@ -34,6 +34,11 @@ def _build_doc_manifest(notebook_id: str) -> list[dict]:
     return manifest
 
 
+def _valid_doc_ids(page_ids: list[str], manifest_ids: set[str]) -> list[str]:
+    """Return only the IDs from page_ids that exist in manifest_ids, preserving order."""
+    return [doc_id for doc_id in page_ids if doc_id in manifest_ids]
+
+
 def _generate_page_content(
     page: WikiPageSpec,
     notebook_id: str,
@@ -124,6 +129,8 @@ def generate_wiki(notebook_id: str, r2r_collection_id: str, job_id: str) -> None
             wiki_store.update_job(job_id, status="failed", error="No documents in notebook")
             return
 
+        manifest_ids: set[str] = {entry["document_id"] for entry in doc_manifest}
+
         prompt = build_structure_prompt(doc_manifest)
         llm = _make_llm()
         structure_response = llm.invoke(prompt)
@@ -136,6 +143,18 @@ def generate_wiki(notebook_id: str, r2r_collection_id: str, job_id: str) -> None
         )
 
         structure: WikiStructure = parse_wiki_structure_xml(raw_xml)
+
+        # Remap each page's source_doc_ids to only IDs that actually exist in this notebook.
+        # Prevents hallucinated IDs from the structure LLM call reaching rag_query.
+        for page in structure.pages:
+            valid = _valid_doc_ids(page.source_doc_ids, manifest_ids)
+            if len(valid) < len(page.source_doc_ids):
+                dropped = set(page.source_doc_ids) - set(valid)
+                log.warning(
+                    "Page '%s': dropped %d invented doc ID(s) %s; keeping %s",
+                    page.slug, len(dropped), dropped, valid or "(none — will use collection fallback)",
+                )
+            page.source_doc_ids = valid
 
         # Store structure + empty page rows
         sections_data = [
