@@ -57,6 +57,11 @@ export default function ConversationView({
   const scrollEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    reset();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [notebookId]);
+
+  useEffect(() => {
     const ctrl = new AbortController()
     fetch(`${API}/documents`, { signal: ctrl.signal })
       .then((r) => r.json())
