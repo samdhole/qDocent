@@ -188,7 +188,7 @@ The `useUploadQueue` hook (used by `/documents` page) is not reused — it polls
 
 **Dependencies:** Phase 2 (`useBatchUpload` hook)
 
-**Done when:** Full 4-step flow works end-to-end — folder selected, notebook created, files ingested with progress, wiki offer appears; component tests cover step transitions, `POST /notebooks` called before upload starts, `POST /notebooks/{id}/wiki` called on wiki button; covers `folder-ingest.AC1.1`, `folder-ingest.AC1.2`, `folder-ingest.AC1.3`, `folder-ingest.AC1.7`, `folder-ingest.AC1.8`.
+**Done when:** Full 4-step flow works end-to-end — folder selected, notebook created, files ingested with progress, wiki offer appears; component tests cover step transitions, `POST /notebooks` called before upload starts, `POST /notebooks/{id}/wiki` called on wiki button, cancel/name-empty/create-failure states verified; covers `folder-ingest.AC1.1`, `folder-ingest.AC1.2`, `folder-ingest.AC1.3`, `folder-ingest.AC1.7`, `folder-ingest.AC1.8`, `folder-ingest.AC1.9`, `folder-ingest.AC1.10`, `folder-ingest.AC1.11`.
 <!-- END_PHASE_3 -->
 
 <!-- START_PHASE_4 -->
