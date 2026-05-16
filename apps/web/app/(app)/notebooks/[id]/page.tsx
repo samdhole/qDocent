@@ -16,13 +16,6 @@ export default function NotebookPage() {
   const notebookId = params.id;
   const [notebook, setNotebook] = useState<Notebook | null>(null);
   const [notFound, setNotFound] = useState(false);
-  const [resumeConvId, setResumeConvId] = useState<string | undefined>();
-
-  useEffect(() => {
-    const searchParams = new URLSearchParams(window.location.search);
-    const resume = searchParams.get("resume");
-    if (resume) setResumeConvId(resume);
-  }, []);
 
   useEffect(() => {
     if (!notebookId) return;
@@ -87,7 +80,7 @@ export default function NotebookPage() {
         </details>
       </div>
       <div className="flex-1 min-h-0">
-        <ConversationView notebookId={notebookId} initialConversationId={resumeConvId} />
+        <ConversationView notebookId={notebookId} />
       </div>
     </div>
   );
