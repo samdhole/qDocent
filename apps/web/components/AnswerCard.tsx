@@ -1,10 +1,14 @@
 // pattern: Imperative Shell
+"use client";
+import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { Components } from "react-markdown";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Copy, Check } from "lucide-react";
 import { CitationProvider } from "@/components/CitationContext";
 import { CitationBadge } from "@/components/CitationBadge";
 import { remarkCitationBadges } from "@/lib/remarkCitationBadges";
@@ -27,6 +31,15 @@ type Props = {
 };
 
 export default function AnswerCard({ result, onSelectCitation, onSwitchToGeneral }: Props) {
+  const [copied, setCopied] = useState(false);
+
+  function copyAnswer() {
+    void navigator.clipboard.writeText(result.answer).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+
   const isLowConfidenceNoContext =
     result.confidence_label === "low" && result.retrieved_contexts.length === 0;
 
@@ -70,12 +83,25 @@ export default function AnswerCard({ result, onSelectCitation, onSwitchToGeneral
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
               <span>Answer</span>
-              <Badge variant={LABEL_VARIANT[result.confidence_label] ?? "outline"} className="capitalize">
-                {(result.confidence_label ?? "unknown").replace("_", " ")}
-              </Badge>
+              <span title="Confidence reflects how well the answer is grounded in retrieved source material. Low = answer may be incomplete or speculative.">
+                <Badge variant={LABEL_VARIANT[result.confidence_label] ?? "outline"} className="capitalize cursor-help">
+                  {(result.confidence_label ?? "unknown").replace("_", " ")}
+                </Badge>
+              </span>
               {result.needs_human_review && (
                 <span className="text-xs text-orange-700">Human review recommended</span>
               )}
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="ml-auto h-5 w-5 text-muted-foreground hover:text-foreground"
+                onClick={copyAnswer}
+                title="Copy answer to clipboard"
+              >
+                {copied ? <Check className="size-3" /> : <Copy className="size-3" />}
+                <span className="sr-only">Copy answer</span>
+              </Button>
             </CardTitle>
           </CardHeader>
           <CardContent className="text-sm prose prose-sm max-w-none dark:prose-invert">
@@ -129,24 +155,25 @@ export default function AnswerCard({ result, onSelectCitation, onSwitchToGeneral
         )}
 
         {result.retrieved_contexts.length > 0 && (
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold text-muted-foreground">
-                Retrieved Chunks
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {result.retrieved_contexts.map((ctx, i) => (
-                <div
-                  key={ctx.chunk_id != null ? `${ctx.chunk_id}-${i}` : i}
-                  className="text-xs text-muted-foreground border-l-2 pl-2"
-                >
-                  <span className="text-muted-foreground/70">score {ctx.score}</span>
-                  <p className="mt-1 text-foreground/80">{ctx.text}</p>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
+          <details className="group">
+            <summary className="cursor-pointer text-xs text-muted-foreground select-none list-none flex items-center gap-1 py-1">
+              <span className="group-open:rotate-90 transition-transform inline-block">▶</span>
+              Retrieved sources ({result.retrieved_contexts.length})
+            </summary>
+            <Card className="mt-2">
+              <CardContent className="pt-4 space-y-2">
+                {result.retrieved_contexts.map((ctx, i) => (
+                  <div
+                    key={ctx.chunk_id != null ? `${ctx.chunk_id}-${i}` : i}
+                    className="text-xs text-muted-foreground border-l-2 pl-2"
+                  >
+                    <span className="text-muted-foreground/70">score {ctx.score}</span>
+                    <p className="mt-1 text-foreground/80">{ctx.text}</p>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          </details>
         )}
       </div>
     </CitationProvider>
