@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Document, Page } from "react-pdf";
 import "@/lib/pdfWorker"; // Side-effect import — sets the worker URL once.
-import "react-pdf/dist/esm/Page/TextLayer.css";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -125,7 +124,7 @@ export default function SourcePanel({ citation, onClose }: Props) {
                     width={580}
                     onLoadSuccess={handlePageLoadSuccess}
                     renderAnnotationLayer={false}
-                    renderTextLayer={true}
+                    renderTextLayer={false}
                   />
                 )}
               </Document>
@@ -144,6 +143,7 @@ export default function SourcePanel({ citation, onClose }: Props) {
           </div>
         </div>
 
+        {/* Empty text_preview → hide the strip; no point quoting nothing */}
         {overlayChunk?.text_preview && (
           <div className="px-4 py-3 border-t bg-muted/20">
             <p className="text-xs font-medium text-muted-foreground mb-1">Cited passage</p>
@@ -163,7 +163,7 @@ export default function SourcePanel({ citation, onClose }: Props) {
             <ChevronLeft className="size-4 mr-1" /> Previous
           </Button>
           <span className="text-xs text-muted-foreground">
-            Page {pageNum} · citation {citation.pageStart === (citation.pageEnd ?? citation.pageStart) ? `p.${citation.pageStart}` : `pp.${citation.pageStart}–${citation.pageEnd}`}
+            {pageNum} of {citation.pageEnd ?? citation.pageStart}
           </span>
           <Button
             variant="outline"
