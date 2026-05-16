@@ -50,7 +50,7 @@ export default function ConversationView({
   notebookId,
   documentIds,
 }: ConversationViewProps = {}) {
-  const { messages, pending, phase, partialText, sendMessage, reset } = useConversationStream();
+  const { messages, pending, phase, partialText, sendMessage, reset } = useConversationStream({ persist: !notebookId });
   const [queryMode, setQueryMode] = useQueryMode();
   const [documents, setDocuments] = useState<SourceDocument[]>([]);
   const [selectedCitation, setSelectedCitation] = useState<SelectedCitation | null>(null);

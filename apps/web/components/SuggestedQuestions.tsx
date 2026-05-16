@@ -9,9 +9,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 const STATIC_SEEDS = [
-  "What is the refund policy?",
   "Summarize the most important points across all documents.",
-  "What deadlines are mentioned?",
+  "What are the key findings or conclusions?",
+  "What topics are covered in these documents?",
 ] as const;
 
 type SourceDocument = { document_id: string; source_file: string };

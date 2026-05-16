@@ -158,6 +158,12 @@ def agent_query(
             return _make_not_found_result(message, conversation_id)
 
     try:
+        _task_prompt_q = (
+            "You are a document research assistant with access to search tools.\n"
+            "RULE: Immediately call search_file_knowledge for every user question. "
+            "Never ask for permission to search.\n"
+            "RULE: After searching, synthesize the answer using numbered citations [1], [2], etc."
+        )
         agent_response = get_client().retrieval.agent(
             message={"role": "user", "content": message},
             conversation_id=conversation_id,
@@ -165,7 +171,9 @@ def agent_query(
             rag_generation_config={"stream": False},
             search_settings=search_settings,
             include_title_if_available=True,
-            rag_tools=["search_file_descriptions", "search_file_knowledge", "content"],
+            rag_tools=["search_file_descriptions", "search_file_knowledge", "get_file_content"],
+            use_system_context=False,
+            task_prompt=_task_prompt_q,
         )
         # AgentResponse has no search_results field — fetch citations separately
         search_response = get_client().retrieval.search(
@@ -301,6 +309,24 @@ def _adapt_agent_response(
     return _assemble_from_chunks(question, answer, chunk_results, conversation_id)
 
 
+async def _async_search_chunks(query: str, search_settings: dict, client: Any) -> list:
+    """Async fallback search when no SearchResultsEvent arrived in the agent stream.
+
+    Called when the R2R agent uses tools internally but doesn't emit SearchResultsEvent
+    (observed with use_system_context=False + task_prompt). Returns raw chunk dicts
+    in the same shape expected by _assemble_from_chunks.
+    """
+    try:
+        resp = await client.retrieval.search(query=query, search_settings=search_settings)
+        inner = getattr(resp, "results", None) or (resp.get("results") if isinstance(resp, dict) else None) or resp
+        if hasattr(inner, "model_dump"):
+            inner = inner.model_dump()
+        elif hasattr(inner, "__dict__"):
+            inner = vars(inner)
+        return (inner.get("chunk_search_results") if isinstance(inner, dict) else None) or []
+    except Exception:
+        return []
+
 
 async def agent_stream(
     message: str,
@@ -340,20 +366,37 @@ async def agent_stream(
     # gemini-2.5-flash (r2r_gemini.toml) required — gemini-3-flash-preview has a
     # thought_signature bug that breaks multi-tool agent calls.
     _client = get_async_client()
+    # use_system_context=False + task_prompt: required because gemini-2.5-flash
+    # (the model in r2r_gemini.toml) asks for search permission instead of searching
+    # immediately when the default R2R system prompt is active. Setting
+    # use_system_context=False lets our task_prompt fully control the system instruction.
+    _task_prompt = (
+        "You are a document research assistant with access to search tools.\n"
+        "RULE: Immediately call search_file_knowledge for every user question. "
+        "Never ask for permission to search.\n"
+        "RULE: After searching, synthesize the answer using numbered citations [1], [2], etc."
+    )
     _agent_data: dict[str, Any] = {
         "message": {"role": "user", "content": message},
         "conversation_id": conversation_id,
         "mode": "rag",
+        "search_mode": "custom",
+        "use_system_context": False,
+        "task_prompt": _task_prompt,
         "rag_generation_config": {"stream": True},
         "search_settings": search_settings,
         "include_title_if_available": True,
-        "rag_tools": ["search_file_descriptions", "search_file_knowledge", "content"],
+        "rag_tools": ["search_file_descriptions", "search_file_knowledge", "get_file_content"],
     }
 
     yield _sse({"type": "status", "phase": "searching"})
 
     full_text_parts: list[str] = []
-    last_search_results: dict[str, Any] = {}
+    # Accumulate chunks across ALL SearchResultsEvents — the agent may call search
+    # tools multiple times (description, knowledge, content) and we need all chunks
+    # so that [shortid] markers in the final answer can be resolved.
+    all_chunk_results: list[Any] = []
+    _seen_chunk_ids: set[str] = set()
     generation_started = False
 
     # SSE arrives as alternating lines: "event: <type>" then "data: <json>"
@@ -391,7 +434,16 @@ async def agent_stream(
                 # SearchResultsEvent.model_dump() → {event, data: {id, object, data: {chunk_search_results,...}}}
                 # Drill through the two levels of "data" to get chunk_search_results at the top level.
                 outer = payload.get("data") or {}
-                last_search_results = outer.get("data", outer) or {}
+                inner_results = outer.get("data", outer) or {}
+                for chunk in (inner_results.get("chunk_search_results") or []):
+                    cid = str(
+                        (chunk.get("metadata") or {}).get("chunk_id")
+                        or (chunk.get("id") if isinstance(chunk, dict) else getattr(chunk, "id", None))
+                        or ""
+                    )
+                    if cid not in _seen_chunk_ids:
+                        _seen_chunk_ids.add(cid)
+                        all_chunk_results.append(chunk)
                 yield _sse({"type": "status", "phase": "found_results"})
             elif event_type == "ToolCallEvent":
                 # Agent invoked a search tool — emit a fresh searching beat so the UI updates
@@ -412,11 +464,14 @@ async def agent_stream(
                         yield _sse({"type": "token", "text": text})
             elif event_type == "FinalAnswerEvent":
                 payload = _event_payload(event)
+                # When no SearchResultsEvent arrived (agent uses tools but R2R doesn't
+                # emit them), fall back to a direct search call for citation assembly.
+                chunks = all_chunk_results or await _async_search_chunks(message, search_settings, _client)
                 adapted = _adapt_final_event(
                     question=message,
                     payload=payload,
                     fallback_text="".join(full_text_parts),
-                    search_results=last_search_results,
+                    accumulated_chunks=chunks,
                     conversation_id=conversation_id,
                 )
                 adapted = _apply_doc_only_check(adapted, doc_only)
@@ -430,13 +485,13 @@ async def agent_stream(
         yield _sse({"type": "error", "detail": f"Stream error: {exc}"})
         return
 
-    # If we exited the loop without a FinalAnswerEvent, synthesize one from
-    # what we collected (defensive — the SDK is documented to always emit one).
+    # If we exited the loop without a FinalAnswerEvent, synthesize from accumulated data.
+    chunks = all_chunk_results or await _async_search_chunks(message, search_settings, _client)
     adapted = _adapt_final_event(
         question=message,
         payload={},
         fallback_text="".join(full_text_parts),
-        search_results=last_search_results,
+        accumulated_chunks=chunks,
         conversation_id=conversation_id,
     )
     adapted = _apply_doc_only_check(adapted, doc_only)
@@ -461,7 +516,7 @@ def _adapt_final_event(
     question: str,
     payload: dict[str, Any],
     fallback_text: str,
-    search_results: dict[str, Any],
+    accumulated_chunks: list[Any],
     conversation_id: str | None = None,
 ) -> dict[str, Any]:
     """Build the standard response dict from streaming events."""
@@ -470,8 +525,7 @@ def _adapt_final_event(
         or (payload.get("data") or {}).get("answer")
         or fallback_text
     )
-    chunk_results = search_results.get("chunk_search_results") or []
     # Use caller-supplied conversation_id (RAG endpoint doesn't echo it back)
     event_conversation_id = (payload.get("data") or {}).get("conversation_id") or conversation_id
-    return _assemble_from_chunks(question, final_answer, chunk_results, event_conversation_id)
+    return _assemble_from_chunks(question, final_answer, accumulated_chunks, event_conversation_id)
 

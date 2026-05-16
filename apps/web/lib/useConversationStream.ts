@@ -15,10 +15,10 @@ interface SendMessageOpts {
 
 export type StreamPhase = "idle" | "searching" | "found_results" | "generating";
 
-export function useConversationStream() {
+export function useConversationStream({ persist = true }: { persist?: boolean } = {}) {
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
-    if (typeof window === "undefined") return [];
+    if (!persist || typeof window === "undefined") return [];
     try {
       const stored = localStorage.getItem(MESSAGES_KEY);
       if (stored) {
@@ -49,6 +49,7 @@ export function useConversationStream() {
   }, []);
 
   useEffect(() => {
+    if (!persist) return;
     try {
       if (messages.length === 0) {
         localStorage.removeItem(MESSAGES_KEY);
@@ -58,7 +59,7 @@ export function useConversationStream() {
     } catch {
       // Storage quota exceeded or unavailable.
     }
-  }, [messages]);
+  }, [persist, messages]);
 
   function appendPartial(text: string) {
     partialTextRef.current += text;
