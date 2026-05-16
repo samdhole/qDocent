@@ -98,6 +98,12 @@ export default function SourcePanel({ citation, onClose }: Props) {
       ? `Pages ${citation.pageStart}–${citation.pageEnd}`
       : `Page ${citation.pageStart}`;
 
+  const footerPage = pageNum ?? citation.pageStart;
+  const citedEnd = citation.pageEnd ?? citation.pageStart;
+  const footerLabel = citedEnd !== citation.pageStart
+    ? `Page ${footerPage} · cited pp.${citation.pageStart}–${citedEnd}`
+    : `Page ${footerPage}`;
+
   return (
     <Sheet open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
       <SheetContent side="right" className="w-full sm:w-[640px] sm:max-w-[640px] p-0 flex flex-col">
@@ -166,7 +172,7 @@ export default function SourcePanel({ citation, onClose }: Props) {
             <ChevronLeft className="size-4 mr-1" /> Previous
           </Button>
           <span className="text-xs text-muted-foreground">
-            {pageNum} of {citation.pageEnd ?? citation.pageStart}
+            {footerLabel}
           </span>
           <Button
             variant="outline"

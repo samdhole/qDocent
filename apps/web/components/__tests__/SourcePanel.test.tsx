@@ -328,4 +328,47 @@ describe("SourcePanel", () => {
     // Now Next should be disabled
     expect(nextButton).toBeDisabled();
   });
+
+  it("AC2: footer shows 'Page N · cited pp.X–Y' for multi-page citation", async () => {
+    const multiPageCitation: SelectedCitation = {
+      documentId: "doc123",
+      documentName: "test-document.pdf",
+      pageStart: 3,
+      pageEnd: 7,
+      chunkIndex: 0,
+    };
+
+    render(<SourcePanel citation={multiPageCitation} onClose={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalled();
+    });
+
+    // Footer span shows current page + cited range
+    // { selector: "span" } ensures we match the footer element, not any other node that
+    // might incidentally contain this string. Use Unicode escapes so en-dash (U+2013)
+    // and middle-dot (U+00B7) are unambiguous.
+    expect(screen.getByText("Page 3 · cited pp.3–7", { selector: "span" })).toBeInTheDocument();
+  });
+
+  it("AC2: footer shows 'Page N' only for single-page citation", async () => {
+    const singlePageCitation: SelectedCitation = {
+      documentId: "doc123",
+      documentName: "test-document.pdf",
+      pageStart: 5,
+      pageEnd: 5,
+      chunkIndex: 0,
+    };
+
+    render(<SourcePanel citation={singlePageCitation} onClose={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalled();
+    });
+
+    // Footer shows page only — no range suffix
+    expect(screen.getByText("Page 5", { selector: "span" })).toBeInTheDocument();
+    // Confirm no "· cited" suffix — regex doesn't care about encoding
+    expect(screen.queryByText(/cited pp\./)).not.toBeInTheDocument();
+  });
 });
