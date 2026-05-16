@@ -1,17 +1,45 @@
+import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import SourcePanel from "../SourcePanel";
-import type { ChunksResponse, SelectedCitation } from "@/lib/types";
+import type { ChunksResponse, SelectedCitation, ChunkManifestEntry } from "@/lib/types";
+
+// Mock props types for Document and Page components
+type DocumentMockProps = {
+  children: React.ReactNode;
+  file?: string;
+  loading?: React.ReactNode;
+  error?: React.ReactNode;
+};
+
+type PageMockProps = {
+  children?: React.ReactNode;
+  pageNumber: number;
+};
+
+type BboxDims = {
+  pageWidthPx?: number;
+  pageHeightPx?: number;
+  naturalWidthPt?: number;
+  naturalHeightPt?: number;
+};
+
+type CssBox = {
+  left: string;
+  top: string;
+  width: string;
+  height: string;
+};
 
 // Mock react-pdf: render stub Document and Page components that just render their children
 vi.mock("react-pdf", () => ({
-  Document: ({ children, file, loading, error }: any) => (
+  Document: ({ children }: DocumentMockProps) => (
     <div data-testid="pdf-document">
       {children}
     </div>
   ),
-  Page: ({ children, pageNumber }: any) => (
+  Page: ({ children, pageNumber }: PageMockProps) => (
     // Do NOT call onLoadSuccess synchronously — it triggers setPageDims which
     // causes a render loop in jsdom. The text-preview strip tests don't need pageDims.
     <div data-testid={`pdf-page-${pageNumber}`}>
@@ -26,18 +54,25 @@ vi.mock("@/lib/pdfWorker", () => ({}));
 
 // Mock the bbox conversion utilities
 vi.mock("@/lib/bboxConversion", () => ({
-  findOverlayChunk: (chunks: any[], citation: any, pageNum: any) => {
+  findOverlayChunk: (
+    chunks: Array<ChunkManifestEntry>,
+    citation: SelectedCitation | null,
+    pageNum: number | null
+  ): ChunkManifestEntry | null => {
     if (!citation || !chunks || !pageNum) return null;
     // Return a mock chunk that matches the current page
     const matchingChunk = chunks.find(
-      (c: any) =>
+      (c: ChunkManifestEntry) =>
         c.page_start !== null &&
         pageNum >= c.page_start &&
         (!c.page_end || pageNum <= c.page_end)
     );
     return matchingChunk || null;
   },
-  bboxToCssBox: (bbox: [number, number, number, number], dims: any) => {
+  bboxToCssBox: (
+    bbox: [number, number, number, number],
+    dims: BboxDims
+  ): CssBox => {
     // Simple mock: just return proportional CSS values
     const [x0, top, x1, bottom] = bbox;
     const pageWidthPx = dims.pageWidthPx || 580;
@@ -52,11 +87,16 @@ vi.mock("@/lib/bboxConversion", () => ({
       height: `${((bottom - top) / naturalHeightPt) * pageHeightPx}px`,
     };
   },
-  isFullPageBbox: (bbox: [number, number, number, number], width: number, height: number) => {
-    // Consider full page if bbox covers >90% of the page
+  isFullPageBbox: (
+    bbox: [number, number, number, number],
+    width: number,
+    height: number
+  ): boolean => {
+    // Mirror real implementation: both axes independently must be >= 0.9
     const [x0, top, x1, bottom] = bbox;
-    const areaRatio = ((x1 - x0) * (bottom - top)) / (width * height);
-    return areaRatio > 0.9;
+    const widthRatio = (x1 - x0) / width;
+    const heightRatio = (bottom - top) / height;
+    return widthRatio >= 0.9 && heightRatio >= 0.9;
   },
 }));
 
