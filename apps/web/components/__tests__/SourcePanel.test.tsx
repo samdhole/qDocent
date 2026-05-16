@@ -11,23 +11,14 @@ vi.mock("react-pdf", () => ({
       {children}
     </div>
   ),
-  Page: ({ children, pageNumber, onLoadSuccess, width }: any) => {
-    // Simulate successful page load with normalized dimensions
-    if (onLoadSuccess) {
-      onLoadSuccess({
-        width: width || 580,
-        height: 700,
-        originalWidth: 612, // Letter width in points
-        originalHeight: 792, // Letter height in points
-      });
-    }
-    return (
-      <div data-testid={`pdf-page-${pageNumber}`}>
-        Page {pageNumber}
-        {children}
-      </div>
-    );
-  },
+  Page: ({ children, pageNumber }: any) => (
+    // Do NOT call onLoadSuccess synchronously — it triggers setPageDims which
+    // causes a render loop in jsdom. The text-preview strip tests don't need pageDims.
+    <div data-testid={`pdf-page-${pageNumber}`}>
+      Page {pageNumber}
+      {children}
+    </div>
+  ),
 }));
 
 // Mock the pdfWorker module (side-effect only)
@@ -254,7 +245,7 @@ describe("SourcePanel", () => {
 
     render(<SourcePanel citation={singlePageCitation} onClose={vi.fn()} />);
 
-    expect(screen.getByText("Page 5")).toBeInTheDocument();
+    expect(screen.getByText("Page 5", { selector: "p" })).toBeInTheDocument();
   });
 
   it("AC2: calls onClose when close button is clicked", async () => {
@@ -263,7 +254,8 @@ describe("SourcePanel", () => {
 
     render(<SourcePanel citation={mockCitation} onClose={onClose} />);
 
-    const closeButton = screen.getByRole("button", { name: "Close" });
+    // SheetContent adds its own close button; getAllByRole returns both — take the first (Sheet's built-in X)
+    const closeButton = screen.getAllByRole("button", { name: "Close" })[0];
     await user.click(closeButton);
 
     expect(onClose).toHaveBeenCalledTimes(1);
