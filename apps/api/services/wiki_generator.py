@@ -39,12 +39,15 @@ def _generate_page_content(
     notebook_id: str,
     r2r_collection_id: str,
     job_id: str,
+    all_pages: list[WikiPageSpec],
 ) -> None:
     """Retrieve chunks for one page, call Gemini, store the result. Called in thread pool.
 
     Uses r2r_client.rag_query (no conversation memory needed) — page generation is a
     one-shot retrieval. When the page declares source_doc_ids, scope by document IDs;
     otherwise fall back to the notebook's R2R collection scope.
+
+    all_pages: all WikiPageSpec objects in the wiki structure, used for cross-reference index.
     """
     page_log = logging.LoggerAdapter(log, {"job_id": job_id, "notebook_id": notebook_id})
     try:
@@ -58,7 +61,7 @@ def _generate_page_content(
         chunk_context = "\n\n".join(chunk_texts) if chunk_texts else "(No source material retrieved)"
 
         # Generate page markdown via Gemini
-        prompt = build_page_prompt(page, chunk_context)
+        prompt = build_page_prompt(page, chunk_context, all_pages=all_pages, notebook_id=notebook_id)
         llm = _make_llm()
         response = llm.invoke(prompt)
         raw_content = response.content if hasattr(response, "content") else str(response)
@@ -140,7 +143,7 @@ def generate_wiki(notebook_id: str, r2r_collection_id: str, job_id: str) -> None
         with ThreadPoolExecutor(max_workers=_MAX_WORKERS) as executor:
             futures = {
                 executor.submit(
-                    _generate_page_content, page, notebook_id, r2r_collection_id, job_id
+                    _generate_page_content, page, notebook_id, r2r_collection_id, job_id, structure.pages
                 ): page.slug
                 for page in structure.pages
             }

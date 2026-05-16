@@ -70,17 +70,60 @@ def build_structure_prompt(doc_manifest: list[dict]) -> str:
     )
 
 
-def build_page_prompt(page: WikiPageSpec, chunk_context: str) -> str:
+def build_page_prompt(
+    page: WikiPageSpec,
+    chunk_context: str,
+    all_pages: list[WikiPageSpec] | None = None,
+    notebook_id: str = "",
+) -> str:
     """Build the LLM prompt to generate a single wiki page in Markdown.
 
+    page: WikiPageSpec for the page to generate.
     chunk_context: retrieved text chunks joined by double newline.
+    all_pages: list of all pages in the wiki structure (optional, for cross-reference index).
+    notebook_id: notebook ID for constructing wiki page URLs (optional).
     """
+    # Build cross-reference index
+    cross_ref_lines = []
+    if all_pages and notebook_id:
+        for p in all_pages:
+            if p.slug == page.slug:
+                continue  # skip self
+            url = f"/notebooks/{notebook_id}/wiki/{p.slug}"
+            cross_ref_lines.append(f"- [{p.title}]({url})")
+
+    # Identify related pages for prominent callout
+    related_set = set(page.related_slugs)
+    related_lines = [
+        line for line in cross_ref_lines
+        if any(f"/wiki/{slug}" in line for slug in related_set)
+    ]
+
+    # Build cross-reference section
+    cross_ref_section = ""
+    if all_pages is not None and notebook_id:
+        cross_ref_section = (
+            f"Cross-reference index (other wiki pages you may link to):\n"
+            f"{chr(10).join(cross_ref_lines) if cross_ref_lines else '(none)'}\n\n"
+            f"Closely related pages (prefer linking to these when relevant):\n"
+            f"{chr(10).join(related_lines) if related_lines else '(none — link to any page above)'}\n\n"
+        )
+    elif all_pages == []:
+        # Graceful empty case
+        cross_ref_section = (
+            f"Cross-reference index (other wiki pages you may link to):\n"
+            f"(none)\n\n"
+            f"Closely related pages (prefer linking to these when relevant):\n"
+            f"(none — link to any page above)\n\n"
+        )
+
     return (
         f"You are an expert technical writer.\n"
         f"Write a comprehensive wiki page in Markdown about: **{page.title}**\n\n"
         f"Page description: {page.description}\n\n"
         f"Source material retrieved from the document corpus:\n"
         f"<source_material>\n{chunk_context}\n</source_material>\n\n"
+        f"{cross_ref_section}"
         f"Requirements for this page:\n"
         f"1. Start with a H1 heading: # {page.title}\n"
         f"2. Use H2 (##) and H3 (###) headings to organize content\n"
@@ -88,7 +131,9 @@ def build_page_prompt(page: WikiPageSpec, chunk_context: str) -> str:
         f"4. Include at least one Mermaid diagram if the content has structural relationships\n"
         f"5. Use Markdown tables to summarize key information\n"
         f"6. Ground every claim in the provided source material\n"
-        f"7. Write clear, professional technical prose\n"
-        f"8. End with a brief summary paragraph\n\n"
+        f"7. When you reference a topic covered by another wiki page, use a Markdown link from the cross-reference index above — e.g. [Overview](/notebooks/{notebook_id}/wiki/overview)\n"
+        f"8. Do NOT invent URLs — only link to pages listed in the cross-reference index\n"
+        f"9. Write clear, professional technical prose\n"
+        f"10. End with a brief summary paragraph\n\n"
         f"Generate ONLY the Markdown content for this page."
     )
