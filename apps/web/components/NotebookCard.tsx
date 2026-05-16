@@ -20,6 +20,15 @@ export default function NotebookCard({ notebook, onDelete }: Props) {
     <Card
       className="hover:shadow-md transition-shadow cursor-pointer"
       onClick={() => router.push(`/notebooks/${notebook.id}`)}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          e.stopPropagation();
+          router.push(`/notebooks/${notebook.id}`);
+        }
+      }}
     >
       <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
         <div className="flex items-center gap-2">
