@@ -48,7 +48,7 @@ export function Dropzone({ onFiles, disabled, accept = PDF_ONLY }: Props) {
           {isDragActive ? `Drop your files here` : `Drop files here, or click to browse`}
         </p>
         <p className="text-xs text-muted-foreground">
-          {accept === PDF_ONLY
+          {accept === PDF_ONLY /* Identity check: PDF_ONLY is a const, so === is correct */
             ? "PDFs only on this page. Open a Notebook to upload DOCX, PPTX, or URLs."
             : `Accepted: ${extensions}`}
         </p>
