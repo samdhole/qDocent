@@ -14,23 +14,17 @@ interface Props {
 
 export default function NotebookCard({ notebook, onDelete }: Props) {
   const [confirming, setConfirming] = useState(false);
-  const router = useRouter();
 
   return (
-    <Card
-      className="hover:shadow-md transition-shadow cursor-pointer"
-      onClick={() => router.push(`/notebooks/${notebook.id}`)}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          e.stopPropagation();
-          router.push(`/notebooks/${notebook.id}`);
-        }
-      }}
-    >
-      <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
+    <Card className="hover:shadow-md transition-shadow relative">
+      {/* Invisible overlaid link that makes the card area navigable without role="button" */}
+      <Link
+        href={`/notebooks/${notebook.id}`}
+        className="absolute inset-0 z-0"
+        aria-label={notebook.name}
+        tabIndex={-1}
+      />
+      <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2 relative z-10">
         <div className="flex items-center gap-2">
           <BookOpen className="h-4 w-4 text-muted-foreground" />
           <CardTitle className="text-sm font-medium">{notebook.name}</CardTitle>
@@ -67,7 +61,7 @@ export default function NotebookCard({ notebook, onDelete }: Props) {
           )
         )}
       </CardHeader>
-      <CardContent>
+      <CardContent className="relative z-10">
         <CardDescription className="text-xs line-clamp-2">
           {notebook.description ?? "No description"}
         </CardDescription>
@@ -76,7 +70,7 @@ export default function NotebookCard({ notebook, onDelete }: Props) {
             {notebook.document_count} {notebook.document_count === 1 ? "document" : "documents"}
           </p>
         )}
-        <Link href={`/notebooks/${notebook.id}`} className="mt-3 block">
+        <Link href={`/notebooks/${notebook.id}`} className="mt-3 block relative z-20">
           <Button variant="outline" size="sm" className="w-full">Open</Button>
         </Link>
       </CardContent>
