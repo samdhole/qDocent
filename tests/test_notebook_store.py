@@ -173,3 +173,46 @@ class TestMigration:
         nb = notebook_store.create_notebook("To Delete")
         notebook_store.delete_notebook(nb["id"])
         mock_r2r.delete_r2r_collection.assert_called_once_with("fake-collection-id")
+
+
+class TestDocumentCount:
+    def test_list_notebooks_includes_document_count_aggregation(self):
+        """Test that list_notebooks() returns document_count via LEFT JOIN aggregation."""
+        nb = notebook_store.create_notebook("With Docs")
+        notebook_store.add_document(nb["id"], "doc-1")
+        notebook_store.add_document(nb["id"], "doc-2")
+
+        notebooks = notebook_store.list_notebooks()
+        assert len(notebooks) == 1
+        assert notebooks[0]["document_count"] == 2
+
+    def test_list_notebooks_document_count_zero_for_empty_notebook(self):
+        """Test that a notebook with no documents returns document_count == 0 (not None)."""
+        nb = notebook_store.create_notebook("Empty NB")
+
+        notebooks = notebook_store.list_notebooks()
+        assert len(notebooks) == 1
+        assert notebooks[0]["document_count"] == 0
+        assert notebooks[0]["document_count"] is not None
+
+    def test_list_notebooks_document_count_multiple_notebooks(self):
+        """Test document_count is correctly aggregated across multiple notebooks."""
+        nb1 = notebook_store.create_notebook("NB 1")
+        nb2 = notebook_store.create_notebook("NB 2")
+        nb3 = notebook_store.create_notebook("NB 3")
+
+        notebook_store.add_document(nb1["id"], "doc-a")
+        notebook_store.add_document(nb1["id"], "doc-b")
+        notebook_store.add_document(nb2["id"], "doc-c")
+        # nb3 has no documents
+
+        notebooks = notebook_store.list_notebooks()
+        assert len(notebooks) == 3
+
+        nb1_row = next(n for n in notebooks if n["id"] == nb1["id"])
+        nb2_row = next(n for n in notebooks if n["id"] == nb2["id"])
+        nb3_row = next(n for n in notebooks if n["id"] == nb3["id"])
+
+        assert nb1_row["document_count"] == 2
+        assert nb2_row["document_count"] == 1
+        assert nb3_row["document_count"] == 0
