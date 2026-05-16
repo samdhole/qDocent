@@ -1,9 +1,9 @@
 [app]
 fast_llm = "gemini/gemini-2.5-flash"
 quality_llm = "gemini/gemini-2.5-flash"
-vlm = "gemini/gemini-2.0-flash"
-reasoning_llm = "gemini/gemini-2.0-flash"
-planning_llm = "gemini/gemini-2.0-flash"
+vlm = "gemini/gemini-2.5-flash"
+reasoning_llm = "gemini/gemini-2.5-flash"
+planning_llm = "gemini/gemini-2.5-flash"
 
 [auth]
 provider = "r2r"

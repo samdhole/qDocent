@@ -38,7 +38,7 @@ Figures embedded in PDFs are extracted, stored, and matched to answers — eithe
 | DOCX / PPTX | docling-slim |
 | URL ingestion | trafilatura |
 | PDF viewer | react-pdf (PDF.js) |
-| LLM / embeddings | Google Gemini (`gemini-2.5-flash` · `gemini-2.0-flash` · `gemini-3-flash-preview`, `gemini-embedding-2`) |
+| LLM / embeddings | Google Gemini (`gemini-2.5-flash` · `gemini-3-flash-preview`, `gemini-embedding-2`) |
 
 **Runtime:** Python 3.11 · Node.js 20 LTS · [uv](https://github.com/astral-sh/uv) · Docker 24+ (full R2R mode only)
 
@@ -179,7 +179,7 @@ R2R_CONFIG_NAME=full GEMINI_API_KEY=<key> \
   docker compose -f compose.full.yaml --profile postgres up -d
 ```
 
-R2R is configured via `r2r_gemini.toml`: `fast_llm` and `quality_llm` point at `gemini/gemini-2.5-flash`; `vlm`, `reasoning_llm`, and `planning_llm` point at `gemini/gemini-2.0-flash`; embeddings use `gemini/gemini-embedding-2` (3072-dim). Wiki generation, RAGAS eval, and suggested questions use `gemini-3-flash-preview` directly (separate code paths, not via R2R).
+R2R is configured via `r2r_gemini.toml`: all LLM slots point at `gemini/gemini-2.5-flash`; embeddings use `gemini/gemini-embedding-2` (3072-dim). Wiki generation, RAGAS eval, and suggested questions use `gemini-3-flash-preview` directly (separate code paths, not via R2R).
 
 ---
 
