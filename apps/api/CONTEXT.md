@@ -1,6 +1,6 @@
 # API Layer
 
-Last verified: 2026-05-15
+Last verified: 2026-05-16
 
 @status: active
 @issues: none
@@ -56,6 +56,7 @@ POST /ingest    → {status: "ok", result: {r2r, quality_report, document_id, fi
 POST /ingest/jobs → {job_id, status}
 GET  /ingest/jobs/{id} → {job_id, status, result?, error?}
 GET  /documents → {documents: [{document_id, source_file, source_url, size_bytes, updated_at}]}
+GET  /notebooks → {notebooks: [{id, name, description, r2r_collection_id, created_at, updated_at, document_count}]} (document_count is a LEFT JOIN COUNT over notebook_documents; 0 when no docs)
 GET  /documents/{id}/source → source PDF file
 GET  /documents/{id}/chunks → {document_id, chunks: [{chunk_index, page_start, page_end, bbox, section_path, text_preview}]}
 GET  /documents/{id}/questions → {document_id, questions: [str, ...]} (cache-first: serves questions.json when present; on miss, calls Gemini via question_generator, caches result; 404 if no chunks.json; empty list if GOOGLE_API_KEY unset or LLM fails)
