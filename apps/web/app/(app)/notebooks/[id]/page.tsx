@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import ConversationView from "@/components/ConversationView";
 import NotebookHeader from "@/components/NotebookHeader";
 import { Dropzone } from "@/components/Dropzone";
+import { NOTEBOOK_ACCEPT } from "@/lib/acceptedTypes";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Notebook } from "@/lib/types";
 
@@ -15,6 +16,13 @@ export default function NotebookPage() {
   const notebookId = params.id;
   const [notebook, setNotebook] = useState<Notebook | null>(null);
   const [notFound, setNotFound] = useState(false);
+  const [resumeConvId, setResumeConvId] = useState<string | undefined>();
+
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const resume = searchParams.get("resume");
+    if (resume) setResumeConvId(resume);
+  }, []);
 
   useEffect(() => {
     if (!notebookId) return;
@@ -56,6 +64,7 @@ export default function NotebookPage() {
           </summary>
           <div className="mt-2">
             <Dropzone
+              accept={NOTEBOOK_ACCEPT}
               onFiles={async (files) => {
                 for (const file of files) {
                   try {
@@ -78,7 +87,7 @@ export default function NotebookPage() {
         </details>
       </div>
       <div className="flex-1 min-h-0">
-        <ConversationView notebookId={notebookId} />
+        <ConversationView notebookId={notebookId} initialConversationId={resumeConvId} />
       </div>
     </div>
   );
