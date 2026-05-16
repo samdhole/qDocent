@@ -38,7 +38,7 @@ Figures embedded in PDFs are extracted, stored, and matched to answers — eithe
 | DOCX / PPTX | docling-slim |
 | URL ingestion | trafilatura |
 | PDF viewer | react-pdf (PDF.js) |
-| LLM / embeddings | Google Gemini (`gemini-3-flash-preview`, `gemini-embedding-2`) |
+| LLM / embeddings | Google Gemini (`gemini-2.5-flash` · `gemini-2.0-flash` · `gemini-3-flash-preview`, `gemini-embedding-001`) |
 
 **Runtime:** Python 3.11 · Node.js 20 LTS · [uv](https://github.com/astral-sh/uv) · Docker 24+ (full R2R mode only)
 
@@ -121,7 +121,7 @@ apps/web/ :3000    Next.js 16 App Router
   /notebooks/[id]   wiki tree nav + conversational chat
   /ask              standalone one-shot Q&A
   /documents        upload queue + source management
-  /evals            RAGAS results table
+  /demo             portfolio showcase (wiki · cited Q&A · figures · live chat)
      │
      ▼
 packages/evals/    RAGAS offline evaluation → reports/evals/
@@ -179,7 +179,7 @@ R2R_CONFIG_NAME=full GEMINI_API_KEY=<key> \
   docker compose -f compose.full.yaml --profile postgres up -d
 ```
 
-R2R is configured via `r2r_gemini.toml`: all LLM slots point at `gemini/gemini-3-flash-preview` via litellm; embeddings use `gemini/gemini-embedding-2` (3072-dim).
+R2R is configured via `r2r_gemini.toml`: `fast_llm` and `quality_llm` point at `gemini/gemini-2.5-flash`; `vlm`, `reasoning_llm`, and `planning_llm` point at `gemini/gemini-2.0-flash`; embeddings use `gemini/gemini-embedding-001`. Wiki generation, RAGAS eval, and suggested questions use `gemini-3-flash-preview` directly (separate code paths, not via R2R).
 
 ---
 
@@ -245,7 +245,7 @@ docquery/
 │   │                          notebook_store · wiki_store · wiki_generator
 │   │                          conversation_store · ingest_job_store · ragas_runner
 │   └── web/                   Next.js 16 UI
-│       ├── app/(app)/         route group (notebooks · ask · conversations · docs · evals)
+│       ├── app/(app)/         route group (notebooks · ask · conversations · docs · demo)
 │       ├── components/        AnswerCard · ConversationView · SourcePanel · CitationBadge
 │       │                      NotebookGrid · WikiPage · WikiTreeNav · SuggestedQuestions
 │       └── lib/               types · bboxConversion · remarkCitationBadges · useConversationStream
@@ -254,7 +254,7 @@ docquery/
 │   ├── evals/                 RAGAS harness (eval_dataset.yaml + run_ragas.py)
 │   └── workflows/             LangGraph support-triage + email-draft graphs
 ├── scripts/                   CLI utilities (ask · ingest · eval · demo-check · reset)
-├── tests/                     pytest suite (100+ test functions)
+├── tests/                     pytest suite (~614 test functions, ~50 test files)
 ├── data/
 │   ├── sample_docs/           Sample PDFs for local demo
 │   ├── documents/             Per-document artefacts (source PDF · chunks · questions)

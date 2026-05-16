@@ -119,7 +119,7 @@ Python: 3.11. Node.js: 20 LTS. Docker 24.0.0+ required for full R2R mode.
 > **First-time setup:** Copy `r2r_gemini.toml.example` → `r2r_gemini.toml` and set a real
 > `default_admin_password` before starting R2R. Never commit `r2r_gemini.toml` — it is gitignored.
 
-R2R is configured via `r2r_gemini.toml` at the project root. `fast_llm`, `quality_llm`, and `chunk_enrichment.generation_config.model` point at `gemini/gemini-2.5-flash`; `vlm`, `reasoning_llm`, and `planning_llm` point at `gemini/gemini-2.0-flash`; embeddings at `gemini/gemini-embedding-2` (3072-dim). **Do not switch the agent-path LLMs back to `gemini-3-flash-preview`** — it has a `thought_signature` bug that breaks R2R's multi-tool agent loop (used by `/conversations/*/messages` and the streaming variant via `/retrieval/agent`). RAGAS eval, wiki generation, and suggested-question generation still use `gemini-3-flash-preview` directly (separate code paths, not via R2R). Do not start R2R without this config or it will fall back to OpenAI defaults and fail.
+R2R is configured via `r2r_gemini.toml` at the project root. `fast_llm`, `quality_llm`, and `chunk_enrichment.generation_config.model` point at `gemini/gemini-2.5-flash`; `vlm`, `reasoning_llm`, and `planning_llm` point at `gemini/gemini-2.0-flash`; embeddings at `gemini/gemini-embedding-001`. **Do not switch the agent-path LLMs back to `gemini-3-flash-preview`** — it has a `thought_signature` bug that breaks R2R's multi-tool agent loop (used by `/conversations/*/messages` and the streaming variant via `/retrieval/agent`). RAGAS eval, wiki generation, and suggested-question generation still use `gemini-3-flash-preview` directly (separate code paths, not via R2R). Do not start R2R without this config or it will fall back to OpenAI defaults and fail.
 
 **Light mode** (fastest for local demo, recommended):
 
@@ -171,7 +171,7 @@ The `install/` directory ships first-run setup and daily-launch wrappers for cli
 
 ## Tests
 
-Pytest suite under `tests/` (currently ~48 test files, 537 test functions, including multi-format coverage: `test_format_router.py`, `test_docling_loader.py`, `test_web_loader.py`, plus URL-ingest cases in `test_route_notebooks.py`). Run with:
+Pytest suite under `tests/` (currently ~50 test files, ~614 test functions, including multi-format coverage: `test_format_router.py`, `test_docling_loader.py`, `test_web_loader.py`, plus URL-ingest cases in `test_route_notebooks.py`). Run with:
 
 ```bash
 .venv/Scripts/python.exe -m pytest tests/ -v   # Windows
