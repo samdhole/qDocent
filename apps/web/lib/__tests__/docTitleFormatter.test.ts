@@ -22,6 +22,7 @@ describe("formatDocTitle", () => {
     const result = formatDocTitle("a-very-long-filename-that-exceeds-40-chars.pdf")
     expect(result.length).toBeLessThanOrEqual(41) // 40 chars + "…"
     expect(result.endsWith("…")).toBe(true)
+    expect(result).not.toMatch(/ …$/)
   })
 
   it("does not truncate short titles (AC6.1)", () => {
