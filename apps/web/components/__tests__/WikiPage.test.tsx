@@ -32,11 +32,65 @@ describe("WikiPage", () => {
     render(
       <WikiPage title="T" content="text" sourceDocIds={["abc123def456"]} />
     );
-    expect(screen.getByText(/abc123def4/)).toBeInTheDocument();
+    expect(screen.getByText(/abc123de/)).toBeInTheDocument();
   });
 
   it("hides source section when sourceDocIds is empty", () => {
     render(<WikiPage title="T" content="text" sourceDocIds={[]} />);
     expect(screen.queryByText("SOURCE DOCUMENTS")).not.toBeInTheDocument();
+  });
+
+  it("renders resolved doc name as clickable badge", () => {
+    render(
+      <WikiPage
+        title="Test"
+        content="content"
+        sourceDocIds={["abc-123"]}
+        docNames={{ "abc-123": "report.pdf" }}
+      />
+    );
+    const badge = screen.getByRole("link", { name: "report.pdf" });
+    expect(badge).toHaveAttribute("href", expect.stringContaining("/documents/abc-123/source"));
+    expect(badge).toHaveAttribute("target", "_blank");
+  });
+
+  it("falls back to short ID when docName missing", () => {
+    render(
+      <WikiPage
+        title="Test"
+        content="content"
+        sourceDocIds={["deadbeef-1234-5678-abcd-000000000000"]}
+        docNames={{}}
+      />
+    );
+    expect(screen.getByText(/deadbeef/)).toBeInTheDocument();
+  });
+
+  it("wiki cross-links use Next.js Link without target blank", () => {
+    render(
+      <WikiPage
+        title="Test"
+        content="See [Architecture](/notebooks/nb-1/wiki/architecture) for details."
+        sourceDocIds={[]}
+        docNames={{}}
+      />
+    );
+    const link = screen.getByRole("link", { name: "Architecture" });
+    expect(link).toHaveAttribute("href", "/notebooks/nb-1/wiki/architecture");
+    expect(link).not.toHaveAttribute("target", "_blank");
+  });
+
+  it("external links open in new tab", () => {
+    render(
+      <WikiPage
+        title="Test"
+        content="Visit [Example](https://example.com) for more."
+        sourceDocIds={[]}
+        docNames={{}}
+      />
+    );
+    const link = screen.getByRole("link", { name: "Example" });
+    expect(link).toHaveAttribute("href", "https://example.com");
+    expect(link).toHaveAttribute("target", "_blank");
   });
 });

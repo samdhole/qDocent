@@ -41,9 +41,10 @@ function joinStructure(
 export default async function WikiSlugPage({ params }: Props) {
   const { id, slug } = await params;
 
-  const [wikiResp, pageResp] = await Promise.all([
+  const [wikiResp, pageResp, docsResp] = await Promise.all([
     fetch(`${API_BASE}/notebooks/${id}/wiki`, { cache: "no-store" }),
     fetch(`${API_BASE}/notebooks/${id}/wiki/${slug}`, { cache: "no-store" }),
+    fetch(`${API_BASE}/notebooks/${id}/documents`, { cache: "no-store" }),
   ]);
 
   if (!pageResp.ok) notFound();
@@ -60,6 +61,15 @@ export default async function WikiSlugPage({ params }: Props) {
     source_doc_ids: string[];
   };
 
+  const docNames: Record<string, string> = {};
+  if (docsResp.ok) {
+    const docsData = await docsResp.json() as { documents?: { document_id: string; source_file: string }[] };
+    for (const doc of docsData.documents ?? []) {
+      // Store just the basename (e.g. "robinhood-ars.pdf" not full path)
+      docNames[doc.document_id] = doc.source_file.split('/').at(-1) ?? doc.source_file;
+    }
+  }
+
   return (
     <div className="flex gap-8 p-6 min-h-screen">
       {structure && (
@@ -70,6 +80,7 @@ export default async function WikiSlugPage({ params }: Props) {
           title={page.title}
           content={page.content ?? ""}
           sourceDocIds={page.source_doc_ids ?? []}
+          docNames={docNames}
         />
         <div className="border-t border-border pt-6">
           <p className="text-sm font-medium text-muted-foreground mb-4">
