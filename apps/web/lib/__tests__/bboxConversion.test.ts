@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { bboxToCssBox, findOverlayChunk } from "@/lib/bboxConversion";
+import { bboxToCssBox, findOverlayChunk, isFullPageBbox } from "@/lib/bboxConversion";
 import type { ChunkManifestEntry, SelectedCitation } from "@/lib/types";
 
 describe("bboxToCssBox", () => {
@@ -80,5 +80,28 @@ describe("findOverlayChunk", () => {
   it("returns null when no chunk matches the page range", () => {
     const result = findOverlayChunk([chunk1], baseCitation, 99);
     expect(result).toBeNull();
+  });
+});
+
+describe("isFullPageBbox", () => {
+  it("returns true when bbox covers the full US-letter page exactly (AC3.4)", () => {
+    expect(isFullPageBbox([0, 0, 612, 792], 612, 792)).toBe(true);
+  });
+
+  it("returns true when bbox covers ≥90% of both dimensions (AC3.4)", () => {
+    // 95% coverage in width and height
+    expect(isFullPageBbox([0, 0, 582, 752], 612, 792)).toBe(true);
+  });
+
+  it("returns false when bbox is a precise text region (AC3.2)", () => {
+    expect(isFullPageBbox([72, 100, 540, 200], 612, 792)).toBe(false);
+  });
+
+  it("returns false when width is large but height is small (AC3.2)", () => {
+    expect(isFullPageBbox([0, 0, 612, 100], 612, 792)).toBe(false);
+  });
+
+  it("returns false when height is large but width is small (AC3.2)", () => {
+    expect(isFullPageBbox([0, 0, 100, 792], 612, 792)).toBe(false);
   });
 });

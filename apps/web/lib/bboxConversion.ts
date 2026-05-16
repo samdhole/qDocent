@@ -54,3 +54,17 @@ export function findOverlayChunk(
     ) ?? null
   );
 }
+
+// A bbox that covers ≥90% of both page dimensions is treated as "full page" —
+// the ingestion pipeline emits these for text chunks that span the body column.
+// Rendering a full-page overlay would obscure the content rather than highlight it.
+export function isFullPageBbox(
+  bbox: BBox,
+  naturalWidthPt: number,
+  naturalHeightPt: number,
+): boolean {
+  const [x0, top, x1, bottom] = bbox;
+  const widthRatio = (x1 - x0) / naturalWidthPt;
+  const heightRatio = (bottom - top) / naturalHeightPt;
+  return widthRatio >= 0.9 && heightRatio >= 0.9;
+}
