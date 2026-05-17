@@ -40,7 +40,6 @@ export default function WikiPage({ title, content, sourceDocIds, docNames }: Wik
   return (
     <div className="flex-1 min-w-0">
       <article className="prose prose-neutral dark:prose-invert max-w-none">
-        <h1>{title}</h1>
         <ReactMarkdown
           remarkPlugins={[remarkGfm]}
           components={markdownComponents}

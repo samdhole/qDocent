@@ -10,8 +10,8 @@ vi.mock("../MermaidDiagram", () => ({
 }));
 
 describe("WikiPage", () => {
-  it("renders the page title", () => {
-    render(<WikiPage title="Overview" content="Hello" sourceDocIds={[]} />);
+  it("renders the page title from markdown content", () => {
+    render(<WikiPage title="Overview" content={"# Overview\n\nHello"} sourceDocIds={[]} />);
     expect(
       screen.getByRole("heading", { name: "Overview" })
     ).toBeInTheDocument();
