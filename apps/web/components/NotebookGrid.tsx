@@ -5,8 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { BookOpen, PlusCircle } from "lucide-react";
+import { BookOpen, PlusCircle, FolderOpen } from "lucide-react";
 import NotebookCard from "@/components/NotebookCard";
+import { FolderImportDialog } from "@/components/FolderImportDialog";
 import type { Notebook } from "@/lib/types";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -18,6 +19,7 @@ export default function NotebookGrid() {
   const [newName, setNewName] = useState("");
   const [newDesc, setNewDesc] = useState("");
   const [creating, setCreating] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
 
   useEffect(() => {
     const ctrl = new AbortController();
@@ -88,9 +90,14 @@ export default function NotebookGrid() {
     <div className="p-6">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-semibold">Notebooks</h1>
-        <Button onClick={() => setShowCreate(true)}>
-          <PlusCircle className="mr-2 h-4 w-4" /> New Notebook
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setImportOpen(true)}>
+            <FolderOpen className="mr-2 h-4 w-4" /> 📂 Import Folder
+          </Button>
+          <Button onClick={() => setShowCreate(true)}>
+            <PlusCircle className="mr-2 h-4 w-4" /> New Notebook
+          </Button>
+        </div>
       </div>
 
       {notebooks.length === 0 ? (
@@ -133,6 +140,20 @@ export default function NotebookGrid() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <FolderImportDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        onImported={(notebookId) => {
+          setImportOpen(false);
+          // Reload notebooks list to show newly created notebook
+          const ctrl = new AbortController();
+          fetch(`${API}/notebooks`, { signal: ctrl.signal })
+            .then((r) => r.json())
+            .then((data: Notebook[]) => setNotebooks(data))
+            .catch(console.error);
+        }}
+      />
     </div>
   );
 }
