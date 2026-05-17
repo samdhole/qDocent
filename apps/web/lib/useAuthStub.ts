@@ -1,7 +1,7 @@
 // pattern: Imperative Shell
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 const AUTH_KEY = "qdocent.auth";
 
@@ -13,19 +13,21 @@ type AuthState = {
 const DEFAULT_STATE: AuthState = { isLoggedIn: false, username: "" };
 
 export function useAuthStub() {
-  const [auth, setAuth] = useState<AuthState>(() => {
-    if (typeof window === "undefined") return DEFAULT_STATE;
+  // Always start false on both server and client to avoid hydration mismatch.
+  // localStorage is read in useEffect (client-only) and synced into state.
+  const [auth, setAuth] = useState<AuthState>(DEFAULT_STATE);
+
+  useEffect(() => {
     try {
       const stored = localStorage.getItem(AUTH_KEY);
       if (stored) {
         const parsed = JSON.parse(stored) as AuthState;
-        if (parsed?.isLoggedIn) return parsed;
+        if (parsed?.isLoggedIn) setAuth(parsed);
       }
     } catch {
       // Corrupt or missing storage keeps the user logged out.
     }
-    return DEFAULT_STATE;
-  });
+  }, []);
 
   const login = useCallback((username: string) => {
     const next: AuthState = { isLoggedIn: true, username };
