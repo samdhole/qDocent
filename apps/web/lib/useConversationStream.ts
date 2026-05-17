@@ -15,8 +15,11 @@ interface SendMessageOpts {
 
 export type StreamPhase = "idle" | "searching" | "found_results" | "generating";
 
-export function useConversationStream({ persist = true }: { persist?: boolean } = {}) {
-  const [conversationId, setConversationId] = useState<string | null>(null);
+export function useConversationStream({
+  persist = true,
+  initialConversationId,
+}: { persist?: boolean; initialConversationId?: string } = {}) {
+  const [conversationId, setConversationId] = useState<string | null>(initialConversationId ?? null);
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
     if (!persist || typeof window === "undefined") return [];
     try {

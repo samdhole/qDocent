@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import ConversationView from "@/components/ConversationView";
 import NotebookHeader from "@/components/NotebookHeader";
@@ -14,7 +14,9 @@ const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 export default function NotebookPage() {
   const params = useParams<{ id: string }>();
+  const searchParams = useSearchParams();
   const notebookId = params.id;
+  const resumeConvId = searchParams.get("resume") ?? undefined;
   const [notebook, setNotebook] = useState<Notebook | null>(null);
   const [notFound, setNotFound] = useState(false);
 
@@ -82,7 +84,7 @@ export default function NotebookPage() {
         </details>
       </div>
       <div className="flex-1 min-h-0">
-        <ConversationView notebookId={notebookId} />
+        <ConversationView notebookId={notebookId} initialConversationId={resumeConvId} />
       </div>
     </div>
   );

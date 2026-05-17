@@ -44,13 +44,18 @@ function phaseLabel(phase: StreamPhase): string {
 interface ConversationViewProps {
   notebookId?: string;
   documentIds?: string[];
+  initialConversationId?: string;
 }
 
 export default function ConversationView({
   notebookId,
   documentIds,
+  initialConversationId,
 }: ConversationViewProps = {}) {
-  const { messages, pending, phase, partialText, sendMessage, reset } = useConversationStream({ persist: !notebookId });
+  const { messages, pending, phase, partialText, sendMessage, reset } = useConversationStream({
+    persist: !notebookId,
+    initialConversationId,
+  });
   const [queryMode, setQueryMode] = useQueryMode();
   const [documents, setDocuments] = useState<SourceDocument[]>([]);
   const [selectedCitation, setSelectedCitation] = useState<SelectedCitation | null>(null);

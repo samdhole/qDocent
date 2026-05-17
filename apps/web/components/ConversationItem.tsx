@@ -18,8 +18,8 @@ export default function ConversationItem({
   notebookName,
 }: ConversationItemProps) {
   const href = conversation.notebook_id
-    ? `/notebooks/${conversation.notebook_id}`
-    : '/ask';
+    ? `/notebooks/${conversation.notebook_id}?resume=${conversation.r2r_conv_id}`
+    : `/ask`;
 
   const date = new Date(conversation.created_at).toLocaleString(undefined, {
     dateStyle: 'medium',
