@@ -88,6 +88,7 @@ describe("useBatchUpload", () => {
       timeout: 2000,
     });
 
+    expect(maxConcurrent).toBeGreaterThan(1);
     expect(maxConcurrent).toBeLessThanOrEqual(4);
     expect(result.current.done).toBe(8);
   });
@@ -126,9 +127,14 @@ describe("useBatchUpload", () => {
 
   it("aborts in-flight requests on unmount", async () => {
     const resolveAll: Array<() => void> = [];
+    let capturedSignal: AbortSignal | undefined;
+
     mockFetch.mockImplementation(
-      () =>
+      (_url: string, options?: RequestInit) =>
         new Promise<{ ok: boolean }>((resolve) => {
+          if (options?.signal) {
+            capturedSignal = options.signal;
+          }
           resolveAll.push(() => resolve({ ok: true }));
         })
     );
@@ -139,9 +145,11 @@ describe("useBatchUpload", () => {
     });
 
     expect(result.current.batchStatus).toBe("running");
-    // Unmount should abort in-flight requests without throwing
+    // Unmount should abort in-flight requests
     unmount();
     resolveAll.forEach((r) => r());
-    // No assertion needed — test passes if unmount doesn't throw/warn
+
+    // Verify the AbortController was triggered
+    expect(capturedSignal?.aborted).toBe(true);
   });
 });
