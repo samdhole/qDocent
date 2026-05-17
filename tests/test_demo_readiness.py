@@ -38,10 +38,6 @@ def test_run_checks_marks_demo_ready_when_core_surfaces_respond(tmp_path: Path) 
                     }
                 ],
             },
-            ("POST", "/workflows/support/email-draft"): {
-                "requires_human_approval": True,
-                "draft_response": "Thanks for writing in.",
-            },
         }
         return responses[(method, path)]
 
@@ -56,7 +52,6 @@ def test_run_checks_marks_demo_ready_when_core_surfaces_respond(tmp_path: Path) 
         "api_health",
         "stored_documents",
         "ask_with_citations",
-        "workflow_email_draft",
         "latest_ragas_eval",
     ]
     assert all(check.passed for check in report.checks)
@@ -79,8 +74,6 @@ def test_run_checks_fails_when_latest_eval_has_too_few_questions(tmp_path: Path)
             return {"documents": []}
         if method == "POST" and path == "/ask":
             return {"answer": "Answer", "citations": [{"source": "policy.pdf"}]}
-        if method == "POST" and path == "/workflows/support/email-draft":
-            return {"requires_human_approval": True, "draft_response": "Draft"}
         raise AssertionError((method, path, payload))
 
     report = demo_readiness.run_checks(

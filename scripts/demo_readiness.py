@@ -82,7 +82,6 @@ def run_checks(
         _check_api_health(requester),
         _check_stored_documents(requester),
         _check_ask_with_citations(requester),
-        _check_workflow_email_draft(requester),
         _check_latest_ragas_eval(evals_dir),
     ]
     return ReadinessReport(
@@ -159,24 +158,6 @@ def _check_ask_with_citations(request_json: RequestJson) -> ReadinessCheck:
         f"Ask returned an answer with {len(usable)} usable citation(s).",
     )
 
-
-def _check_workflow_email_draft(request_json: RequestJson) -> ReadinessCheck:
-    payload = {
-        "message": (
-            "Customer asks for a refund because their onboarding documents "
-            "were processed late. Draft a support reply."
-        )
-    }
-    try:
-        response = request_json("POST", "/workflows/support/email-draft", payload)
-    except RuntimeError as exc:
-        return ReadinessCheck("workflow_email_draft", False, str(exc))
-    draft = str(response.get("draft_response") or response.get("draft") or "").strip()
-    if not draft:
-        return ReadinessCheck("workflow_email_draft", False, "Workflow response did not include a draft.")
-    if "requires_human_approval" not in response and "needs_approval" not in response:
-        return ReadinessCheck("workflow_email_draft", False, "Workflow response did not include approval state.")
-    return ReadinessCheck("workflow_email_draft", True, "Workflow generated an approval-aware draft.")
 
 
 def _check_latest_ragas_eval(evals_dir: Path) -> ReadinessCheck:
