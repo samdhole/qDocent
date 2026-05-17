@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import ConversationView from "@/components/ConversationView";
 import NotebookHeader from "@/components/NotebookHeader";
 import { Dropzone } from "@/components/Dropzone";
+import { UrlIngestInput } from "@/components/UrlIngestInput";
 import { NOTEBOOK_ACCEPT } from "@/lib/acceptedTypes";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Notebook } from "@/lib/types";
@@ -76,6 +77,7 @@ export default function NotebookPage() {
                 }
               }}
             />
+            <UrlIngestInput notebookId={notebookId} />
           </div>
         </details>
       </div>
