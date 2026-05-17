@@ -285,7 +285,7 @@ describe("ChatInput", () => {
 
       const input = screen.getByRole("combobox") as HTMLInputElement
       // Initial placeholder
-      expect(input.placeholder).toBe("What is the refund policy?")
+      expect(input.placeholder).toBe("Ask a question… or type # to attach a specific document")
 
       // Attach a document
       await user.type(input, "#ref")

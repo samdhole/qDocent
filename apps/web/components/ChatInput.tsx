@@ -170,7 +170,7 @@ export function ChatInput({ pending, documents, onSubmit }: Props) {
           value={text}
           onChange={handleChange}
           onKeyDown={handleKeyDown}
-          placeholder={attachedDocs.length > 0 ? "Ask about selected documents..." : "Ask a question about your documents..."}
+          placeholder={attachedDocs.length > 0 ? "Ask about selected documents..." : "Ask a question… or type # to attach a specific document"}
           disabled={pending}
           role="combobox"
           aria-haspopup="listbox"
