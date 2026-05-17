@@ -43,7 +43,7 @@ export function useBatchUpload(options?: {
       setItems(snapshot);
       setBatchStatus("running");
 
-      // Shared mutable counters — safe in JS (single-threaded event loop)
+      // Per-invocation counters — safe because each start() creates a new closure scope.
       let index = 0;
       let inFlight = 0;
       let settled = 0;

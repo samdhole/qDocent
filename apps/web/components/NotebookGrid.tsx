@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { BookOpen, PlusCircle, FolderOpen } from "lucide-react";
+import { BookOpen, PlusCircle } from "lucide-react";
 import NotebookCard from "@/components/NotebookCard";
 import { FolderImportDialog } from "@/components/FolderImportDialog";
 import type { Notebook } from "@/lib/types";
@@ -89,7 +89,7 @@ export default function NotebookGrid() {
         <h1 className="text-2xl font-semibold">Notebooks</h1>
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={() => setImportOpen(true)}>
-            <FolderOpen className="mr-2 h-4 w-4" /> 📂 Import Folder
+            📂 Import Folder
           </Button>
           <Button onClick={() => setShowCreate(true)}>
             <PlusCircle className="mr-2 h-4 w-4" /> New Notebook
@@ -141,7 +141,7 @@ export default function NotebookGrid() {
       <FolderImportDialog
         open={importOpen}
         onOpenChange={setImportOpen}
-        onImported={(notebookId) => {
+        onImported={(_notebookId) => {
           setImportOpen(false);
           reloadNotebooks();
         }}

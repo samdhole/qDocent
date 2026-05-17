@@ -7,6 +7,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -143,6 +144,9 @@ export function FolderImportDialog({ open, onOpenChange, onImported }: Props) {
             {step === "progress" && "Importing Files…"}
             {step === "done" && "Import Complete"}
           </DialogTitle>
+          <DialogDescription className="sr-only">
+            Import files from a local folder into a new notebook.
+          </DialogDescription>
         </DialogHeader>
 
         {step === "pick" && (
