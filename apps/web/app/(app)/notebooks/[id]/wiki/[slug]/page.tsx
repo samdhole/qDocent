@@ -71,25 +71,27 @@ export default async function WikiSlugPage({ params }: Props) {
   }
 
   return (
-    <div className="flex gap-8 p-6 min-h-screen">
+    <div className="flex gap-8 p-6">
       {structure && (
         <WikiTreeNav notebookId={id} structure={structure} activeSlug={slug} />
       )}
-      <div className="flex-1 flex flex-col gap-8 min-w-0">
+      <div className="flex-1 min-w-0">
         <WikiPage
           title={page.title}
           content={page.content ?? ""}
           sourceDocIds={page.source_doc_ids ?? []}
           docNames={docNames}
         />
-        <div className="border-t border-border pt-6">
+        <div className="border-t border-border pt-6 mt-8">
           <p className="text-sm font-medium text-muted-foreground mb-4">
             Ask about this page
           </p>
-          <ConversationView
-            notebookId={id}
-            documentIds={page.source_doc_ids ?? []}
-          />
+          <div className="h-[520px]">
+            <ConversationView
+              notebookId={id}
+              documentIds={page.source_doc_ids ?? []}
+            />
+          </div>
         </div>
       </div>
     </div>

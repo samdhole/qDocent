@@ -78,7 +78,7 @@ export default function DocumentsPage() {
     <div className="max-w-3xl mx-auto p-6 md:p-8 space-y-6">
       <header>
         <h1 className="text-2xl font-semibold">Documents</h1>
-        <p className="text-sm text-muted-foreground mt-1">Drag and drop PDFs to ingest into R2R.</p>
+        <p className="text-sm text-muted-foreground mt-1">Upload PDFs here. Open a Notebook to add DOCX, PPTX, or URLs.</p>
       </header>
 
       <Dropzone onFiles={enqueue} />
