@@ -172,6 +172,27 @@ describe("FolderImportDialog", () => {
     });
   });
 
+  it("blocks dialog close while upload is running (AC1.9)", async () => {
+    const props = defaultProps();
+    const { rerender } = render(<FolderImportDialog {...props} />);
+
+    // Move directly to progress step by setting batch state to running
+    mockBatchState.batchStatus = "running";
+    rerender(<FolderImportDialog {...props} />);
+
+    // Clear any calls from render
+    props.onOpenChange.mockClear();
+
+    // Try to close the dialog via handleOpenChange (as Dialog X button would do)
+    // In a real scenario, this would come from the Dialog's onOpenChange handler
+    // We simulate it by calling the logic: when running, handleOpenChange should return early
+    const user = userEvent.setup();
+    await user.keyboard("{Escape}");
+
+    // onOpenChange should NOT have been called with false because handleOpenChange returns early
+    expect(props.onOpenChange).not.toHaveBeenCalledWith(false);
+  });
+
   it("Generate Wiki fires POST /notebooks/{id}/wiki fire-and-forget and closes dialog (AC1.7)", async () => {
     const user = userEvent.setup();
     const props = defaultProps();

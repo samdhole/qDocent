@@ -29,7 +29,9 @@ const VALID_EXTS = new Set(
 );
 
 function isValidFile(file: File): boolean {
-  const ext = "." + file.name.split(".").pop()?.toLowerCase();
+  const parts = file.name.split(".");
+  if (parts.length < 2) return false;
+  const ext = "." + parts.pop()!.toLowerCase();
   return VALID_EXTS.has(ext);
 }
 
@@ -40,7 +42,6 @@ export function FolderImportDialog({ open, onOpenChange, onImported }: Props) {
   const [step, setStep] = useState<Step>("pick");
   const [validFiles, setValidFiles] = useState<Array<File>>([]);
   const [filteredCount, setFilteredCount] = useState(0);
-  const [folderName, setFolderName] = useState("");
   const [notebookName, setNotebookName] = useState("");
   const [notebookDesc, setNotebookDesc] = useState("");
   const [createError, setCreateError] = useState<string | null>(null);
@@ -63,7 +64,6 @@ export function FolderImportDialog({ open, onOpenChange, onImported }: Props) {
       setStep("pick");
       setValidFiles([]);
       setFilteredCount(0);
-      setFolderName("");
       setNotebookName("");
       setNotebookDesc("");
       setCreateError(null);
@@ -83,7 +83,6 @@ export function FolderImportDialog({ open, onOpenChange, onImported }: Props) {
     if (valid.length > 0) {
       const rel = (valid[0] as File & { webkitRelativePath?: string }).webkitRelativePath ?? "";
       const folder = rel.split("/")[0] ?? "";
-      setFolderName(folder);
       setNotebookName(folder);
     }
   };

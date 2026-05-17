@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -20,6 +20,13 @@ export default function NotebookGrid() {
   const [newDesc, setNewDesc] = useState("");
   const [creating, setCreating] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+
+  const reloadNotebooks = useCallback(() => {
+    fetch(`${API}/notebooks`)
+      .then((r) => r.json())
+      .then((data: Notebook[]) => setNotebooks(data))
+      .catch(console.error);
+  }, []);
 
   useEffect(() => {
     const ctrl = new AbortController();
@@ -44,12 +51,7 @@ export default function NotebookGrid() {
         setShowCreate(false);
         setNewName("");
         setNewDesc("");
-        // Reload notebooks
-        const reloadCtrl = new AbortController();
-        fetch(`${API}/notebooks`, { signal: reloadCtrl.signal })
-          .then((r) => r.json())
-          .then((data: Notebook[]) => setNotebooks(data))
-          .catch(console.error);
+        reloadNotebooks();
       } else {
         toast.error(`Failed to create notebook: ${resp.status}`);
       }
@@ -67,12 +69,7 @@ export default function NotebookGrid() {
         toast.error(`Failed to delete notebook: ${resp.status}`);
         return;
       }
-      // Reload notebooks
-      const reloadCtrl = new AbortController();
-      fetch(`${API}/notebooks`, { signal: reloadCtrl.signal })
-        .then((r) => r.json())
-        .then((data: Notebook[]) => setNotebooks(data))
-        .catch(console.error);
+      reloadNotebooks();
     } catch {
       toast.error("Failed to delete notebook");
     }
@@ -146,12 +143,7 @@ export default function NotebookGrid() {
         onOpenChange={setImportOpen}
         onImported={(notebookId) => {
           setImportOpen(false);
-          // Reload notebooks list to show newly created notebook
-          const ctrl = new AbortController();
-          fetch(`${API}/notebooks`, { signal: ctrl.signal })
-            .then((r) => r.json())
-            .then((data: Notebook[]) => setNotebooks(data))
-            .catch(console.error);
+          reloadNotebooks();
         }}
       />
     </div>
